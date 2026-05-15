@@ -683,14 +683,14 @@
                 <div class="stat-icon" style="background: rgba(67, 24, 255, 0.1); color: var(--primary-color);">
                     <i class="bi bi-people-fill"></i>
                 </div>
-                <div class="stat-value" id="subscriber-count">-</div>
+                <div class="stat-value" id="subscriber-count">{{ subscriber_count }}</div>
                 <div class="stat-label">Subscribers</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon" style="background: rgba(5, 205, 153, 0.1); color: var(--success-color);">
                     <i class="bi bi-send-fill"></i>
                 </div>
-                <div class="stat-value" id="sent-count">-</div>
+                <div class="stat-value" id="sent-count">{{ sent_count }}</div>
                 <div class="stat-label">Newsletters Sent</div>
             </div>
             <div class="stat-card">
@@ -913,26 +913,16 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function loadStats() {
+    // Counts already rendered server-side; just check email service config
     try {
         const response = await fetch('/api/newsletter/status');
         const data = await response.json();
-
-        document.getElementById('subscriber-count').textContent = data.subscriber_count || 0;
 
         if (!data.email_service?.configured) {
             document.getElementById('setup-alert').style.display = 'flex';
         }
     } catch (err) {
         console.error('Stats error:', err);
-    }
-
-    // Load history count
-    try {
-        const historyRes = await fetch('/api/newsletter/history');
-        const historyData = await historyRes.json();
-        document.getElementById('sent-count').textContent = historyData.history?.length || 0;
-    } catch (err) {
-        document.getElementById('sent-count').textContent = 0;
     }
 }
 

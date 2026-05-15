@@ -56,18 +56,20 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- Bootstrap Icons -->
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-    <!-- Site Styles -->
+    <!-- Critical Site Styles (preloaded for faster rendering) -->
+    <link rel="preload" href="{{ url_for('static', filename='css/site/site.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/site/header.css') }}" as="style">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/site/site.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/site/header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/site/footer.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/site/animations.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/site/search-agent.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/site/animations.css') }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/site/search-agent.css') }}" media="print" onload="this.media='all'">
 
     <!-- Dynamic Primary Color -->
     <style>
@@ -106,12 +108,12 @@
     <!-- Search Agent -->
     {% include 'site/partials/search_agent.html' %}
 
-    <!-- Site JavaScript -->
-    <script src="{{ url_for('static', filename='js/site/site.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/site/header.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/site/footer.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/site/animations.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/site/search-agent.js') }}"></script>
+    <!-- Site JavaScript (deferred to not block rendering) -->
+    <script src="{{ url_for('static', filename='js/site/site.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/site/header.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/site/footer.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/site/animations.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/site/search-agent.js') }}" defer></script>
 
     {% block extra_js %}{% endblock %}
 

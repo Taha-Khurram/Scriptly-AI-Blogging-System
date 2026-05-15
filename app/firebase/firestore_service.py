@@ -3,6 +3,7 @@ from app.firebase.firebase_admin import FirebaseLoader
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from app.utils.cache import cache
+from app.utils.retry import retry_on_unavailable
 
 class FirestoreService:
     def __init__(self):
@@ -13,6 +14,7 @@ class FirestoreService:
 
     # ---------------- BLOG METHODS ----------------
 
+    @retry_on_unavailable
     def get_blog_by_id(self, blog_id):
         """Fetches a blog and ensures content is a string so TinyMCE can display it."""
         try:
@@ -161,6 +163,7 @@ class FirestoreService:
     #         return False
     
 
+    @retry_on_unavailable
     def get_blogs_by_status(self, status, user_id):
         """Filters blogs by status AND author."""
         try:
@@ -299,13 +302,19 @@ class FirestoreService:
     def get_all_blogs_filtered(self, user_ids, status_filter='all', category_filter='all',
                                 search='', date_from='', date_to='', page=1, per_page=10):
         try:
-            # Build user name lookup map
-            user_name_map = {}
-            for uid in user_ids:
-                user_doc = self.db.collection(self.user_collection).document(uid).get()
-                if user_doc.exists:
-                    u = user_doc.to_dict()
-                    user_name_map[uid] = u.get('name') or u.get('email', '').split('@')[0] or 'Unknown'
+            from app.utils.parallel import run_parallel_simple
+
+            # Batch-fetch all user names in parallel (instead of N sequential calls)
+            def fetch_user_name(uid):
+                doc = self.db.collection(self.user_collection).document(uid).get()
+                if doc.exists:
+                    u = doc.to_dict()
+                    return (uid, u.get('name') or u.get('email', '').split('@')[0] or 'Unknown')
+                return (uid, 'Unknown')
+
+            user_tasks = [(fetch_user_name, (uid,)) for uid in user_ids]
+            user_results = run_parallel_simple(user_tasks, max_workers=min(len(user_ids), 10))
+            user_name_map = {uid: name for uid, name in user_results if uid}
 
             all_blogs = []
             for i in range(0, len(user_ids), 30):
@@ -456,6 +465,7 @@ class FirestoreService:
     #         return []
     
     
+    @retry_on_unavailable
     def get_all_categories(self, user_id=None, limit=None, use_cache=True):
         """
         Fetch all categories for the user's team (stored under site owner).
@@ -852,37 +862,24 @@ class FirestoreService:
                 user_data["created_by"] = user_data.get("created_by", None)
                 user_data["last_login"] = firestore.SERVER_TIMESTAMP
                 user_ref.set(user_data)
-
-                try:
-                    from app.services.google_sheets_service import GoogleSheetsService
-                    sheets = GoogleSheetsService.get_instance()
-                    sid = GoogleSheetsService.get_spreadsheet_id_for_user(user_id)
-                    sheets.sync_user(user_id, user_data.get('name', ''), user_data.get('email', ''),
-                                     user_data['role'], user_data.get('created_by', ''), spreadsheet_id=sid)
-                except Exception:
-                    pass
-
                 return user_data
             else:
                 user_ref.update({"last_login": firestore.SERVER_TIMESTAMP})
-                existing = existing_user.to_dict()
-
-                try:
-                    from app.services.google_sheets_service import GoogleSheetsService
-                    from datetime import datetime
-                    sheets = GoogleSheetsService.get_instance()
-                    sid = GoogleSheetsService.get_spreadsheet_id_for_user(user_id)
-                    sheets.sync_user(user_id, existing.get('name', ''), existing.get('email', ''),
-                                     existing.get('role', ''), existing.get('created_by', ''),
-                                     existing.get('created_at'), datetime.utcnow(), spreadsheet_id=sid)
-                except Exception:
-                    pass
-
-                return existing
+                return existing_user.to_dict()
         except Exception as e:
             print(f"❌ Error saving user: {e}")
             return None
 
+    def update_last_login(self, user_id):
+        """Update last_login timestamp (fire-and-forget)."""
+        try:
+            self.db.collection(self.user_collection).document(user_id).update({
+                "last_login": firestore.SERVER_TIMESTAMP
+            })
+        except Exception:
+            pass
+
+    @retry_on_unavailable
     def get_user_by_id(self, user_id):
         """Gets a user document by their ID."""
         try:
@@ -1019,23 +1016,33 @@ class FirestoreService:
             print(f"❌ Error fetching invitations: {e}")
             return []
 
+    @retry_on_unavailable
     def get_published_count(self, user_id):
         """Get count of published blogs for a site owner (includes team members' blogs)."""
         try:
-            count_query = self.db.collection(self.collection_name)\
-                                .where(filter=FieldFilter('site_owner_id', '==', user_id))\
-                                .where(filter=FieldFilter('status', '==', 'PUBLISHED'))\
-                                .count()
-            count_result = count_query.get()
-            site_owner_count = count_result[0][0].value
+            from app.utils.parallel import run_parallel_simple
 
-            fallback_query = self.db.collection(self.collection_name)\
-                                .where(filter=FieldFilter('author_id', '==', user_id))\
-                                .where(filter=FieldFilter('status', '==', 'PUBLISHED'))\
-                                .count()
-            fallback_result = fallback_query.get()
-            author_count = fallback_result[0][0].value
+            def count_by_site_owner():
+                q = self.db.collection(self.collection_name)\
+                    .where(filter=FieldFilter('site_owner_id', '==', user_id))\
+                    .where(filter=FieldFilter('status', '==', 'PUBLISHED'))\
+                    .count()
+                return q.get()[0][0].value
 
+            def count_by_author():
+                q = self.db.collection(self.collection_name)\
+                    .where(filter=FieldFilter('author_id', '==', user_id))\
+                    .where(filter=FieldFilter('status', '==', 'PUBLISHED'))\
+                    .count()
+                return q.get()[0][0].value
+
+            results = run_parallel_simple([
+                (count_by_site_owner, ()),
+                (count_by_author, ()),
+            ], max_workers=2)
+
+            site_owner_count = results[0] or 0
+            author_count = results[1] or 0
             return max(site_owner_count, author_count)
         except Exception as e:
             print(f"Error getting published blogs count: {e}")
@@ -1268,10 +1275,16 @@ class FirestoreService:
 
     # ---------------- OPTIMIZED BATCH METHODS ----------------
 
+    @retry_on_unavailable
     def get_dashboard_data(self, user_id):
         """
         Fetch dashboard data for a regular user (their own blogs only).
         """
+        cache_key = f"dashboard:{user_id}"
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
         from app.utils.parallel import run_parallel_simple
 
         try:
@@ -1287,7 +1300,7 @@ class FirestoreService:
 
             results = run_parallel_simple(queries, max_workers=7)
 
-            return {
+            data = {
                 "published_count": results[0] or 0,
                 "drafts": results[1] or [],
                 "pending": results[2] or [],
@@ -1296,6 +1309,8 @@ class FirestoreService:
                 "categories": results[5] or [],
                 "recent_activity": results[6] or [],
             }
+            cache.set(cache_key, data, ttl=180)
+            return data
         except Exception as e:
             print(f"Error fetching dashboard data: {e}")
             return {
@@ -1308,10 +1323,15 @@ class FirestoreService:
                 "recent_activity": [],
             }
 
+    @retry_on_unavailable
     def get_admin_dashboard_data(self, admin_id):
         """
         Fetch dashboard data for admin including all team members' blogs.
         """
+        cache_key = f"admin_dashboard:{admin_id}"
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
         from app.utils.parallel import run_parallel_simple
 
         try:
@@ -1382,7 +1402,7 @@ class FirestoreService:
 
             results = run_parallel_simple(queries, max_workers=7)
 
-            return {
+            data = {
                 "published_count": results[0] or 0,
                 "drafts": results[1] or [],
                 "pending": results[2] or [],
@@ -1391,6 +1411,8 @@ class FirestoreService:
                 "categories": results[5] or [],
                 "recent_activity": results[6] or [],
             }
+            cache.set(cache_key, data, ttl=180)
+            return data
         except Exception as e:
             print(f"Error fetching admin dashboard data: {e}")
             return {
@@ -1416,6 +1438,7 @@ class FirestoreService:
             "updated_at": datetime.utcnow()
         }
 
+    @retry_on_unavailable
     def get_app_settings(self):
         """Fetches app-level settings from Firestore."""
         try:
@@ -1975,6 +1998,7 @@ For questions about these Terms, contact us at {contact_email}.
             print(f"❌ Error updating site settings: {e}")
             return False
 
+    @retry_on_unavailable
     def get_published_blogs(self, user_id, limit=20):
         """
         Fetches published blogs for the public site.
@@ -1982,7 +2006,7 @@ For questions about these Terms, contact us at {contact_email}.
         Filters by site_owner_id to include blogs from all team members.
         Falls back to author_id for backwards compatibility with older blogs.
         Uses in-memory cache with 2-minute TTL to reduce Firestore queries.
-        Auto-generates slugs for existing blogs that don't have them.
+        Runs both queries in parallel for faster response times.
         """
         cache_key = f"published_blogs:{user_id}:{limit}"
         cached = cache.get(cache_key)
@@ -1990,35 +2014,14 @@ For questions about these Terms, contact us at {contact_email}.
             return cached
 
         try:
-            blogs = []
-            blog_ids = set()
+            from app.utils.parallel import run_parallel_simple
 
-            # Fetch by site_owner_id (no order_by to avoid composite index)
-            site_owner_query = self.db.collection(self.collection_name)\
-                .where(filter=FieldFilter('site_owner_id', '==', user_id))\
-                .where(filter=FieldFilter('status', '==', 'PUBLISHED'))
-
-            for doc in site_owner_query.stream():
-                data = doc.to_dict()
-                data['id'] = doc.id
-                blog_ids.add(doc.id)
-                # Process content for display
-                raw_content = data.get('content', '')
-                if isinstance(raw_content, dict):
-                    data['content'] = raw_content
-                else:
-                    data['content'] = {'body': str(raw_content) if raw_content else ''}
-                # Ensure slug exists (auto-migrate if needed)
-                data = self._ensure_blog_slug(data, doc.id)
-                blogs.append(data)
-
-            # Fallback: also fetch by author_id for older blogs without site_owner_id
-            fallback_query = self.db.collection(self.collection_name)\
-                .where(filter=FieldFilter('author_id', '==', user_id))\
-                .where(filter=FieldFilter('status', '==', 'PUBLISHED'))
-
-            for doc in fallback_query.stream():
-                if doc.id not in blog_ids:  # Avoid duplicates
+            def _fetch_by_site_owner():
+                results = []
+                query = self.db.collection(self.collection_name)\
+                    .where(filter=FieldFilter('site_owner_id', '==', user_id))\
+                    .where(filter=FieldFilter('status', '==', 'PUBLISHED'))
+                for doc in query.stream():
                     data = doc.to_dict()
                     data['id'] = doc.id
                     raw_content = data.get('content', '')
@@ -2026,13 +2029,39 @@ For questions about these Terms, contact us at {contact_email}.
                         data['content'] = raw_content
                     else:
                         data['content'] = {'body': str(raw_content) if raw_content else ''}
-                    # Ensure slug exists (auto-migrate if needed)
                     data = self._ensure_blog_slug(data, doc.id)
-                    blogs.append(data)
+                    results.append(data)
+                return results
 
-            # Sort combined results by updated_at in Python (newest first)
-            # Use float timestamp to avoid TypeError when mixing
-            # timezone-aware (Firestore) and naive (datetime.utcnow()) datetimes
+            def _fetch_by_author():
+                results = []
+                query = self.db.collection(self.collection_name)\
+                    .where(filter=FieldFilter('author_id', '==', user_id))\
+                    .where(filter=FieldFilter('status', '==', 'PUBLISHED'))
+                for doc in query.stream():
+                    data = doc.to_dict()
+                    data['id'] = doc.id
+                    raw_content = data.get('content', '')
+                    if isinstance(raw_content, dict):
+                        data['content'] = raw_content
+                    else:
+                        data['content'] = {'body': str(raw_content) if raw_content else ''}
+                    data = self._ensure_blog_slug(data, doc.id)
+                    results.append(data)
+                return results
+
+            parallel_results = run_parallel_simple([
+                (_fetch_by_site_owner, ()),
+                (_fetch_by_author, ()),
+            ], max_workers=2)
+
+            site_owner_blogs = parallel_results[0] or []
+            author_blogs = parallel_results[1] or []
+
+            # Merge and deduplicate
+            blog_ids = {b['id'] for b in site_owner_blogs}
+            blogs = site_owner_blogs + [b for b in author_blogs if b['id'] not in blog_ids]
+
             def _sort_key(blog):
                 val = blog.get('updated_at')
                 if val is None:
@@ -2050,7 +2079,6 @@ For questions about these Terms, contact us at {contact_email}.
             print(f"❌ Error fetching published blogs: {e}")
             import traceback
             traceback.print_exc()
-            # Do NOT cache error results — return empty but let next request retry
             return []
 
     def get_published_blog_by_id(self, blog_id):

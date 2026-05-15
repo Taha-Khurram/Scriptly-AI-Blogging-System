@@ -74,13 +74,13 @@ def create_app(config_class=Config):
         )
 
     # Context processor to inject app settings into all templates
+    _ctx_db_service = FirestoreService()
+
     @app.context_processor
     def inject_app_settings():
-        """Make app settings available to all templates."""
-        from app.firebase.firestore_service import FirestoreService
+        """Make app settings available to all templates (cached in FirestoreService)."""
         try:
-            db_service = FirestoreService()
-            app_settings = db_service.get_app_settings()
+            app_settings = _ctx_db_service.get_app_settings()
             return {'app_config': app_settings}
         except Exception:
             return {'app_config': {'app_name': 'Scriptly', 'tagline': ''}}
@@ -159,5 +159,20 @@ def create_app(config_class=Config):
     # Initialize background scheduler for scheduled blog publishing
     from app.scheduler import init_scheduler
     init_scheduler(app)
+
+    # Pre-warm Firebase token verification key cache and Firestore gRPC connection
+    import threading
+    def _warm_firebase():
+        try:
+            from firebase_admin import auth
+            auth.verify_id_token("dummy", check_revoked=False)
+        except Exception:
+            pass
+        try:
+            db = FirestoreService()
+            db.get_app_settings()
+        except Exception:
+            pass
+    threading.Thread(target=_warm_firebase, daemon=True).start()
 
     return app

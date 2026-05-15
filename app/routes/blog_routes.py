@@ -44,6 +44,12 @@ def require_login():
     if not session.get('logged_in'):
         return redirect(url_for('auth_bp.login'))
 
+@blog_bp.after_request
+def add_cache_headers(response):
+    if request.headers.get('X-Pjax') and response.status_code == 200:
+        response.headers['Cache-Control'] = 'private, max-age=10, stale-while-revalidate=30'
+    return response
+
 # ---------------------------------------------------
 # WEB PAGE ROUTES
 # ---------------------------------------------------
@@ -1083,15 +1089,19 @@ def site_settings_page():
     """Site Settings Dashboard"""
     user_id = session.get('user_id')
 
-    # Get current settings
-    settings = db_service.get_site_settings(user_id)
+    from app.utils.parallel import run_parallel_simple
 
-    # Get published blogs for management (includes team members' blogs)
-    published_blogs = db_service.get_published_blogs(user_id, limit=100)
+    results = run_parallel_simple([
+        (db_service.get_site_settings, (user_id,)),
+        (lambda: db_service.get_published_blogs(user_id, limit=100), ()),
+        (lambda: db_service.get_all_categories(user_id=user_id), ()),
+        (db_service.get_blogs_by_status, ("UNDER_REVIEW", user_id)),
+    ], max_workers=4)
 
-    # Get stats for the settings page
-    categories = db_service.get_all_categories(user_id=user_id)
-    pending = db_service.get_blogs_by_status("UNDER_REVIEW", user_id=user_id)
+    settings = results[0] or {}
+    published_blogs = results[1] or []
+    categories = results[2] or []
+    pending = results[3] or []
 
     # Get time preview based on current settings
     time_preview = get_current_time_preview(
@@ -1278,12 +1288,23 @@ def newsletter_page():
     """Newsletter Management Dashboard"""
     user_id = session.get('user_id')
 
-    # Get published blogs count for stats
-    published_blogs = db_service.get_blogs_by_status("PUBLISHED", user_id=user_id)
+    from app.utils.parallel import run_parallel_simple
+
+    results = run_parallel_simple([
+        (db_service.get_published_count, (user_id,)),
+        (db_service.get_subscriber_count, (user_id,)),
+        (db_service.get_newsletter_history, (user_id,)),
+    ], max_workers=3)
+
+    published_count = results[0] or 0
+    subscriber_count = results[1] or 0
+    sent_count = len(results[2]) if results[2] else 0
 
     return render_template(
         'newsletter.html',
-        published_count=len(published_blogs),
+        published_count=published_count,
+        subscriber_count=subscriber_count,
+        sent_count=sent_count,
         username=session.get('user_name', 'User')
     )
 

@@ -57,19 +57,61 @@
           <div class="col-blog-date">Updated</div>
         </div>
         <div id="blogsList">
-          <div class="text-center py-5">
-            <div class="spinner-border spinner-border-sm text-primary opacity-50"></div>
-            <p class="text-secondary fw-medium mt-2 mb-0">Loading blogs...</p>
-          </div>
+          {% if initial_data and initial_data.blogs %}
+            {% for blog in initial_data.blogs %}
+            <div class="blog-row">
+              <div class="col-blog-title">
+                <span class="blog-title-cell" title="{{ blog.title or 'Untitled' }}">{{ (blog.title or 'Untitled')[:45] }}</span>
+              </div>
+              <div class="col-blog-author">
+                <div class="blog-author-cell">
+                  <div class="blog-author-avatar">{{ (blog.author_name or 'U')[0]|upper }}</div>
+                  <span class="blog-author-name">{{ (blog.author_name or 'Unknown')[:20] }}</span>
+                </div>
+              </div>
+              <div class="col-blog-category">
+                <span class="blog-category-badge">{{ blog.category or 'Uncategorized' }}</span>
+              </div>
+              <div class="col-blog-status">
+                {% set status = blog.status or 'DRAFT' %}
+                {% if status == 'PUBLISHED' %}
+                  <span class="blog-status-badge status-badge-published"><i class="bi bi-circle-fill"></i> Published</span>
+                {% elif status == 'UNDER_REVIEW' %}
+                  <span class="blog-status-badge status-badge-under_review"><i class="bi bi-circle-fill"></i> Under Review</span>
+                {% elif status == 'REJECTED' %}
+                  <span class="blog-status-badge status-badge-rejected"><i class="bi bi-circle-fill"></i> Rejected</span>
+                {% else %}
+                  <span class="blog-status-badge status-badge-draft"><i class="bi bi-circle-fill"></i> Draft</span>
+                {% endif %}
+              </div>
+              <div class="col-blog-date">
+                <span class="blog-date-cell">{{ blog.updated_at[:10] if blog.updated_at else '' }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="blogs-empty">
+              <i class="bi bi-journals"></i>
+              <p>No blogs found.</p>
+            </div>
+          {% endif %}
         </div>
       </div>
 
       <!-- Pagination -->
-      <div class="blogs-pagination" id="blogsPagination"></div>
+      <div class="blogs-pagination" id="blogsPagination">
+        {% if initial_data and initial_data.total_pages > 1 %}
+          {% for p in range(1, initial_data.total_pages + 1) %}
+            {% if p <= 5 or p == initial_data.total_pages %}
+              <button class="page-btn{{ ' active' if p == 1 else '' }}" onclick="goToPage({{ p }})">{{ p }}</button>
+            {% elif p == 6 %}
+              <span class="page-ellipsis">...</span>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      </div>
 
     </div>
-  </main>
-</div>
 
 <!-- Date Range Modal -->
 <div class="modal fade" id="dateRangeModal" tabindex="-1" aria-hidden="true">
@@ -105,8 +147,8 @@
   </div>
 </div>
 
-{% endblock %}
-
-{% block extra_js %}
 <script src="{{ url_for('static', filename='js/pages/all_blogs.js') }}"></script>
+  </main>
+</div>
+
 {% endblock %}

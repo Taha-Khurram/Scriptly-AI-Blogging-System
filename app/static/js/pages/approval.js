@@ -30,8 +30,9 @@ function checkEmptyState() {
 }
 
 // Setup schedule modal confirm button
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('confirmScheduleBtn').addEventListener('click', async () => {
+(function() {
+  var scheduleBtn = document.getElementById('confirmScheduleBtn');
+  if (scheduleBtn) scheduleBtn.addEventListener('click', async () => {
     const dateTime = document.getElementById('scheduleDateTime').value;
     if (!dateTime) {
       showToast({ type: 'error', title: 'Error', message: 'Please select a date and time.', duration: 3000 });
@@ -71,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.innerHTML = '<i class="bi bi-calendar-check"></i> Schedule';
     }
   });
-});
+})();
 
 function openScheduleModal(blogId) {
   currentBlogId = blogId;

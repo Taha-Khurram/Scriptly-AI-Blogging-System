@@ -64,6 +64,7 @@ async function openViewModal(id) {
   currentViewingId = id;
   try {
     const res = await fetch(`/api/get_blog/${id}`);
+    if (!res.ok) throw new Error(`Server error (${res.status})`);
     const data = await res.json();
 
     if (data.success) {
@@ -151,11 +152,11 @@ async function openViewModal(id) {
       });
     }
   } catch (err) {
-    console.error(err);
+    console.error('openViewModal error:', err);
     showToast({
       type: 'error',
       title: 'Connection Error',
-      message: 'Could not connect to server.',
+      message: err.message || 'Could not connect to server.',
       duration: 5000
     });
   }
@@ -165,6 +166,7 @@ async function openEditModal(id) {
   currentEditingId = id;
   try {
     const res = await fetch(`/api/get_blog/${id}`);
+    if (!res.ok) throw new Error(`Server error (${res.status})`);
     const data = await res.json();
     if (data.success) {
       document.getElementById('modal-title').value = data.blog.title;
@@ -233,10 +235,11 @@ async function openEditModal(id) {
       });
     }
   } catch (err) {
+    console.error('openEditModal error:', err);
     showToast({
       type: 'error',
       title: 'Connection Error',
-      message: 'Could not connect to server.',
+      message: err.message || 'Could not connect to server.',
       duration: 5000
     });
   }

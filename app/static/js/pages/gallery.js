@@ -6,12 +6,12 @@
 let currentPage = 1;
 let deleteImageId = null;
 
-document.addEventListener('DOMContentLoaded', function () {
+(function initGallery() {
     try { setupUploadZone(); } catch(e) { console.error(e); }
     try { setupFileInput(); } catch(e) { console.error(e); }
     try { setupDeleteModal(); } catch(e) { console.error(e); }
-    loadImages();
-});
+    // Skip initial load — server already rendered first page
+})();
 
 // ==================== UPLOAD ZONE ====================
 

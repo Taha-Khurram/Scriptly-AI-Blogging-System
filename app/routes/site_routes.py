@@ -1,11 +1,23 @@
-from flask import Blueprint, render_template, abort, request, redirect, url_for, jsonify
+from flask import Blueprint, render_template, abort, request, redirect, url_for, jsonify, make_response
 from app.firebase.firestore_service import FirestoreService
+from app.utils.parallel import run_parallel_simple
 import markdown
 import math
 import re as _re
 
 site_bp = Blueprint('site_bp', __name__, url_prefix='/site')
 db_service = FirestoreService()
+
+
+@site_bp.after_request
+def add_cache_headers(response):
+    """Add browser cache headers for public site pages to reduce server load."""
+    if response.status_code == 200 and request.method == 'GET':
+        if 'text/html' in response.content_type:
+            response.headers['Cache-Control'] = 'public, max-age=60, stale-while-revalidate=120'
+        elif 'application/json' in response.content_type:
+            response.headers['Cache-Control'] = 'public, max-age=30, stale-while-revalidate=60'
+    return response
 
 
 class _SlugRedirect(Exception):
@@ -77,20 +89,23 @@ def _resolve_site(site_identifier):
 def site_home(site_identifier):
     """Public site homepage - displays published blogs"""
     try:
-        # Resolve site identifier (slug or user_id)
         user_id, settings = _resolve_site(site_identifier)
 
-        # Get published blogs using dynamic posts_per_page setting
         posts_limit = settings.get('posts_per_page', 10)
-        published_blogs = db_service.get_published_blogs(user_id, limit=posts_limit)
+        featured_post_id = settings.get('featured_post_id')
 
-        # Get categories for filtering
-        categories = db_service.get_all_categories(user_id=user_id)
+        queries = [
+            (db_service.get_published_blogs, (user_id, posts_limit)),
+            (db_service.get_all_categories, (user_id,)),
+        ]
+        if featured_post_id:
+            queries.append((db_service.get_published_blog_by_id, (featured_post_id,)))
 
-        # Get featured post if set
-        featured_post = None
-        if settings.get('featured_post_id'):
-            featured_post = db_service.get_published_blog_by_id(settings['featured_post_id'])
+        results = run_parallel_simple(queries, max_workers=3)
+
+        published_blogs = results[0] or []
+        categories = results[1] or []
+        featured_post = results[2] if featured_post_id else None
 
         return render_template(
             'site/site_home.html',
@@ -110,7 +125,6 @@ def site_home(site_identifier):
 def site_post(site_identifier, slug_or_id):
     """Single blog post view - supports both slug and ID for backwards compatibility"""
     try:
-        # Resolve site identifier
         user_id, settings = _resolve_site(site_identifier)
 
         # Try slug lookup first (for SEO-friendly URLs)
@@ -118,20 +132,17 @@ def site_post(site_identifier, slug_or_id):
 
         if result:
             if result.get('redirect'):
-                # 301 redirect to current slug
                 return redirect(
                     url_for('site_bp.site_post', site_identifier=site_identifier, slug_or_id=result['new_slug']),
                     code=301
                 )
             blog = result['blog']
         else:
-            # Fallback to ID lookup for backwards compatibility
             blog = db_service.get_published_blog_by_id(slug_or_id)
 
         if not blog:
             return _render_site_404(user_id, settings)
 
-        # Verify blog belongs to this site (by site_owner_id, not author_id)
         if blog.get('site_owner_id') != user_id and blog.get('author_id') != user_id:
             return _render_site_404(user_id, settings)
 
@@ -140,7 +151,6 @@ def site_post(site_identifier, slug_or_id):
         if isinstance(content, dict):
             html_content = content.get('html', '')
             if not html_content:
-                # Convert markdown to HTML if needed
                 md_content = content.get('markdown') or content.get('body') or ''
                 html_content = markdown.markdown(md_content, extensions=['extra', 'tables', 'toc'])
             blog['html_content'] = html_content
@@ -151,17 +161,23 @@ def site_post(site_identifier, slug_or_id):
             blog['toc'] = []
             blog['toc_html'] = ''
 
-        # Get related blogs (same category)
-        related_blogs = []
-        if blog.get('category'):
-            all_published = db_service.get_published_blogs(user_id, limit=10)
-            related_blogs = [
-                b for b in all_published
-                if b.get('category') == blog.get('category') and b.get('id') != blog.get('id')
-            ][:3]
+        # Fetch related blogs and categories in parallel
+        def _get_related_blogs():
+            if blog.get('category'):
+                all_published = db_service.get_published_blogs(user_id, limit=10)
+                return [
+                    b for b in all_published
+                    if b.get('category') == blog.get('category') and b.get('id') != blog.get('id')
+                ][:3]
+            return []
 
-        # Get categories for footer
-        categories = db_service.get_all_categories(user_id=user_id)
+        results = run_parallel_simple([
+            (_get_related_blogs, ()),
+            (db_service.get_all_categories, (user_id,)),
+        ], max_workers=2)
+
+        related_blogs = results[0] or []
+        categories = results[1] or []
 
         return render_template(
             'site/site_post.html',
@@ -181,12 +197,15 @@ def site_post(site_identifier, slug_or_id):
 def site_about(site_identifier):
     """About page with site description"""
     try:
-        # Resolve site identifier
         user_id, settings = _resolve_site(site_identifier)
 
-        # Get stats
-        published_blogs = db_service.get_published_blogs(user_id, limit=100)
-        categories = db_service.get_all_categories(user_id=user_id)
+        results = run_parallel_simple([
+            (db_service.get_published_blogs, (user_id, 100)),
+            (db_service.get_all_categories, (user_id,)),
+        ], max_workers=2)
+
+        published_blogs = results[0] or []
+        categories = results[1] or []
 
         return render_template(
             'site/site_about.html',
@@ -206,21 +225,22 @@ def site_about(site_identifier):
 def site_category(site_identifier, category_name):
     """Filter blogs by category"""
     try:
-        # Resolve site identifier
         user_id, settings = _resolve_site(site_identifier)
 
-        # Get published blogs using dynamic posts_per_page setting
         posts_limit = settings.get('posts_per_page', 10)
-        all_published = db_service.get_published_blogs(user_id, limit=posts_limit)
 
-        # Filter by category
+        results = run_parallel_simple([
+            (db_service.get_published_blogs, (user_id, posts_limit)),
+            (db_service.get_all_categories, (user_id,)),
+        ], max_workers=2)
+
+        all_published = results[0] or []
+        categories = results[1] or []
+
         filtered_blogs = [
             b for b in all_published
             if b.get('category', '').lower() == category_name.lower()
         ]
-
-        # Get all categories for sidebar
-        categories = db_service.get_all_categories(user_id=user_id)
 
         return render_template(
             'site/site_home.html',
@@ -240,19 +260,21 @@ def site_category(site_identifier, category_name):
 def site_blog(site_identifier):
     """Dedicated blog listing page with pagination and search"""
     try:
-        # Resolve site identifier
         user_id, settings = _resolve_site(site_identifier)
 
-        # Pagination and filter parameters
         page = request.args.get('page', 1, type=int)
         per_page = settings.get('posts_per_page', 12)
         category = request.args.get('category', None)
         search_query = request.args.get('search', '').strip()
 
-        # Get all published blogs
-        all_blogs = db_service.get_published_blogs(user_id, limit=100)
+        results = run_parallel_simple([
+            (db_service.get_published_blogs, (user_id, 100)),
+            (db_service.get_all_categories, (user_id,)),
+        ], max_workers=2)
 
-        # Filter by search query if provided
+        all_blogs = results[0] or []
+        categories = results[1] or []
+
         if search_query:
             search_lower = search_query.lower()
             all_blogs = [
@@ -262,21 +284,16 @@ def site_blog(site_identifier):
                 or search_lower in b.get('category', '').lower()
             ]
 
-        # Filter by category if provided
         if category:
             all_blogs = [
                 b for b in all_blogs
                 if b.get('category', '').lower() == category.lower()
             ]
 
-        # Calculate pagination
         total_posts = len(all_blogs)
         total_pages = math.ceil(total_posts / per_page) if total_posts > 0 else 1
         start = (page - 1) * per_page
         paginated_blogs = all_blogs[start:start + per_page]
-
-        # Get categories for sidebar
-        categories = db_service.get_all_categories(user_id=user_id)
 
         return render_template(
             'site/site_blog.html',
@@ -301,10 +318,7 @@ def site_blog(site_identifier):
 def site_contact(site_identifier):
     """Contact page"""
     try:
-        # Resolve site identifier
         user_id, settings = _resolve_site(site_identifier)
-
-        # Get categories for footer
         categories = db_service.get_all_categories(user_id=user_id)
 
         return render_template(

@@ -11,13 +11,18 @@ let currentDateTo = '';
 let currentPage = 1;
 const perPage = 10;
 let searchTimeout = null;
+let initialLoadDone = false;
 
-document.addEventListener('DOMContentLoaded', function () {
+(function initAllBlogs() {
     applyUrlParams();
     setupFilterTabs();
     setupControls();
-    loadBlogs();
-});
+    if (window.location.search) {
+        loadBlogs();
+    } else {
+        initialLoadDone = true;
+    }
+})();
 
 function applyUrlParams() {
     var params = new URLSearchParams(window.location.search);

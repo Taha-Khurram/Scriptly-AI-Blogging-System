@@ -45,19 +45,42 @@
       <!-- Gallery Grid -->
       <div class="gallery-container">
         <div class="gallery-grid" id="galleryGrid">
-          <div class="gallery-loading">
-            <div class="spinner-border spinner-border-sm text-primary opacity-50"></div>
-            <p class="text-secondary fw-medium mt-2 mb-0">Loading images...</p>
-          </div>
+          {% if initial_data and initial_data.images %}
+            {% for img in initial_data.images %}
+            <div class="gallery-card" data-id="{{ img.id }}">
+              <img src="{{ img.url }}" alt="{{ img.filename }}" loading="lazy">
+              <div class="gallery-card-overlay">
+                <div class="gallery-card-actions">
+                  <button class="gallery-card-btn copy-btn" onclick="copyUrl(event, '{{ img.url }}')" title="Copy URL"><i class="bi bi-clipboard"></i></button>
+                  <button class="gallery-card-btn delete-btn" onclick="showDeleteConfirm(event, '{{ img.id }}')" title="Delete"><i class="bi bi-trash"></i></button>
+                </div>
+                <div class="gallery-card-name">{{ img.filename }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="gallery-empty-state">
+              <div class="gallery-empty-icon"><i class="bi bi-images"></i></div>
+              <p>No images yet. Upload your first image above.</p>
+            </div>
+          {% endif %}
         </div>
       </div>
 
       <!-- Pagination -->
-      <div class="gallery-pagination" id="galleryPagination"></div>
+      <div class="gallery-pagination" id="galleryPagination">
+        {% if initial_data and initial_data.total_pages > 1 %}
+          {% for p in range(1, initial_data.total_pages + 1) %}
+            {% if p <= 5 or p == initial_data.total_pages %}
+              <button class="page-btn{{ ' active' if p == 1 else '' }}" onclick="goToPage({{ p }})">{{ p }}</button>
+            {% elif p == 6 %}
+              <span class="page-ellipsis">...</span>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      </div>
 
     </div>
-  </main>
-</div>
 
 <!-- Delete Confirmation Modal -->
 <div class="gallery-modal-overlay" id="deleteOverlay" onclick="closeDeleteModal(event)">
@@ -79,8 +102,8 @@
   </div>
 </div>
 
-{% endblock %}
+<script src="{{ url_for('static', filename='js/pages/gallery.js') }}?v=3"></script>
+  </main>
+</div>
 
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/gallery.js') }}?v=2"></script>
 {% endblock %}

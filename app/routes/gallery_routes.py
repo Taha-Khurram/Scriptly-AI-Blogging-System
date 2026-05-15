@@ -13,6 +13,13 @@ MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'gallery')
 
 
+@gallery_bp.after_request
+def add_cache_headers(response):
+    if request.headers.get('X-Pjax') and response.status_code == 200:
+        response.headers['Cache-Control'] = 'private, max-age=10, stale-while-revalidate=30'
+    return response
+
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -31,7 +38,9 @@ def allowed_file(filename):
 @gallery_bp.route('/gallery')
 @login_required
 def gallery_page():
-    return render_template('gallery.html')
+    user_id = session.get('user_id')
+    initial_data = db_service.get_gallery_images(user_id, page=1, per_page=20)
+    return render_template('gallery.html', initial_data=initial_data)
 
 
 @gallery_bp.route('/api/gallery/upload', methods=['POST'])

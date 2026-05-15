@@ -11,6 +11,13 @@ settings_bp = Blueprint('settings', __name__)
 db_service = FirestoreService()
 
 
+@settings_bp.after_request
+def add_cache_headers(response):
+    if request.headers.get('X-Pjax') and response.status_code == 200:
+        response.headers['Cache-Control'] = 'private, max-age=10, stale-while-revalidate=30'
+    return response
+
+
 @settings_bp.route('/app-settings')
 @admin_required
 def app_settings_page():
