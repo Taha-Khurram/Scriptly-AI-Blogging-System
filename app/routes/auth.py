@@ -23,49 +23,48 @@ def verify_token():
     data = request.json
     id_token = data.get('idToken')
     try:
-        from concurrent.futures import ThreadPoolExecutor
+        import json, base64
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        decoded_token = admin_auth.verify_id_token(id_token, check_revoked=False)
-        uid = decoded_token['uid']
-        email = decoded_token.get('email')
+        # Decode JWT payload instantly (no network) to get uid/email early
+        payload_part = id_token.split('.')[1]
+        payload_part += '=' * (4 - len(payload_part) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_part))
+        uid = payload['user_id']
+        email = payload.get('email', '')
 
-        user_info = {
-            "uid": uid,
-            "name": decoded_token.get('name') or email.split('@')[0],
-            "email": email
-        }
-
-        # Run invitation check and user fetch in parallel
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            invitation_future = executor.submit(db_service.get_pending_invitation_by_email, email)
+        # Run token verification AND Firestore lookups ALL in parallel
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            verify_future = executor.submit(lambda: admin_auth.verify_id_token(id_token, check_revoked=False))
             user_future = executor.submit(db_service.get_user_by_id, uid)
+            invite_future = executor.submit(db_service.get_pending_invitation_by_email, email)
 
-            invitation = invitation_future.result()
+            # Token verification must succeed (security)
+            decoded_token = verify_future.result()
+
             existing_user = user_future.result()
+            invitation = invite_future.result()
+
+        name = decoded_token.get('name') or email.split('@')[0]
 
         if existing_user:
-            # Existing user — update last_login in background, return immediately
             user_record = existing_user
-            executor = ThreadPoolExecutor(max_workers=1)
-            executor.submit(db_service.update_last_login, uid)
-            executor.shutdown(wait=False)
+            # Fire-and-forget last_login update
+            ThreadPoolExecutor(max_workers=1).submit(db_service.update_last_login, uid)
         else:
-            # New user — apply invitation role and save
+            user_info = {"uid": uid, "name": name, "email": email}
             if invitation:
                 user_info['role'] = invitation['role']
                 user_info['created_by'] = invitation['invited_by']
             user_record = db_service.save_user(user_info)
 
-        # Accept invitation in background (non-blocking)
         if invitation:
-            executor = ThreadPoolExecutor(max_workers=1)
-            executor.submit(db_service.accept_invitation, invitation['id'])
-            executor.shutdown(wait=False)
+            ThreadPoolExecutor(max_workers=1).submit(db_service.accept_invitation, invitation['id'])
 
         session.permanent = True
         session.update({
             'user_id': uid,
-            'user_name': user_record.get('name', user_info['name']),
+            'user_name': user_record.get('name', name),
             'user_role': user_record.get('role', 'ADMIN'),
             'profile_image': user_record.get('profile_image', ''),
             'logged_in': True,
