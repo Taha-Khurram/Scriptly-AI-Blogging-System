@@ -557,6 +557,16 @@ a {
     to { opacity: 1; }
 }
 
+/* Pjax navigation transitions */
+.dashboard-main.pjax-leaving {
+    opacity: 0;
+    transition: opacity 0.15s ease-out;
+}
+
+.dashboard-main.pjax-entering {
+    animation: contentFade 0.2s ease-out;
+}
+
 /* Progress bar at top */
 #nav-progress {
     position: fixed;
