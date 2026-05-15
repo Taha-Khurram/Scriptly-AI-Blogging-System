@@ -20,7 +20,9 @@ if __name__ == "__main__":
             app,
             host='0.0.0.0',
             port=5000,
-            threads=12,
-            connection_limit=100,
-            channel_timeout=120
+            threads=16,
+            connection_limit=200,
+            channel_timeout=30,
+            recv_bytes=65536,
+            send_bytes=65536,
         )

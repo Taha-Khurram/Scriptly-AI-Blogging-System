@@ -581,17 +581,24 @@ const Pjax = (() => {
             }
         });
 
-        // Add new page-specific styles
+        // Add new page-specific styles and wait for them to load
+        const loadPromises = [];
         newStyles.forEach(href => {
             if (!document.querySelector(`link[href="${href}"]`)) {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
                 link.href = href;
+                const promise = new Promise(resolve => {
+                    link.onload = resolve;
+                    link.onerror = resolve;
+                });
                 document.head.appendChild(link);
+                loadPromises.push(promise);
             }
         });
 
         currentPageStyles = newStyles;
+        return Promise.all(loadPromises);
     }
 
     function executeScripts(scripts, inlineScripts) {
@@ -649,6 +656,7 @@ const Pjax = (() => {
 
         isNavigating = true;
         currentAbortController = new AbortController();
+        const timeoutId = setTimeout(() => currentAbortController.abort(), 15000);
         showProgress();
 
         const mainContent = document.querySelector('.dashboard-main');
@@ -694,12 +702,12 @@ const Pjax = (() => {
             // Cleanup old scripts
             cleanupOldScripts();
 
+            // Load new styles BEFORE swapping content (prevents flash of unstyled content)
+            await loadStyles(assets.styles);
+
             // Swap skeleton with real content
             mainContent.innerHTML = newMain.innerHTML;
             mainContent.classList.add('pjax-entering');
-
-            // Load new styles
-            loadStyles(assets.styles);
 
             // Update URL and history
             if (pushState) {
@@ -722,6 +730,7 @@ const Pjax = (() => {
             console.warn('Pjax navigation failed, falling back:', error.message);
             window.location.href = url;
         } finally {
+            clearTimeout(timeoutId);
             isNavigating = false;
             currentAbortController = null;
         }

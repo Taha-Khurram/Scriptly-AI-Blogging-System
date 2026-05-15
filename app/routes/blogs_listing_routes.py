@@ -15,6 +15,13 @@ def login_required(f):
     return decorated_function
 
 
+@blogs_bp.after_request
+def add_cache_headers(response):
+    if request.headers.get('X-Pjax') and response.status_code == 200:
+        response.headers['Cache-Control'] = 'private, max-age=10, stale-while-revalidate=30'
+    return response
+
+
 @blogs_bp.route('/all-blogs')
 @login_required
 def all_blogs_page():

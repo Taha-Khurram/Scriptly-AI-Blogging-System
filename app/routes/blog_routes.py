@@ -44,6 +44,12 @@ def require_login():
     if not session.get('logged_in'):
         return redirect(url_for('auth_bp.login'))
 
+@blog_bp.after_request
+def add_cache_headers(response):
+    if request.headers.get('X-Pjax') and response.status_code == 200:
+        response.headers['Cache-Control'] = 'private, max-age=10, stale-while-revalidate=30'
+    return response
+
 # ---------------------------------------------------
 # WEB PAGE ROUTES
 # ---------------------------------------------------
