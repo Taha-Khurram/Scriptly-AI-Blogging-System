@@ -95,47 +95,67 @@ function openScheduleModal(blogId) {
 
 async function openViewModal(id) {
   currentBlogId = id;
+
+  const modalEl = document.getElementById('viewModal');
+  if (!modalEl) {
+    showToast({ type: 'error', title: 'Error', message: 'Modal not found. Please refresh the page.', duration: 5000 });
+    return;
+  }
+
   try {
     const res = await fetch(`/api/get_blog/${id}`);
     const data = await res.json();
 
-    if (data.success) {
-      const blog = data.blog;
-      const content = blog.content;
+    if (!data.success) {
+      showToast({ type: 'error', title: 'Error', message: data.message || 'Failed to load blog.', duration: 5000 });
+      return;
+    }
 
-      // Set title
-      document.getElementById('view-modal-title').innerText = (blog.title || 'Untitled').replace(/\*\*/g, '');
+    const blog = data.blog;
+    const content = blog.content;
 
-      // Set category
-      document.getElementById('view-modal-category').innerText = blog.category || 'General';
+    const el = (elId) => document.getElementById(elId);
 
-      // Set author info
-      const authorName = blog.author || blog.created_by || 'Unknown Author';
-      document.getElementById('view-author-name').innerText = authorName;
-      document.getElementById('view-author-avatar').innerText = authorName.substring(0, 2).toUpperCase();
+    // Set title
+    const titleEl = el('view-modal-title');
+    if (titleEl) titleEl.innerText = (blog.title || 'Untitled').replace(/\*\*/g, '');
 
-      // Set date
-      if (blog.updated_at) {
-        document.getElementById('view-submit-date').innerText = 'Submitted on ' + new Date(blog.updated_at).toLocaleDateString('en-US', {
-          year: 'numeric', month: 'short', day: 'numeric'
-        });
-      }
+    // Set category
+    const catEl = el('view-modal-category');
+    if (catEl) catEl.innerText = blog.category || 'General';
 
-      // Get content - use html field for formatted content
-      let contentHtml = '';
-      if (typeof content === 'object') {
-        contentHtml = content.html || content.body || '';
-      } else {
-        contentHtml = content || '';
-      }
+    // Set author info
+    const authorName = blog.author || blog.created_by || 'Unknown Author';
+    const nameEl = el('view-author-name');
+    if (nameEl) nameEl.innerText = authorName;
+    const avatarEl = el('view-author-avatar');
+    if (avatarEl) avatarEl.innerText = authorName.substring(0, 2).toUpperCase();
 
-      // Set content with proper HTML rendering
-      document.getElementById('view-modal-content').innerHTML = contentHtml || '<p class="text-muted">No content available</p>';
+    // Set date
+    if (blog.updated_at) {
+      const dateEl = el('view-submit-date');
+      if (dateEl) dateEl.innerText = 'Submitted on ' + new Date(blog.updated_at).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric'
+      });
+    }
 
-      // Display TOC if available
-      const tocContainer = document.getElementById('view-modal-toc');
-      const tocContent = document.getElementById('view-modal-toc-content');
-      if (typeof content === 'object' && content.toc && content.toc.length > 0) {
+    // Get content - use html field for formatted content
+    let contentHtml = '';
+    if (content && typeof content === 'object') {
+      contentHtml = content.html || content.body || '';
+    } else {
+      contentHtml = content || '';
+    }
+
+    // Set content with proper HTML rendering
+    const contentEl = el('view-modal-content');
+    if (contentEl) contentEl.innerHTML = contentHtml || '<p class="text-muted">No content available</p>';
+
+    // Display TOC if available
+    const tocContainer = el('view-modal-toc');
+    const tocContent = el('view-modal-toc-content');
+    if (tocContainer && tocContent) {
+      if (content && typeof content === 'object' && content.toc && content.toc.length > 0) {
         let tocHtml = '<ul>';
         content.toc.forEach(item => {
           tocHtml += `<li class="toc-level-${item.level}">
@@ -145,54 +165,52 @@ async function openViewModal(id) {
         tocHtml += '</ul>';
         tocContent.innerHTML = tocHtml;
         tocContainer.classList.remove('d-none');
-      } else if (typeof content === 'object' && content.toc_html) {
+      } else if (content && typeof content === 'object' && content.toc_html) {
         tocContent.innerHTML = content.toc_html;
         tocContainer.classList.remove('d-none');
       } else {
         tocContainer.classList.add('d-none');
       }
-
-      // Calculate reading time and word count
-      const textContent = contentHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      const wordCount = textContent.split(' ').filter(w => w.length > 0).length;
-      const readingTime = Math.ceil(wordCount / 200);
-
-      document.getElementById('view-modal-reading-time').innerText = readingTime + ' min read';
-      document.getElementById('view-modal-word-count').innerText = wordCount + ' words';
-
-      // Set button actions
-      document.getElementById('view-approve-btn').onclick = function() {
-        bootstrap.Modal.getInstance(document.getElementById('viewModal')).hide();
-        approveBlog(id);
-      };
-
-      document.getElementById('view-reject-btn').onclick = function() {
-        bootstrap.Modal.getInstance(document.getElementById('viewModal')).hide();
-        rejectToDraft(id);
-      };
-
-      document.getElementById('view-schedule-btn').onclick = function() {
-        bootstrap.Modal.getInstance(document.getElementById('viewModal')).hide();
-        openScheduleModal(id);
-      };
-
-      // Show modal
-      const viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
-      viewModal.show();
-    } else {
-      showToast({
-        type: 'error',
-        title: 'Error',
-        message: data.message || 'Failed to load blog.',
-        duration: 5000
-      });
     }
+
+    // Calculate reading time and word count
+    const textContent = contentHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const wordCount = textContent.split(' ').filter(w => w.length > 0).length;
+    const readingTime = Math.ceil(wordCount / 200);
+
+    const readEl = el('view-modal-reading-time');
+    if (readEl) readEl.innerText = readingTime + ' min read';
+    const wordEl = el('view-modal-word-count');
+    if (wordEl) wordEl.innerText = wordCount + ' words';
+
+    // Set button actions
+    const approveBtn = el('view-approve-btn');
+    if (approveBtn) approveBtn.onclick = function() {
+      bootstrap.Modal.getInstance(modalEl).hide();
+      approveBlog(id);
+    };
+
+    const rejectBtn = el('view-reject-btn');
+    if (rejectBtn) rejectBtn.onclick = function() {
+      bootstrap.Modal.getInstance(modalEl).hide();
+      rejectToDraft(id);
+    };
+
+    const scheduleBtn = el('view-schedule-btn');
+    if (scheduleBtn) scheduleBtn.onclick = function() {
+      bootstrap.Modal.getInstance(modalEl).hide();
+      openScheduleModal(id);
+    };
+
+    // Show modal
+    const viewModal = new bootstrap.Modal(modalEl);
+    viewModal.show();
   } catch (err) {
-    console.error(err);
+    console.error('openViewModal error:', err);
     showToast({
       type: 'error',
-      title: 'Connection Error',
-      message: 'Failed to load blog content.',
+      title: 'Error',
+      message: err.message || 'Failed to load blog content.',
       duration: 5000
     });
   }
@@ -200,33 +218,48 @@ async function openViewModal(id) {
 
 async function openReviewModal(id) {
   currentBlogId = id;
+
+  const modalEl = document.getElementById('reviewModal');
+  if (!modalEl) {
+    showToast({ type: 'error', title: 'Error', message: 'Modal not found. Please refresh the page.', duration: 5000 });
+    return;
+  }
+
   try {
     const res = await fetch(`/api/get_blog/${id}`);
     const data = await res.json();
 
-    if (data.success) {
-      const blog = data.blog;
-      const content = blog.content;
+    if (!data.success) {
+      showToast({ type: 'error', title: 'Error', message: data.message || 'Failed to load blog.', duration: 5000 });
+      return;
+    }
 
-      document.getElementById('viewTitle').innerText = (blog.title || 'Untitled').replace(/\*\*/g, '');
+    const blog = data.blog;
+    const content = blog.content;
+    const el = (elId) => document.getElementById(elId);
 
-      // Set category
-      document.getElementById('review-category').innerText = blog.category || 'General';
+    const titleEl = el('viewTitle');
+    if (titleEl) titleEl.innerText = (blog.title || 'Untitled').replace(/\*\*/g, '');
 
-      // Get content - use html field for formatted content
-      let contentHtml = '';
-      if (typeof content === 'object') {
-        contentHtml = content.html || content.body || '';
-      } else {
-        contentHtml = content || '';
-      }
+    const catEl = el('review-category');
+    if (catEl) catEl.innerText = blog.category || 'General';
 
-      document.getElementById('viewContent').innerHTML = contentHtml || '<p class="text-muted">No content</p>';
+    // Get content - use html field for formatted content
+    let contentHtml = '';
+    if (content && typeof content === 'object') {
+      contentHtml = content.html || content.body || '';
+    } else {
+      contentHtml = content || '';
+    }
 
-      // Display TOC if available
-      const tocContainer = document.getElementById('review-modal-toc');
-      const tocContent = document.getElementById('review-modal-toc-content');
-      if (typeof content === 'object' && content.toc && content.toc.length > 0) {
+    const contentEl = el('viewContent');
+    if (contentEl) contentEl.innerHTML = contentHtml || '<p class="text-muted">No content</p>';
+
+    // Display TOC if available
+    const tocContainer = el('review-modal-toc');
+    const tocContent = el('review-modal-toc-content');
+    if (tocContainer && tocContent) {
+      if (content && typeof content === 'object' && content.toc && content.toc.length > 0) {
         let tocHtml = '<ul>';
         content.toc.forEach(item => {
           tocHtml += `<li class="toc-level-${item.level}">
@@ -236,60 +269,53 @@ async function openReviewModal(id) {
         tocHtml += '</ul>';
         tocContent.innerHTML = tocHtml;
         tocContainer.classList.remove('d-none');
-      } else if (typeof content === 'object' && content.toc_html) {
+      } else if (content && typeof content === 'object' && content.toc_html) {
         tocContent.innerHTML = content.toc_html;
         tocContainer.classList.remove('d-none');
       } else {
         tocContainer.classList.add('d-none');
       }
-
-      // Calculate reading time and word count
-      const textContent = contentHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      const wordCount = textContent.split(' ').filter(w => w.length > 0).length;
-      const readingTime = Math.ceil(wordCount / 200);
-
-      document.getElementById('review-reading-time').innerText = readingTime + ' min read';
-      document.getElementById('review-word-count').innerText = wordCount + ' words';
-
-      const modalApproveBtn = document.getElementById('modalApproveBtn');
-      modalApproveBtn.onclick = function () {
-        const modalElem = document.getElementById('reviewModal');
-        const modalInstance = bootstrap.Modal.getInstance(modalElem);
-        if (modalInstance) modalInstance.hide();
-        approveBlog(id);
-      };
-
-      const modalScheduleBtn = document.getElementById('modalScheduleBtn');
-      modalScheduleBtn.onclick = function () {
-        const modalElem = document.getElementById('reviewModal');
-        const modalInstance = bootstrap.Modal.getInstance(modalElem);
-        if (modalInstance) modalInstance.hide();
-        openScheduleModal(id);
-      };
-
-      const modalRejectBtn = document.getElementById('modalRejectBtn');
-      modalRejectBtn.onclick = function () {
-        const modalElem = document.getElementById('reviewModal');
-        const modalInstance = bootstrap.Modal.getInstance(modalElem);
-        if (modalInstance) modalInstance.hide();
-        rejectToDraft(id);
-      };
-
-      const reviewModal = new bootstrap.Modal(document.getElementById('reviewModal'));
-      reviewModal.show();
-    } else {
-      showToast({
-        type: 'error',
-        title: 'Error',
-        message: data.message || 'Failed to load blog.',
-        duration: 5000
-      });
     }
+
+    // Calculate reading time and word count
+    const textContent = contentHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const wordCount = textContent.split(' ').filter(w => w.length > 0).length;
+    const readingTime = Math.ceil(wordCount / 200);
+
+    const readEl = el('review-reading-time');
+    if (readEl) readEl.innerText = readingTime + ' min read';
+    const wordEl = el('review-word-count');
+    if (wordEl) wordEl.innerText = wordCount + ' words';
+
+    const modalApproveBtn = el('modalApproveBtn');
+    if (modalApproveBtn) modalApproveBtn.onclick = function () {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      approveBlog(id);
+    };
+
+    const modalScheduleBtn = el('modalScheduleBtn');
+    if (modalScheduleBtn) modalScheduleBtn.onclick = function () {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      openScheduleModal(id);
+    };
+
+    const modalRejectBtn = el('modalRejectBtn');
+    if (modalRejectBtn) modalRejectBtn.onclick = function () {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      rejectToDraft(id);
+    };
+
+    const reviewModal = new bootstrap.Modal(modalEl);
+    reviewModal.show();
   } catch (err) {
+    console.error('openReviewModal error:', err);
     showToast({
       type: 'error',
-      title: 'Connection Error',
-      message: 'Failed to load blog content.',
+      title: 'Error',
+      message: err.message || 'Failed to load blog content.',
       duration: 5000
     });
   }
