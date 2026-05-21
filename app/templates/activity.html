@@ -67,6 +67,9 @@
         <div class="activity-filter-controls">
           <select id="userFilter" class="filter-select">
             <option value="all">All Users</option>
+            {% for user in initial_users %}
+            <option value="{{ user.uid }}">{{ user.name }}</option>
+            {% endfor %}
           </select>
           <div class="filter-search-wrap">
             <i class="bi bi-search"></i>
@@ -88,15 +91,68 @@
           <div class="col-activity-time">Time</div>
         </div>
         <div id="activityList">
-          <div class="text-center py-5">
-            <div class="spinner-border spinner-border-sm text-primary opacity-50"></div>
-            <p class="text-secondary fw-medium mt-2 mb-0">Loading activity...</p>
-          </div>
+          {% if initial_activities %}
+            {% for activity in initial_activities %}
+            {% set type_key = activity.target_type or activity.type or '' %}
+            <div class="activity-row">
+              <div class="col-activity-user">
+                <div class="activity-user-cell">
+                  <div class="activity-avatar">{{ (activity.user_name or 'U')[0]|upper }}</div>
+                  <span class="activity-user-name">{{ activity.user_name or 'Unknown' }}</span>
+                </div>
+              </div>
+              <div class="col-activity-action">
+                <span class="activity-action-text">{{ activity.action_text or '' }}</span>
+              </div>
+              <div class="col-activity-target">
+                <span class="activity-target-text" title="{{ activity.target_name or activity.blog_title or '' }}">{{ (activity.target_name or activity.blog_title or '')[:25] }}{{ '...' if (activity.target_name or activity.blog_title or '')|length > 25 else '' }}</span>
+              </div>
+              <div class="col-activity-type">
+                {% if type_key in ['blog', 'generated', 'edited', 'published', 'deleted', 'status_change', 'seo_optimized'] %}
+                <span class="activity-type-badge badge-type-blog"><i class="bi bi-file-post"></i> Blog</span>
+                {% elif type_key == 'user' %}
+                <span class="activity-type-badge badge-type-user"><i class="bi bi-person"></i> User</span>
+                {% elif type_key == 'comment' %}
+                <span class="activity-type-badge badge-type-comment"><i class="bi bi-chat-dots"></i> Comment</span>
+                {% elif type_key == 'settings' %}
+                <span class="activity-type-badge badge-type-settings"><i class="bi bi-gear"></i> Settings</span>
+                {% elif type_key == 'newsletter' %}
+                <span class="activity-type-badge badge-type-newsletter"><i class="bi bi-envelope"></i> Newsletter</span>
+                {% elif type_key == 'category' %}
+                <span class="activity-type-badge badge-type-category"><i class="bi bi-tags"></i> Category</span>
+                {% else %}
+                <span class="activity-type-badge badge-type-settings"><i class="bi bi-activity"></i> Other</span>
+                {% endif %}
+              </div>
+              <div class="col-activity-time">
+                <span class="activity-time-text">{{ activity.timestamp[:10] if activity.timestamp else '' }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="activity-empty">
+              <i class="bi bi-clock-history"></i>
+              <p>No activity found.</p>
+            </div>
+          {% endif %}
         </div>
       </div>
 
       <!-- Pagination -->
-      <div class="activity-pagination" id="activityPagination"></div>
+      <div class="activity-pagination" id="activityPagination">
+        {% if initial_total > initial_per_page %}
+        {% set total_pages = (initial_total / initial_per_page)|round(0, 'ceil')|int %}
+        <button class="page-btn disabled" disabled><i class="bi bi-chevron-left"></i></button>
+        {% for i in range(1, [total_pages + 1, 6]|min) %}
+        <button class="page-btn {{ 'active' if i == 1 else '' }}" onclick="goToPage({{ i }})">{{ i }}</button>
+        {% endfor %}
+        {% if total_pages > 5 %}
+        <span class="page-dots">...</span>
+        <button class="page-btn" onclick="goToPage({{ total_pages }})">{{ total_pages }}</button>
+        {% endif %}
+        <button class="page-btn" onclick="goToPage(2)"><i class="bi bi-chevron-right"></i></button>
+        {% endif %}
+      </div>
 
     </div>
   </main>
@@ -139,5 +195,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/activity.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/activity.js') }}?v=2"></script>
 {% endblock %}

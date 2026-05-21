@@ -22,7 +22,39 @@ def admin_required(f):
 def activity_page():
     admin_id = session.get('user_id')
     stats = db_service.get_activity_stats(admin_id)
-    return render_template('activity.html', stats=stats)
+
+    result = db_service.get_all_activity_for_admin(
+        admin_id=admin_id,
+        type_filter='all',
+        user_filter='all',
+        search='',
+        date_from='',
+        date_to='',
+        page=1,
+        per_page=10
+    )
+
+    activities = result.get('activities', [])
+    for act in activities:
+        ts = act.get('timestamp')
+        if ts and hasattr(ts, 'isoformat'):
+            act['timestamp'] = ts.isoformat()
+
+    sub_users = db_service.get_my_sub_users(admin_id)
+    admin_user = db_service.get_user_by_id(admin_id)
+    users = [{"uid": admin_id, "name": admin_user.get("name", "Admin") if admin_user else "Admin"}]
+    for u in sub_users:
+        users.append({"uid": u.get("uid"), "name": u.get("name", u.get("email", "User"))})
+
+    return render_template(
+        'activity.html',
+        stats=stats,
+        initial_activities=activities,
+        initial_total=result.get('total', 0),
+        initial_page=result.get('page', 1),
+        initial_per_page=result.get('per_page', 10),
+        initial_users=users
+    )
 
 
 @activity_bp.route('/api/activity', methods=['GET'])

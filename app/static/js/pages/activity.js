@@ -12,12 +12,20 @@ let currentPage = 1;
 const perPage = 10;
 let searchTimeout = null;
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', initActivity);
+document.addEventListener('pjax:complete', initActivity);
+
+function initActivity() {
     setupFilterTabs();
     setupControls();
-    loadUserFilter();
-    loadActivities();
-});
+    const listEl = document.getElementById('activityList');
+    if (listEl && listEl.querySelector('.activity-row')) {
+        // Data pre-rendered server-side, user filter already populated in HTML
+    } else {
+        loadUserFilter();
+        loadActivities();
+    }
+}
 
 // ==================== FILTER TABS ====================
 
