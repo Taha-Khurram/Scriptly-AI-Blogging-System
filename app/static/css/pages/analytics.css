@@ -706,3 +706,59 @@
 .analytics-toast i {
     color: #10b981;
 }
+
+/* ==================== RECONNECT BANNER ==================== */
+.analytics-reconnect-banner {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: var(--radius-lg);
+    padding: 2rem 2.5rem;
+    margin: 2rem auto;
+    max-width: 600px;
+}
+
+.analytics-reconnect-banner > i {
+    font-size: 2rem;
+    color: #f59e0b;
+    flex-shrink: 0;
+}
+
+.analytics-reconnect-banner div {
+    flex: 1;
+}
+
+.analytics-reconnect-banner strong {
+    display: block;
+    font-size: 1.05rem;
+    color: #92400e;
+    margin-bottom: 0.25rem;
+}
+
+.analytics-reconnect-banner p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #78350f;
+    opacity: 0.85;
+}
+
+.btn-reconnect {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.6rem 1.25rem;
+    background: var(--primary-color);
+    color: white;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+}
+
+.btn-reconnect:hover {
+    opacity: 0.9;
+    color: white;
+}

@@ -74,7 +74,15 @@ def _get_credentials(user_id):
                 'token_expiry': creds.expiry.isoformat() if creds.expiry else None
             })
         except Exception as e:
+            error_str = str(e).lower()
             print(f"Token refresh failed: {e}")
+            if 'invalid_grant' in error_str or 'token has been expired or revoked' in error_str:
+                db_service.db.collection("analytics_config").document(user_id).update({
+                    'connected': False,
+                    'access_token': '',
+                    'refresh_token': '',
+                    'token_expiry': None
+                })
             return None
 
     return creds
@@ -112,7 +120,7 @@ def _extract_domain(url):
 def analytics_page():
     user_id = session.get('user_id')
     config = _get_analytics_config(user_id)
-    connected = bool(config and config.get('connected'))
+    connected = bool(config and config.get('connected') and config.get('refresh_token'))
     property_id = config.get('property_id', '') if config else ''
     property_name = config.get('property_name', '') if config else ''
     measurement_id = config.get('measurement_id', '') if config else ''
@@ -257,7 +265,7 @@ def list_properties():
     user_id = session.get('user_id')
     creds = _get_credentials(user_id)
     if not creds:
-        return jsonify({"error": "Not connected"}), 401
+        return jsonify({"error": "Not connected", "reconnect": True}), 401
 
     try:
         client = AnalyticsAdminServiceClient(credentials=creds)
@@ -342,7 +350,7 @@ def realtime_data():
 
     creds = _get_credentials(user_id)
     if not creds:
-        return jsonify({"error": "Not connected"}), 401
+        return jsonify({"error": "Not connected", "reconnect": True}), 401
 
     try:
         client = BetaAnalyticsDataClient(credentials=creds)
@@ -380,7 +388,7 @@ def overview_data():
 
     creds = _get_credentials(user_id)
     if not creds:
-        return jsonify({"error": "Not connected"}), 401
+        return jsonify({"error": "Not connected", "reconnect": True}), 401
 
     try:
         client = BetaAnalyticsDataClient(credentials=creds)
@@ -439,7 +447,7 @@ def top_pages():
 
     creds = _get_credentials(user_id)
     if not creds:
-        return jsonify({"error": "Not connected"}), 401
+        return jsonify({"error": "Not connected", "reconnect": True}), 401
 
     try:
         client = BetaAnalyticsDataClient(credentials=creds)
@@ -491,7 +499,7 @@ def traffic_sources():
 
     creds = _get_credentials(user_id)
     if not creds:
-        return jsonify({"error": "Not connected"}), 401
+        return jsonify({"error": "Not connected", "reconnect": True}), 401
 
     try:
         client = BetaAnalyticsDataClient(credentials=creds)

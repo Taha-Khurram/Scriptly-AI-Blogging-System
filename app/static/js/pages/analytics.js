@@ -104,10 +104,28 @@
         fetchTrafficSources();
     }
 
+    function handleReconnect(data) {
+        if (data.reconnect) {
+            if (realtimeInterval) { clearInterval(realtimeInterval); realtimeInterval = null; }
+            var wrapper = document.querySelector('.analytics-dashboard') || document.querySelector('.dashboard-content-wrapper');
+            if (wrapper) {
+                wrapper.innerHTML = '<div class="analytics-reconnect-banner">' +
+                    '<i class="bi bi-exclamation-triangle-fill"></i>' +
+                    '<div><strong>Google Analytics disconnected</strong>' +
+                    '<p>Your session has expired. Please reconnect to continue viewing analytics.</p></div>' +
+                    '<a href="/analytics/connect" class="btn-reconnect">Reconnect</a>' +
+                '</div>';
+            }
+            return true;
+        }
+        return false;
+    }
+
     function fetchRealtime() {
         fetch('/api/analytics/realtime')
             .then(function(r) { return r.json(); })
             .then(function(data) {
+                if (handleReconnect(data)) return;
                 if (data.success) {
                     document.getElementById('realtimeCount').textContent = formatNumber(data.active_users);
                 }
@@ -119,6 +137,7 @@
         fetch('/api/analytics/overview?period=' + currentPeriod)
             .then(function(r) { return r.json(); })
             .then(function(data) {
+                if (handleReconnect(data)) return;
                 if (data.success) {
                     var d = data.data;
                     document.getElementById('pageViews').textContent = formatNumber(d.page_views);
@@ -136,6 +155,7 @@
         fetch('/api/analytics/top-pages?period=' + currentPeriod)
             .then(function(r) { return r.json(); })
             .then(function(data) {
+                if (handleReconnect(data)) return;
                 if (!data.success || !data.pages || data.pages.length === 0) {
                     body.innerHTML = '<div class="analytics-empty"><i class="bi bi-file-text"></i><p>No page data yet</p></div>';
                     return;
@@ -164,6 +184,7 @@
         fetch('/api/analytics/traffic-sources?period=' + currentPeriod)
             .then(function(r) { return r.json(); })
             .then(function(data) {
+                if (handleReconnect(data)) return;
                 if (!data.success || !data.sources || data.sources.length === 0) {
                     body.innerHTML = '<div class="analytics-empty"><i class="bi bi-signpost-split"></i><p>No traffic data yet</p></div>';
                     return;
