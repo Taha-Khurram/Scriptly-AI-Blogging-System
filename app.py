@@ -9,11 +9,11 @@ logger = logging.getLogger('waitress')
 logger.setLevel(logging.INFO)
 
 if __name__ == "__main__":
-    debug = os.environ.get('FLASK_DEBUG', '0') == '1'
+    debug = os.environ.get('FLASK_DEBUG', '1') == '1'
 
     if debug:
-        print("[DEBUG] ScriptlyAI running at http://localhost:5000")
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        print("[DEBUG] ScriptlyAI running at http://localhost:5000 (auto-reload enabled)")
+        app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=True)
     else:
         print("[INFO] ScriptlyAI is running at http://localhost:5000")
         serve(
@@ -26,3 +26,5 @@ if __name__ == "__main__":
             recv_bytes=65536,
             send_bytes=65536,
         )
+        
+        

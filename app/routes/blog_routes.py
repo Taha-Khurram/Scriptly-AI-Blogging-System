@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, url_for, session, redirect, abort
+from flask import Blueprint, render_template, request, jsonify, url_for, session, redirect, abort, current_app
 from app.agents.blog_agent import BlogAgent
 from app.agents.category_agent import CategoryAgent
 from app.agents.seo_agent import SEOAgent
@@ -10,6 +10,7 @@ from app.utils.date_utils import (
     get_current_time_preview
 )
 from app.utils.slug_utils import PERMALINK_STRUCTURES
+from app.utils.task_manager import task_manager
 from datetime import datetime
 import math
 import markdown
@@ -348,6 +349,7 @@ def generate_and_submit():
     try:
         user_id = session.get('user_id')
         user_name = session.get('user_name', 'User')
+        user_role = session.get('user_role')
 
         if not user_id:
             return jsonify({"success": False, "error": "User session expired"}), 401
@@ -357,99 +359,150 @@ def generate_and_submit():
         auto_submit = data.get('auto_submit', False)
         enable_humanize = data.get('enable_humanize', False)
 
-        # Run optimized pipeline (SEO disabled by default for speed)
-        blog_ai = BlogAgent()
-        generated_data = blog_ai.run_pipeline(prompt, enable_seo=False, enable_humanize=enable_humanize)
+        if not prompt:
+            return jsonify({"success": False, "error": "Prompt is required"}), 400
 
-        # Check if pipeline failed before proceeding
-        if generated_data.get('status') == 'failed' or 'error' in generated_data:
-            error_msg = generated_data.get('error', 'Blog generation failed')
-            print(f"❌ Pipeline failed: {error_msg}")
-            return jsonify({"success": False, "error": error_msg}), 500
-
-        # Extract content safely while preserving full structure
-        content_text = ""
-        content_obj = generated_data.get('content', {})
-        formatting_obj = generated_data.get('formatting', {})
-
-        if isinstance(content_obj, dict):
-            content_text = (
-                content_obj.get('markdown')
-                or content_obj.get('body')
-                or content_obj.get('text', '')
-            )
-            # Preserve the full content structure with HTML and TOC
-            generated_data['content'] = {
-                'body': content_text,
-                'html': content_obj.get('html', ''),
-                'markdown': content_obj.get('markdown', content_text),
-                'toc': formatting_obj.get('toc', []),
-                'toc_html': formatting_obj.get('toc_html', '')
-            }
-        elif isinstance(content_obj, str):
-            content_text = content_obj
-            generated_data['content'] = {
-                'body': content_text,
-                'html': content_text,
-                'markdown': content_text,
-                'toc': [],
-                'toc_html': ''
-            }
-        else:
-            content_text = "AI generation completed but content could not be parsed."
-            generated_data['content'] = {
-                'body': content_text,
-                'html': content_text,
-                'markdown': content_text,
-                'toc': [],
-                'toc_html': ''
-            }
-
-        # Category assignment with cached categories
-        cat_agent = CategoryAgent()
-        categories = db_service.get_all_categories(user_id, limit=50, use_cache=True)
-        generated_data['category'] = cat_agent.categorize_blog(
-            generated_data.get('title'),
-            content_text,
-            categories=categories
-        )
-
-        status = (
-            "PUBLISHED"
-            if auto_submit and session.get('user_role') == 'ADMIN'
-            else "UNDER_REVIEW"
-            if auto_submit
-            else "DRAFT"
-        )
-
-        generated_data['status'] = status
-        generated_data['author_id'] = user_id
-        generated_data['author'] = user_name
-
-        db_service.create_draft(generated_data, user_id)
-
-        db_service.log_activity(
+        app = current_app._get_current_object()
+        task_id = task_manager.create_task(user_id)
+        task_manager.submit(
+            task_id, _run_generation_task,
+            app=app,
             user_id=user_id,
             user_name=user_name,
-            type="generated",
-            action_text=f"generated a blog as {status}",
-            blog_title=generated_data.get('title', 'Untitled')
+            user_role=user_role,
+            prompt=prompt,
+            auto_submit=auto_submit,
+            enable_humanize=enable_humanize
         )
 
-        return jsonify({
-            "success": True,
-            "redirect": url_for(
-                'blog.approval_page'
-                if status == "UNDER_REVIEW"
-                else 'blog.home'
-                if status == "PUBLISHED"
-                else 'blog.drafts_page'
-            )
-        }), 201
+        return jsonify({"success": True, "task_id": task_id}), 202
 
     except Exception as e:
         print(f"❌ Route Error in Generate: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, auto_submit, enable_humanize):
+    """Background task that runs the full blog generation pipeline."""
+    with app.app_context():
+        try:
+            task_manager.update_task(task_id, 'outline', 20)
+
+            blog_ai = BlogAgent()
+            generated_data = blog_ai.run_pipeline(prompt, enable_seo=False, enable_humanize=enable_humanize)
+
+            if generated_data.get('status') == 'failed' or 'error' in generated_data:
+                error_msg = generated_data.get('error', 'Blog generation failed')
+                task_manager.fail_task(task_id, error_msg)
+                return
+
+            task_manager.update_task(task_id, 'formatting', 80)
+
+            content_text = ""
+            content_obj = generated_data.get('content', {})
+            formatting_obj = generated_data.get('formatting', {})
+
+            if isinstance(content_obj, dict):
+                content_text = (
+                    content_obj.get('markdown')
+                    or content_obj.get('body')
+                    or content_obj.get('text', '')
+                )
+                generated_data['content'] = {
+                    'body': content_text,
+                    'html': content_obj.get('html', ''),
+                    'markdown': content_obj.get('markdown', content_text),
+                    'toc': formatting_obj.get('toc', []),
+                    'toc_html': formatting_obj.get('toc_html', '')
+                }
+            elif isinstance(content_obj, str):
+                content_text = content_obj
+                generated_data['content'] = {
+                    'body': content_text,
+                    'html': content_text,
+                    'markdown': content_text,
+                    'toc': [],
+                    'toc_html': ''
+                }
+            else:
+                content_text = "AI generation completed but content could not be parsed."
+                generated_data['content'] = {
+                    'body': content_text,
+                    'html': content_text,
+                    'markdown': content_text,
+                    'toc': [],
+                    'toc_html': ''
+                }
+
+            task_manager.update_task(task_id, 'categorizing', 90)
+
+            cat_agent = CategoryAgent()
+            db = FirestoreService()
+            categories = db.get_all_categories(user_id, limit=50, use_cache=True)
+            generated_data['category'] = cat_agent.categorize_blog(
+                generated_data.get('title'),
+                content_text,
+                categories=categories
+            )
+
+            task_manager.update_task(task_id, 'saving', 95)
+
+            status = (
+                "PUBLISHED"
+                if auto_submit and user_role == 'ADMIN'
+                else "UNDER_REVIEW"
+                if auto_submit
+                else "DRAFT"
+            )
+
+            generated_data['status'] = status
+            generated_data['author_id'] = user_id
+            generated_data['author'] = user_name
+
+            db.create_draft(generated_data, user_id)
+
+            db.log_activity(
+                user_id=user_id,
+                user_name=user_name,
+                type="generated",
+                action_text=f"generated a blog as {status}",
+                blog_title=generated_data.get('title', 'Untitled')
+            )
+
+            if status == "UNDER_REVIEW":
+                redirect_url = "/approval"
+            elif status == "PUBLISHED":
+                redirect_url = "/dashboard"
+            else:
+                redirect_url = "/drafts"
+
+            task_manager.complete_task(task_id, {"redirect": redirect_url})
+
+        except Exception as e:
+            print(f"❌ Background Task Error: {e}")
+            task_manager.fail_task(task_id, str(e))
+
+
+@blog_bp.route('/api/generate/status/<task_id>', methods=['GET'])
+def generation_status(task_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Session expired"}), 401
+
+    task = task_manager.get_task(task_id)
+    if not task:
+        return jsonify({"error": "Task not found or expired"}), 404
+
+    if task['user_id'] != user_id:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    return jsonify({
+        "status": task['status'],
+        "progress": task['progress'],
+        "stage": task['stage'],
+        "result": task.get('result'),
+        "error": task.get('error')
+    })
 
 
 @blog_bp.route('/api/humanize/<blog_id>', methods=['POST'])

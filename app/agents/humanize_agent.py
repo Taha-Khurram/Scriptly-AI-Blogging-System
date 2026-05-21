@@ -206,7 +206,7 @@ class HumanizeAgent:
                 chunk_headings = len(re.findall(r'^#{1,3}\s', chunk, re.MULTILINE))
                 print(f"   Chunk {i+1}: {chunk_words} words, {chunk_headings} headings")
 
-            # Step 2: Rewrite each half with a different prompt variant (max 2 API calls)
+            # Step 2: Rewrite each half with a different prompt variant
             print(f"\n🤖 Step 2: Rewriting chunks via Gemini API")
             rewritten = []
             for i, chunk in enumerate(chunks):
@@ -267,7 +267,9 @@ class HumanizeAgent:
         return [first_half, second_half]
 
     def _rewrite_chunk(self, chunk, topic, index):
-        """Rewrite a chunk using a prompt variant. Skips if under 30 words."""
+        """Rewrite a chunk using a prompt variant with 1 retry on timeout."""
+        import time
+
         chunk_words = len(chunk.split())
         variant_num = index % len(PROMPT_VARIANTS)
 
@@ -280,26 +282,32 @@ class HumanizeAgent:
         variant = PROMPT_VARIANTS[variant_num]
         prompt = variant.format(topic=topic or "this topic", section=chunk)
 
-        try:
-            response = self.model.generate_content(
-                prompt, generation_config=self.generation_config
-            )
-            result = self._clean_response(response.text)
-            result_words = len(result.split())
+        for attempt in range(2):
+            try:
+                response = self.model.generate_content(
+                    prompt,
+                    generation_config=self.generation_config
+                )
+                result = self._clean_response(response.text)
+                result_words = len(result.split())
 
-            # Sanity: if chunk had headings and result lost them all, keep original
-            orig_headings = re.findall(r'^#{1,3}\s', chunk, re.MULTILINE)
-            new_headings = re.findall(r'^#{1,3}\s', result, re.MULTILINE)
-            if len(orig_headings) > 0 and len(new_headings) == 0:
-                print(f"⚠️ Lost all headings, keeping original")
+                orig_headings = re.findall(r'^#{1,3}\s', chunk, re.MULTILINE)
+                new_headings = re.findall(r'^#{1,3}\s', result, re.MULTILINE)
+                if len(orig_headings) > 0 and len(new_headings) == 0:
+                    print(f"⚠️ Lost all headings, keeping original")
+                    return chunk
+
+                print(f"✅ Done ({chunk_words} → {result_words} words)")
+                return result
+
+            except Exception as e:
+                error_str = str(e).lower()
+                if attempt == 0 and ('deadline' in error_str or 'timeout' in error_str or '504' in error_str):
+                    print(f"⚠️ Timeout, retrying once...", end=" ", flush=True)
+                    time.sleep(2)
+                    continue
+                print(f"❌ Failed: {e}")
                 return chunk
-
-            print(f"✅ Done ({chunk_words} → {result_words} words)")
-            return result
-
-        except Exception as e:
-            print(f"❌ Failed: {e}")
-            return chunk
 
     def _clean_response(self, text):
         """Strip code fences and preamble from LLM output."""

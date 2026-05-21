@@ -46,6 +46,15 @@ def publish_due_blogs():
         print(f"[Scheduler] Error: {e}")
 
 
+def cleanup_expired_tasks():
+    """Remove completed/failed tasks older than 10 minutes."""
+    try:
+        from app.utils.task_manager import task_manager
+        task_manager.cleanup_expired(max_age=600)
+    except Exception as e:
+        print(f"[Scheduler] Task cleanup error: {e}")
+
+
 def init_scheduler(app):
     """Initialize the background scheduler."""
     # Prevent double-start in Flask debug reloader
@@ -55,6 +64,13 @@ def init_scheduler(app):
             trigger=IntervalTrigger(seconds=60),
             id='publish_scheduled_blogs',
             name='Publish scheduled blogs',
+            replace_existing=True
+        )
+        scheduler.add_job(
+            func=cleanup_expired_tasks,
+            trigger=IntervalTrigger(seconds=300),
+            id='cleanup_expired_tasks',
+            name='Cleanup expired generation tasks',
             replace_existing=True
         )
         scheduler.start()

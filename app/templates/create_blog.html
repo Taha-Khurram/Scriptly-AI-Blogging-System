@@ -50,9 +50,16 @@
       </div>
 
       <div id="loader" class="mt-4 d-none">
-        <div class="d-flex align-items-center gap-3 bg-white px-4 py-3 rounded-pill shadow-card border border-light">
-          <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-          <span class="text-secondary small fw-bold">AI is generating your content...</span>
+        <div class="d-flex flex-column align-items-center gap-2">
+          <div class="d-flex align-items-center gap-3 bg-white px-4 py-3 rounded-pill shadow-card border border-light">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            <span class="text-secondary small fw-bold">Starting generation...</span>
+          </div>
+          <div class="w-100" style="max-width: 300px;">
+            <div class="progress" style="height: 6px; border-radius: 3px;">
+              <div id="genProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%; transition: width 0.5s ease;"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -62,5 +69,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/create-blog.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/create-blog.js') }}?v=2"></script>
 {% endblock %}
