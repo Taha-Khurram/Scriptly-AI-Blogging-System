@@ -1,40 +1,40 @@
 import os
-import resend
-from flask import render_template_string
+import mailtrap as mt
+
 
 class EmailService:
     """
-    Email service using Resend API.
-    Free tier: 3,000 emails/month, no credit card required.
-    Sign up at https://resend.com
+    Email service using Mailtrap API.
+    Sign up at https://mailtrap.io
     """
 
     def __init__(self):
-        self.api_key = os.getenv("RESEND_API_KEY")
-        self.from_email = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
-        self.from_name = os.getenv("FROM_NAME", "Newsletter")
+        self.api_token = os.getenv("MAILTRAP_API_TOKEN")
+        self.from_email = os.getenv("FROM_EMAIL", "noreply@scriptly.app")
+        self.from_name = os.getenv("FROM_NAME", "Scriptly")
+        self.inbox_id = int(os.getenv("MAILTRAP_INBOX_ID", "4651152"))
 
-        if self.api_key:
-            resend.api_key = self.api_key
-
-    def _get_from_address(self):
-        """Format the from address with name."""
-        return f"{self.from_name} <{self.from_email}>"
+    def _get_client(self):
+        """Get Mailtrap API client in sandbox mode."""
+        if not self.api_token:
+            return None
+        return mt.MailtrapClient(token=self.api_token, sandbox=True, inbox_id=self.inbox_id)
 
     def send_single(self, to_email: str, subject: str, html_content: str):
         """Send email to a single recipient."""
-        if not self.api_key:
-            return {"success": False, "error": "RESEND_API_KEY not configured"}
+        client = self._get_client()
+        if not client:
+            return {"success": False, "error": "MAILTRAP_API_TOKEN not configured"}
 
         try:
-            params = {
-                "from": self._get_from_address(),
-                "to": [to_email],
-                "subject": subject,
-                "html": html_content
-            }
-            response = resend.Emails.send(params)
-            return {"success": True, "id": response.get("id")}
+            mail = mt.Mail(
+                sender=mt.Address(email=self.from_email, name=self.from_name),
+                to=[mt.Address(email=to_email)],
+                subject=subject,
+                html=html_content,
+            )
+            response = client.send(mail)
+            return {"success": True, "id": getattr(response, 'message_ids', [None])[0] if hasattr(response, 'message_ids') else str(response)}
         except Exception as e:
             print(f"Email send error: {e}")
             return {"success": False, "error": str(e)}
@@ -44,8 +44,9 @@ class EmailService:
         Send newsletter to multiple recipients.
         Uses individual sends for better deliverability and tracking.
         """
-        if not self.api_key:
-            return {"success": False, "error": "RESEND_API_KEY not configured"}
+        client = self._get_client()
+        if not client:
+            return {"success": False, "error": "MAILTRAP_API_TOKEN not configured"}
 
         if not to_emails:
             return {"success": False, "error": "No recipients provided"}
@@ -59,13 +60,13 @@ class EmailService:
 
         for email in to_emails:
             try:
-                params = {
-                    "from": self._get_from_address(),
-                    "to": [email],
-                    "subject": subject,
-                    "html": html_content
-                }
-                resend.Emails.send(params)
+                mail = mt.Mail(
+                    sender=mt.Address(email=self.from_email, name=self.from_name),
+                    to=[mt.Address(email=email)],
+                    subject=subject,
+                    html=html_content,
+                )
+                client.send(mail)
                 results["sent"] += 1
             except Exception as e:
                 results["failed"] += 1
@@ -89,8 +90,9 @@ class EmailService:
             base_url: Base URL for unsubscribe links
             site_name: Name to show in footer
         """
-        if not self.api_key:
-            return {"success": False, "error": "RESEND_API_KEY not configured"}
+        client = self._get_client()
+        if not client:
+            return {"success": False, "error": "MAILTRAP_API_TOKEN not configured"}
 
         if not subscribers:
             return {"success": False, "error": "No subscribers"}
@@ -109,7 +111,6 @@ class EmailService:
                 continue
 
             try:
-                # Personalize content with subscriber email for unsubscribe
                 personalized_html = html_content.replace(
                     "{{ email }}", email
                 ).replace(
@@ -117,13 +118,13 @@ class EmailService:
                     f"{base_url}/unsubscribe?email={email}"
                 )
 
-                params = {
-                    "from": self._get_from_address(),
-                    "to": [email],
-                    "subject": subject,
-                    "html": personalized_html
-                }
-                resend.Emails.send(params)
+                mail = mt.Mail(
+                    sender=mt.Address(email=self.from_email, name=self.from_name),
+                    to=[mt.Address(email=email)],
+                    subject=subject,
+                    html=personalized_html,
+                )
+                client.send(mail)
                 results["sent"] += 1
 
             except Exception as e:
@@ -136,13 +137,19 @@ class EmailService:
         return results
 
     def test_connection(self):
-        """Test if API key is valid by checking Resend API."""
-        if not self.api_key:
-            return {"valid": False, "error": "RESEND_API_KEY not set"}
+        """Test if API token is valid."""
+        if not self.api_token:
+            return {"valid": False, "error": "MAILTRAP_API_TOKEN not set"}
 
         try:
-            # Try to list domains (lightweight API call)
-            resend.Domains.list()
+            client = self._get_client()
+            mail = mt.Mail(
+                sender=mt.Address(email=self.from_email, name=self.from_name),
+                to=[mt.Address(email=self.from_email)],
+                subject="Connection Test",
+                text="Test",
+            )
+            client.send(mail)
             return {"valid": True}
         except Exception as e:
             return {"valid": False, "error": str(e)}
