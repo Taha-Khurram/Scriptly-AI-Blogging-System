@@ -1256,8 +1256,10 @@ def update_site_settings():
         if new_slug:
             if len(new_slug) < 3:
                 return jsonify({"success": False, "error": "Site slug must be at least 3 characters"}), 400
-            if not db_service.is_slug_available(new_slug, exclude_user_id=user_id):
-                return jsonify({"success": False, "error": "This slug is already taken"}), 400
+            existing_settings = db_service.get_site_settings(user_id)
+            if not existing_settings or existing_settings.get('site_slug') != new_slug:
+                if not db_service.is_slug_available(new_slug, exclude_user_id=user_id):
+                    return jsonify({"success": False, "error": "This slug is already taken"}), 400
 
         # Build settings object with all fields
         settings = {
@@ -1339,13 +1341,14 @@ def update_site_settings():
         success = db_service.update_site_settings(user_id, settings)
 
         if success:
-            db_service.log_activity(
-                user_id=user_id,
-                user_name=session.get('user_name', 'User'),
-                type="settings",
-                action_text="updated site settings",
-                blog_title=""
-            )
+            import threading
+            threading.Thread(target=db_service.log_activity, kwargs={
+                'user_id': user_id,
+                'user_name': session.get('user_name', 'User'),
+                'type': 'settings',
+                'action_text': 'updated site settings',
+                'blog_title': ''
+            }, daemon=True).start()
 
         return jsonify({"success": success})
 

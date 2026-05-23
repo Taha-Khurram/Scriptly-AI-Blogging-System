@@ -2490,6 +2490,9 @@
 </div>
 
 <script>
+    function _v(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+    function _c(id) { var el = document.getElementById(id); return el ? el.checked : false; }
+
     // Tab Navigation
     document.querySelectorAll('.settings-tab').forEach(tab => {
         tab.addEventListener('click', function() {
@@ -2590,149 +2593,122 @@
         submitBtn.classList.add('loading');
         submitBtn.disabled = true;
 
-        const formData = {
-            // General
-            site_name: document.getElementById('site_name').value,
-            site_slug: document.getElementById('site_slug').value.toLowerCase().replace(/[^a-z0-9-]/g, ''),
-            site_description: document.getElementById('site_description').value,
-            niche: document.getElementById('niche').value,
-            site_visibility: document.getElementById('site_visibility').value,
-            // Appearance
-            logo_url: document.getElementById('logo_url').value,
-            favicon_url: document.getElementById('favicon_url').value,
-            primary_color: document.getElementById('primary_color').value,
-            secondary_color: document.getElementById('secondary_color').value,
-            cover_image_url: document.getElementById('cover_image_url').value,
-            // Content
-            posts_per_page: parseInt(document.getElementById('posts_per_page').value),
-            show_reading_time: document.getElementById('show_reading_time').checked,
-            show_author: document.getElementById('show_author').checked,
-            featured_post_id: document.getElementById('featured_post_id').value,
-            // SEO
-            meta_title: document.getElementById('meta_title').value,
-            meta_description: document.getElementById('meta_description').value,
-            og_image_url: document.getElementById('og_image_url').value,
-            analytics_id: document.getElementById('analytics_id').value,
-            custom_domain: document.getElementById('custom_domain').value,
-            // Social
-            social_twitter: document.getElementById('social_twitter').value,
-            social_linkedin: document.getElementById('social_linkedin').value,
-            social_github: document.getElementById('social_github').value,
-            contact_email: document.getElementById('contact_email').value,
-            about_content: document.getElementById('about_content').value,
-
-            // Locale & Time
-            timezone: document.getElementById('timezone').value,
-            date_format: document.getElementById('date_format').value,
-            time_format: document.getElementById('time_format').value,
-            locale: document.getElementById('locale').value,
-
-            // Header Settings
-            header: {
-                nav_home: document.getElementById('header_nav_home').value,
-                nav_blog: document.getElementById('header_nav_blog').value,
-                nav_about: document.getElementById('header_nav_about').value,
-                nav_contact: document.getElementById('header_nav_contact').value,
-                cta_text: document.getElementById('header_cta_text').value,
-                show_search: document.getElementById('header_show_search').checked
-            },
-
-            // Footer Settings
-            footer: {
-                copyright: document.getElementById('footer_copyright').value,
-                col1_title: document.getElementById('footer_col1_title').value,
-                col2_title: document.getElementById('footer_col2_title').value,
-                col3_title: document.getElementById('footer_col3_title').value,
-                show_newsletter: document.getElementById('footer_show_newsletter').checked,
-                newsletter_title: document.getElementById('footer_newsletter_title').value,
-                newsletter_description: document.getElementById('footer_newsletter_description').value
-            },
-
-            // Home Hero
-            hero_home: {
-                badge: document.getElementById('hero_home_badge').value,
-                title: document.getElementById('hero_home_title').value,
-                subtitle: document.getElementById('hero_home_subtitle').value,
-                cta_primary: document.getElementById('hero_home_cta_primary').value,
-                cta_secondary: document.getElementById('hero_home_cta_secondary').value,
-                stats_label_1: document.getElementById('hero_home_stats_label_1').value,
-                stats_label_2: document.getElementById('hero_home_stats_label_2').value,
-                stats_label_3: document.getElementById('hero_home_stats_label_3').value
-            },
-
-            // About Hero
-            hero_about: {
-                title: document.getElementById('hero_about_title').value,
-                subtitle: document.getElementById('hero_about_subtitle').value,
-                story_title: document.getElementById('hero_about_story_title').value,
-                values_title: document.getElementById('hero_about_values_title').value,
-                value_1_title: document.getElementById('hero_about_value_1_title').value,
-                value_1_desc: document.getElementById('hero_about_value_1_desc').value,
-                value_2_title: document.getElementById('hero_about_value_2_title').value,
-                value_2_desc: document.getElementById('hero_about_value_2_desc').value,
-                value_3_title: document.getElementById('hero_about_value_3_title').value,
-                value_3_desc: document.getElementById('hero_about_value_3_desc').value,
-                stats_title: document.getElementById('hero_about_stats_title').value,
-                cta_title: document.getElementById('hero_about_cta_title').value,
-                cta_subtitle: document.getElementById('hero_about_cta_subtitle').value
-            },
-
-            // Blog Hero
-            hero_blog: {
-                title: document.getElementById('hero_blog_title').value,
-                subtitle: document.getElementById('hero_blog_subtitle').value
-            },
-
-            // Contact Hero
-            hero_contact: {
-                title: document.getElementById('hero_contact_title').value,
-                subtitle: document.getElementById('hero_contact_subtitle').value,
-                form_title: document.getElementById('hero_contact_form_title').value,
-                form_subtitle: document.getElementById('hero_contact_form_subtitle').value,
-                faq_1_q: document.getElementById('hero_contact_faq_1_q').value,
-                faq_1_a: document.getElementById('hero_contact_faq_1_a').value,
-                faq_2_q: document.getElementById('hero_contact_faq_2_q').value,
-                faq_2_a: document.getElementById('hero_contact_faq_2_a').value,
-                faq_3_q: document.getElementById('hero_contact_faq_3_q').value,
-                faq_3_a: document.getElementById('hero_contact_faq_3_a').value,
-                faq_4_q: document.getElementById('hero_contact_faq_4_q').value,
-                faq_4_a: document.getElementById('hero_contact_faq_4_a').value
-            },
-
-            // Permalinks
-            permalinks: {
-                structure: document.querySelector('input[name="permalink_structure"]:checked')?.value || 'post-name',
-                category_base: document.getElementById('category_base').value,
-                tag_base: document.getElementById('tag_base').value
-            },
-
-            // SEO
-            seo: {
-                indexing_enabled: document.getElementById('seo_indexing_enabled').checked,
-                robots_txt_custom: document.getElementById('seo_robots_txt').value,
-                og_site_name: document.getElementById('seo_og_site_name').value,
-                og_default_image: document.getElementById('og_image_url').value,
-                twitter_card: document.getElementById('seo_twitter_card').value,
-                twitter_site: document.getElementById('seo_twitter_site').value
-            },
-
-            // RSS Feed
-            rss: {
-                enabled: document.getElementById('rss_enabled').checked,
-                posts_count: parseInt(document.getElementById('rss_posts_count').value) || 20,
-                content_type: document.getElementById('rss_content_type').value,
-                include_featured_image: document.getElementById('rss_include_image').checked
-            },
-
-            // Google Sheets
-            google_sheets_id: (() => {
-                const val = document.getElementById('google_sheets_id').value.trim();
-                const match = val.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-                return match ? match[1] : val;
-            })()
-        };
-
         try {
+            const formData = {
+                site_name: _v('site_name'),
+                site_slug: _v('site_slug').toLowerCase().replace(/[^a-z0-9-]/g, ''),
+                site_description: _v('site_description'),
+                niche: _v('niche'),
+                site_visibility: _v('site_visibility'),
+                logo_url: _v('logo_url'),
+                favicon_url: _v('favicon_url'),
+                primary_color: _v('primary_color'),
+                secondary_color: _v('secondary_color'),
+                cover_image_url: _v('cover_image_url'),
+                posts_per_page: parseInt(_v('posts_per_page')) || 10,
+                show_reading_time: _c('show_reading_time'),
+                show_author: _c('show_author'),
+                featured_post_id: _v('featured_post_id'),
+                meta_title: _v('meta_title'),
+                meta_description: _v('meta_description'),
+                og_image_url: _v('og_image_url'),
+                analytics_id: _v('analytics_id'),
+                custom_domain: _v('custom_domain'),
+                social_twitter: _v('social_twitter'),
+                social_linkedin: _v('social_linkedin'),
+                social_github: _v('social_github'),
+                contact_email: _v('contact_email'),
+                about_content: _v('about_content'),
+                timezone: _v('timezone'),
+                date_format: _v('date_format'),
+                time_format: _v('time_format'),
+                locale: _v('locale'),
+                header: {
+                    nav_home: _v('header_nav_home'),
+                    nav_blog: _v('header_nav_blog'),
+                    nav_about: _v('header_nav_about'),
+                    nav_contact: _v('header_nav_contact'),
+                    cta_text: _v('header_cta_text'),
+                    show_search: _c('header_show_search')
+                },
+                footer: {
+                    copyright: _v('footer_copyright'),
+                    col1_title: _v('footer_col1_title'),
+                    col2_title: _v('footer_col2_title'),
+                    col3_title: _v('footer_col3_title'),
+                    show_newsletter: _c('footer_show_newsletter'),
+                    newsletter_title: _v('footer_newsletter_title'),
+                    newsletter_description: _v('footer_newsletter_description')
+                },
+                hero_home: {
+                    badge: _v('hero_home_badge'),
+                    title: _v('hero_home_title'),
+                    subtitle: _v('hero_home_subtitle'),
+                    cta_primary: _v('hero_home_cta_primary'),
+                    cta_secondary: _v('hero_home_cta_secondary'),
+                    stats_label_1: _v('hero_home_stats_label_1'),
+                    stats_label_2: _v('hero_home_stats_label_2'),
+                    stats_label_3: _v('hero_home_stats_label_3')
+                },
+                hero_about: {
+                    title: _v('hero_about_title'),
+                    subtitle: _v('hero_about_subtitle'),
+                    story_title: _v('hero_about_story_title'),
+                    values_title: _v('hero_about_values_title'),
+                    value_1_title: _v('hero_about_value_1_title'),
+                    value_1_desc: _v('hero_about_value_1_desc'),
+                    value_2_title: _v('hero_about_value_2_title'),
+                    value_2_desc: _v('hero_about_value_2_desc'),
+                    value_3_title: _v('hero_about_value_3_title'),
+                    value_3_desc: _v('hero_about_value_3_desc'),
+                    stats_title: _v('hero_about_stats_title'),
+                    cta_title: _v('hero_about_cta_title'),
+                    cta_subtitle: _v('hero_about_cta_subtitle')
+                },
+                hero_blog: {
+                    title: _v('hero_blog_title'),
+                    subtitle: _v('hero_blog_subtitle')
+                },
+                hero_contact: {
+                    title: _v('hero_contact_title'),
+                    subtitle: _v('hero_contact_subtitle'),
+                    form_title: _v('hero_contact_form_title'),
+                    form_subtitle: _v('hero_contact_form_subtitle'),
+                    faq_1_q: _v('hero_contact_faq_1_q'),
+                    faq_1_a: _v('hero_contact_faq_1_a'),
+                    faq_2_q: _v('hero_contact_faq_2_q'),
+                    faq_2_a: _v('hero_contact_faq_2_a'),
+                    faq_3_q: _v('hero_contact_faq_3_q'),
+                    faq_3_a: _v('hero_contact_faq_3_a'),
+                    faq_4_q: _v('hero_contact_faq_4_q'),
+                    faq_4_a: _v('hero_contact_faq_4_a')
+                },
+                permalinks: {
+                    structure: document.querySelector('input[name="permalink_structure"]:checked')?.value || 'post-name',
+                    category_base: _v('category_base'),
+                    tag_base: _v('tag_base')
+                },
+                seo: {
+                    indexing_enabled: _c('seo_indexing_enabled'),
+                    robots_txt_custom: _v('seo_robots_txt'),
+                    og_site_name: _v('seo_og_site_name'),
+                    og_default_image: _v('og_image_url'),
+                    twitter_card: _v('seo_twitter_card'),
+                    twitter_site: _v('seo_twitter_site')
+                },
+                rss: {
+                    enabled: _c('rss_enabled'),
+                    posts_count: parseInt(_v('rss_posts_count')) || 20,
+                    content_type: _v('rss_content_type'),
+                    include_featured_image: _c('rss_include_image')
+                },
+                google_sheets_id: (() => {
+                    const val = _v('google_sheets_id').trim();
+                    const match = val.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+                    return match ? match[1] : val;
+                })()
+            };
+
             const response = await fetch('/api/site-settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2748,10 +2724,10 @@
                     message: 'Your site settings have been updated.',
                     duration: 4000
                 });
-
-                // Update preview
-                document.getElementById('preview-name').textContent = formData.site_name;
-                document.getElementById('preview-desc').textContent = formData.site_description;
+                var previewName = document.getElementById('preview-name');
+                var previewDesc = document.getElementById('preview-desc');
+                if (previewName) previewName.textContent = formData.site_name;
+                if (previewDesc) previewDesc.textContent = formData.site_description;
             } else {
                 showToast({
                     type: 'error',
@@ -2761,11 +2737,11 @@
                 });
             }
         } catch (err) {
-            console.error(err);
+            console.error('Site settings save error:', err);
             showToast({
                 type: 'error',
-                title: 'Connection Error',
-                message: 'Failed to save settings.',
+                title: 'Save Error',
+                message: err.message || 'Failed to save settings.',
                 duration: 5000
             });
         } finally {
