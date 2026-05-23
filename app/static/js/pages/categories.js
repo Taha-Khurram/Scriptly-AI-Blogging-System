@@ -154,9 +154,17 @@ async function viewCategoryBlogs(categoryId, categoryName) {
       tbody.innerHTML = '';
 
       data.blogs.forEach(blog => {
-        const statusBadge = blog.status === 'published'
-          ? '<span class="badge bg-success-subtle text-success rounded-pill px-3">Published</span>'
-          : '<span class="badge bg-warning-subtle text-warning rounded-pill px-3">Draft</span>';
+        const status = (blog.status || 'DRAFT').toUpperCase();
+        let statusBadge;
+        if (status === 'PUBLISHED') {
+          statusBadge = '<span class="badge bg-success-subtle text-success rounded-pill px-3">Published</span>';
+        } else if (status === 'UNDER_REVIEW') {
+          statusBadge = '<span class="badge bg-info-subtle text-info rounded-pill px-3">Under Review</span>';
+        } else if (status === 'REJECTED') {
+          statusBadge = '<span class="badge bg-danger-subtle text-danger rounded-pill px-3">Rejected</span>';
+        } else {
+          statusBadge = '<span class="badge bg-warning-subtle text-warning rounded-pill px-3">Draft</span>';
+        }
 
         const createdAt = blog.created_at
           ? new Date(blog.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
