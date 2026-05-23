@@ -502,6 +502,24 @@ const Pjax = (() => {
                 <div class="skeleton-table-row"><div style="display:flex;align-items:center;gap:10px;width:25%;"><div class="skeleton skeleton-circle" style="width:36px;height:36px;flex-shrink:0;"></div><div class="skeleton skeleton-text" style="width:70%;"></div></div><div class="skeleton skeleton-text" style="width:28%;"></div><div class="skeleton skeleton-text" style="width:10%;"></div><div class="skeleton" style="width:60px;height:22px;border-radius:12px;"></div><div class="skeleton skeleton-text" style="width:8%;"></div></div>
                 <div class="skeleton-table-row"><div style="display:flex;align-items:center;gap:10px;width:25%;"><div class="skeleton skeleton-circle" style="width:36px;height:36px;flex-shrink:0;"></div><div class="skeleton skeleton-text" style="width:90%;"></div></div><div class="skeleton skeleton-text" style="width:22%;"></div><div class="skeleton skeleton-text" style="width:14%;"></div><div class="skeleton" style="width:60px;height:22px;border-radius:12px;"></div><div class="skeleton skeleton-text" style="width:8%;"></div></div>
                 <div class="skeleton-table-row"><div style="display:flex;align-items:center;gap:10px;width:25%;"><div class="skeleton skeleton-circle" style="width:36px;height:36px;flex-shrink:0;"></div><div class="skeleton skeleton-text" style="width:75%;"></div></div><div class="skeleton skeleton-text" style="width:26%;"></div><div class="skeleton skeleton-text" style="width:11%;"></div><div class="skeleton" style="width:60px;height:22px;border-radius:12px;"></div><div class="skeleton skeleton-text" style="width:8%;"></div></div>
+            </div>`,
+
+        // Optimization: header + input card + metrics grid
+        optimization: `
+            <header class="dashboard-header skeleton-header">
+                <div><div class="skeleton skeleton-text" style="height:14px;width:80px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:180px;"></div></div>
+            </header>
+            <div class="skeleton-card" style="margin-bottom:1.5rem;">
+                <div class="skeleton skeleton-text" style="height:14px;width:180px;margin-bottom:1rem;"></div>
+                <div style="display:flex;gap:0.75rem;"><div class="skeleton" style="flex:1;height:44px;border-radius:12px;"></div><div class="skeleton" style="width:130px;height:44px;border-radius:12px;"></div></div>
+            </div>
+            <div class="skeleton-stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
             </div>`
     };
 
@@ -524,7 +542,8 @@ const Pjax = (() => {
         '/analytics': 'analytics',
         '/create': 'create',
         '/app-settings': 'appSettings',
-        '/users/manage-users': 'manageUsers'
+        '/users/manage-users': 'manageUsers',
+        '/optimization': 'optimization'
     };
 
     function getSkeletonForUrl(url) {
@@ -557,7 +576,8 @@ const Pjax = (() => {
             '/categories', '/gallery', '/seo-tools', '/newsletter',
             '/formatting-tools', '/site-settings', '/approval',
             '/comments', '/schedule', '/leads', '/activity',
-            '/analytics', '/app-settings', '/users/manage-users'
+            '/analytics', '/app-settings', '/users/manage-users',
+            '/optimization'
         ];
         return dashboardPaths.some(p => url.pathname === p || url.pathname.startsWith(p));
     }
@@ -1007,7 +1027,8 @@ document.addEventListener("click", (e) => {
                 '/categories', '/gallery', '/seo-tools', '/newsletter',
                 '/formatting-tools', '/site-settings', '/approval',
                 '/comments', '/schedule', '/leads', '/activity',
-                '/analytics', '/app-settings', '/users/manage-users'
+                '/analytics', '/app-settings', '/users/manage-users',
+                '/optimization'
             ];
             const url = new URL(link.href);
             const isPjaxLink = dashboardPaths.some(p => url.pathname === p || url.pathname.startsWith(p));

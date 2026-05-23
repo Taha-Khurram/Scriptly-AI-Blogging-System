@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Optimization | ScriptlyAI{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/optimization.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+
+  {% include 'partials/sidebar.html' %}
+
+  <!-- MAIN CONTENT -->
+  <main class="dashboard-main">
+    <header class="dashboard-header">
+      <div>
+        <div class="header-welcome-text">SEO Tools</div>
+        <h1 class="header-title">URL Optimization</h1>
+      </div>
+    </header>
+
+    <div class="dashboard-content-wrapper animate-fade-up">
+
+      <!-- URL Input Card -->
+      <div class="optimization-input-card">
+        <label class="input-label">Analyze URL Performance</label>
+        <div class="optimization-input-group">
+          <input type="text" id="urlInput" placeholder="Enter a URL (e.g., medium.com)" autocomplete="off">
+          <button class="btn-analyze" id="analyzeBtn" onclick="analyzeUrl()">
+            <i class="bi bi-search"></i> Analyze
+          </button>
+        </div>
+      </div>
+
+      <!-- Results Section -->
+      <div class="optimization-results" id="resultsSection">
+        <div class="analyzed-url-badge" id="analyzedUrl">
+          <i class="bi bi-link-45deg"></i>
+          <span id="analyzedUrlText"></span>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="optimization-metrics-grid" id="metricsGrid"></div>
+
+        <!-- Details Card -->
+        <div class="optimization-details-card" id="detailsCard">
+          <div class="details-title"><i class="bi bi-info-circle-fill"></i> Full Metrics Breakdown</div>
+          <div class="details-grid" id="detailsGrid"></div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div class="optimization-empty" id="emptyState">
+        <i class="bi bi-speedometer2"></i>
+        <p>Enter a URL above to analyze its SEO performance metrics</p>
+      </div>
+
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var analyzeBtn = document.getElementById('analyzeBtn');
+    var urlInput = document.getElementById('urlInput');
+    var resultsSection = document.getElementById('resultsSection');
+    var emptyState = document.getElementById('emptyState');
+    var metricsGrid = document.getElementById('metricsGrid');
+    var detailsGrid = document.getElementById('detailsGrid');
+    var analyzedUrlText = document.getElementById('analyzedUrlText');
+
+    urlInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') analyzeUrl();
+    });
+
+    window.analyzeUrl = async function() {
+        var url = urlInput.value.trim();
+        if (!url) {
+            showToast({ type: 'warning', title: 'Missing URL', message: 'Please enter a URL to analyze.' });
+            urlInput.focus();
+            return;
+        }
+
+        analyzeBtn.disabled = true;
+        analyzeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analyzing...';
+        emptyState.style.display = 'none';
+        resultsSection.classList.remove('show');
+
+        try {
+            var response = await fetch('/api/optimization/url-metrics?url=' + encodeURIComponent(url));
+            var result = await response.json();
+
+            if (!response.ok || !result.success) {
+                showToast({ type: 'error', title: 'Analysis Failed', message: result.error || 'Unable to fetch metrics.' });
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            renderResults(url, result.data);
+
+        } catch (err) {
+            showToast({ type: 'error', title: 'Connection Error', message: 'Failed to connect. Please try again.' });
+            emptyState.style.display = 'block';
+        } finally {
+            analyzeBtn.disabled = false;
+            analyzeBtn.innerHTML = '<i class="bi bi-search"></i> Analyze';
+        }
+    };
+
+    function formatNumber(num) {
+        if (num === null || num === undefined || num === '') return 'N/A';
+        num = Number(num);
+        if (isNaN(num)) return 'N/A';
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num.toLocaleString();
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    var metricDefinitions = [
+        { key: 'domainRating', altKeys: ['domain_rating', 'dr'], label: 'Domain Rating', icon: 'bi-award-fill', color: 'purple' },
+        { key: 'backlinks', altKeys: ['total_backlinks', 'backlink'], label: 'Backlinks', icon: 'bi-link-45deg', color: 'green' },
+        { key: 'refDomains', altKeys: ['referring_domains', 'ref_domains'], label: 'Referring Domains', icon: 'bi-diagram-3-fill', color: 'blue' },
+        { key: 'traffic', altKeys: ['organic_traffic', 'org_traffic'], label: 'Organic Traffic', icon: 'bi-graph-up-arrow', color: 'orange' },
+        { key: 'organicKeywords', altKeys: ['organic_keywords', 'keywords'], label: 'Organic Keywords', icon: 'bi-key-fill', color: 'pink' },
+        { key: 'urlRating', altKeys: ['url_rating', 'ur'], label: 'URL Rating', icon: 'bi-shield-check', color: 'teal' }
+    ];
+
+    function getMetricValue(data, def) {
+        var val = data[def.key];
+        if (val !== undefined && val !== null) return val;
+        for (var i = 0; i < def.altKeys.length; i++) {
+            val = data[def.altKeys[i]];
+            if (val !== undefined && val !== null) return val;
+        }
+        return null;
+    }
+
+    function renderResults(url, data) {
+        analyzedUrlText.textContent = url;
+
+        var metricsHtml = '';
+        metricDefinitions.forEach(function(def) {
+            var val = getMetricValue(data, def);
+            metricsHtml += '<div class="metric-card">' +
+                '<div class="metric-icon ' + def.color + '"><i class="bi ' + def.icon + '"></i></div>' +
+                '<div class="metric-info">' +
+                    '<div class="metric-label">' + def.label + '</div>' +
+                    '<div class="metric-value">' + formatNumber(val) + '</div>' +
+                '</div></div>';
+        });
+        metricsGrid.innerHTML = metricsHtml;
+
+        var detailsHtml = '';
+        var skipKeys = {};
+        metricDefinitions.forEach(function(def) {
+            skipKeys[def.key] = true;
+            def.altKeys.forEach(function(k) { skipKeys[k] = true; });
+        });
+
+        Object.keys(data).forEach(function(key) {
+            if (skipKeys[key]) return;
+            var val = data[key];
+            if (val === null || val === undefined || val === '') return;
+            if (typeof val === 'object') return;
+            var label = key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^./, function(s) { return s.toUpperCase(); });
+            detailsHtml += '<div class="detail-row">' +
+                '<span class="detail-label">' + escapeHtml(label) + '</span>' +
+                '<span class="detail-value">' + escapeHtml(String(val)) + '</span>' +
+                '</div>';
+        });
+
+        if (detailsHtml) {
+            detailsGrid.innerHTML = detailsHtml;
+            document.getElementById('detailsCard').style.display = 'block';
+        } else {
+            document.getElementById('detailsCard').style.display = 'none';
+        }
+
+        resultsSection.classList.add('show');
+    }
+})();
+</script>
+{% endblock %}

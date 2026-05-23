@@ -19,6 +19,9 @@ class Config:
     # Get your key at: https://rapidapi.com/developer_jeeva_k/api/seo-keyword-research
     RAPIDAPI_KEY = os.getenv('RAPIDAPI_KEY')
 
+    # RapidAPI for Ahrefs URL Research (ahrefs-url-research.p.rapidapi.com)
+    AHREFS_RAPIDAPI_KEY = os.getenv('AHREFS_RAPIDAPI_KEY')
+
     # Google OAuth for Analytics integration
     GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
     GOOGLE_OAUTH_CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
