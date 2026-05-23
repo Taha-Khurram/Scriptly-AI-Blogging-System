@@ -45,12 +45,21 @@ def schedule_list():
             else:
                 display_date = str(scheduled_at)
 
+            entry_status = entry.get("status", "SCHEDULED")
+            blog_id = entry.get("id") or entry.get("blog_id")
+
+            if entry_status == "SCHEDULED":
+                blog_doc = db_service.get_blog_by_id(blog_id)
+                if blog_doc and blog_doc.get("status") == "PUBLISHED":
+                    entry_status = "PUBLISHED"
+                    db_service.update_schedule_entry_status(blog_id, "PUBLISHED")
+
             result.append({
-                "id": entry.get("id") or entry.get("blog_id"),
+                "id": blog_id,
                 "title": (entry.get("title") or "Untitled").replace("**", ""),
                 "category": entry.get("category", "General"),
                 "author": entry.get("author", "Unknown"),
-                "status": entry.get("status"),
+                "status": entry_status,
                 "scheduled_at": display_date
             })
 
