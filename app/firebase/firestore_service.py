@@ -1083,6 +1083,9 @@ class FirestoreService:
             if new_status == "SCHEDULED" and scheduled_at:
                 update_data["scheduled_at"] = scheduled_at
                 update_data["scheduled_by"] = scheduled_by
+            elif new_status == "PUBLISHED":
+                # Keep scheduled_at so published blogs remain on calendar
+                update_data["scheduled_by"] = firestore.DELETE_FIELD
             elif new_status != "SCHEDULED":
                 update_data["scheduled_at"] = firestore.DELETE_FIELD
                 update_data["scheduled_by"] = firestore.DELETE_FIELD
@@ -1165,31 +1168,44 @@ class FirestoreService:
             blogs_ref = self.db.collection("blogs")
             results = []
 
+            # Get all user IDs under this admin (same pattern as available_blogs)
+            user_ids = [site_owner_id]
+            try:
+                user_docs = self.db.collection("users").where("created_by", "==", site_owner_id).stream()
+                for u in user_docs:
+                    user_ids.append(u.id)
+            except Exception:
+                pass
+
             # Fetch currently scheduled blogs
-            scheduled_docs = (
-                blogs_ref
-                .where(filter=FieldFilter("status", "==", "SCHEDULED"))
-                .stream()
-            )
-            for doc in scheduled_docs:
-                data = doc.to_dict()
-                owner = data.get("site_owner_id") or data.get("author_id")
-                if owner == site_owner_id:
+            batch_size = 10
+            for i in range(0, len(user_ids), batch_size):
+                batch_ids = user_ids[i:i + batch_size]
+                scheduled_docs = (
+                    blogs_ref
+                    .where(filter=FieldFilter("author_id", "in", batch_ids))
+                    .where(filter=FieldFilter("status", "==", "SCHEDULED"))
+                    .stream()
+                )
+                for doc in scheduled_docs:
+                    data = doc.to_dict()
                     data["id"] = doc.id
                     results.append(data)
 
             # Fetch published blogs that were previously scheduled (have scheduled_at)
-            published_docs = (
-                blogs_ref
-                .where(filter=FieldFilter("status", "==", "PUBLISHED"))
-                .stream()
-            )
-            for doc in published_docs:
-                data = doc.to_dict()
-                owner = data.get("site_owner_id") or data.get("author_id")
-                if owner == site_owner_id and data.get("scheduled_at"):
-                    data["id"] = doc.id
-                    results.append(data)
+            for i in range(0, len(user_ids), batch_size):
+                batch_ids = user_ids[i:i + batch_size]
+                published_docs = (
+                    blogs_ref
+                    .where(filter=FieldFilter("author_id", "in", batch_ids))
+                    .where(filter=FieldFilter("status", "==", "PUBLISHED"))
+                    .stream()
+                )
+                for doc in published_docs:
+                    data = doc.to_dict()
+                    if data.get("scheduled_at"):
+                        data["id"] = doc.id
+                        results.append(data)
 
             def sort_key(x):
                 dt = x.get("scheduled_at")
@@ -1203,6 +1219,7 @@ class FirestoreService:
             return results
         except Exception as e:
             print(f"Error fetching calendar blogs: {e}")
+            return []
             return []
         
 # Categories functions

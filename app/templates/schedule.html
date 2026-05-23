@@ -34,9 +34,16 @@
           </div>
         </div>
         <div class="stat-card">
+          <div class="stat-icon stat-published"><i class="bi bi-check-circle"></i></div>
+          <div class="stat-info">
+            <div class="stat-count" id="stat-published">0</div>
+            <div class="stat-label">Published</div>
+          </div>
+        </div>
+        <div class="stat-card">
           <div class="stat-icon stat-month"><i class="bi bi-calendar-range"></i></div>
           <div class="stat-info">
-            <div class="stat-count" id="stat-month">0</div>
+            <div class="stat-count" id="stat-week">0</div>
             <div class="stat-label">This Week</div>
           </div>
         </div>
@@ -51,111 +58,104 @@
       </div>
 
       <!-- Weekly Calendar Grid -->
-      <div class="weekly-calendar" id="weeklyCalendar">
-        <div class="calendar-loading">
-          <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-          <span class="ms-2 text-muted">Loading schedule...</span>
-        </div>
-      </div>
+      <div class="weekly-calendar" id="weeklyCalendar"></div>
 
     </div>
-  </main>
-</div>
 
-<!-- Reschedule Modal -->
-<div class="modal fade" id="rescheduleModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title">
-          <i class="bi bi-calendar-event"></i> Reschedule Blog
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="custom-modal-body">
-        <p class="text-muted mb-3">Choose a new date and time for publishing:</p>
-        <p class="fw-bold mb-3" id="reschedule-blog-title">Blog Title</p>
-        <input type="datetime-local" class="schedule-datetime-input" id="rescheduleDateTime">
-        <div id="bestTimeSuggestionsReschedule" class="best-time-container mt-3">
-          <div class="best-time-header">
-            <i class="bi bi-robot"></i>
-            <span>AI Publish Time Agent — Recommended Times</span>
+    <!-- Reschedule Modal -->
+    <div class="modal fade" id="rescheduleModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="custom-modal-header">
+            <h5 class="custom-modal-title">
+              <i class="bi bi-calendar-event"></i> Reschedule Blog
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div id="bestTimeSuggestionsListReschedule" class="best-time-list">
-            <div class="best-time-loading">
-              <div class="spinner-border spinner-border-sm text-primary"></div>
-              <span>Analyzing best publish times...</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="custom-modal-footer">
-        <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
-          <i class="bi bi-x-lg"></i> Cancel
-        </button>
-        <button type="button" class="btn-modal btn-modal-success" id="confirmRescheduleBtn">
-          <i class="bi bi-calendar-check"></i> Reschedule
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Add Schedule Modal -->
-<div class="modal fade" id="addScheduleModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title">
-          <i class="bi bi-calendar-plus"></i> Schedule a Blog
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="custom-modal-body">
-        <div class="schedule-modal-search">
-          <i class="bi bi-search"></i>
-          <input type="text" id="blogSearchInput" placeholder="Search blogs..." autocomplete="off">
-        </div>
-        <div class="schedule-blog-list" id="blogListContainer">
-          <div class="blog-list-loading">
-            <div class="spinner-border spinner-border-sm text-primary"></div>
-            <span>Loading blogs...</span>
-          </div>
-        </div>
-
-        <!-- Schedule form (shown when a blog is selected) -->
-        <div class="schedule-form-section" id="scheduleFormSection" style="display:none;">
-          <div class="selected-blog-info" id="selectedBlogInfo"></div>
-          <label class="schedule-form-label">Pick date & time:</label>
-          <input type="datetime-local" class="schedule-datetime-input" id="scheduleDateTime">
-          <div id="bestTimeSuggestionsAdd" class="best-time-container mt-3">
-            <div class="best-time-header">
-              <i class="bi bi-robot"></i>
-              <span>AI Publish Time Agent — Recommended Times</span>
-            </div>
-            <div id="bestTimeSuggestionsListAdd" class="best-time-list">
-              <div class="best-time-loading">
-                <div class="spinner-border spinner-border-sm text-primary"></div>
-                <span>Analyzing best publish times...</span>
+          <div class="custom-modal-body">
+            <p class="text-muted mb-3">Choose a new date and time for publishing:</p>
+            <p class="fw-bold mb-3" id="reschedule-blog-title">Blog Title</p>
+            <input type="datetime-local" class="schedule-datetime-input" id="rescheduleDateTime">
+            <div id="bestTimeSuggestionsReschedule" class="best-time-container mt-3">
+              <div class="best-time-header">
+                <i class="bi bi-robot"></i>
+                <span>AI Publish Time Agent — Recommended Times</span>
+              </div>
+              <div id="bestTimeSuggestionsListReschedule" class="best-time-list">
+                <div class="best-time-loading">
+                  <div class="spinner-border spinner-border-sm text-primary"></div>
+                  <span>Analyzing best publish times...</span>
+                </div>
               </div>
             </div>
           </div>
+          <div class="custom-modal-footer">
+            <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
+              <i class="bi bi-x-lg"></i> Cancel
+            </button>
+            <button type="button" class="btn-modal btn-modal-success" id="confirmRescheduleBtn">
+              <i class="bi bi-calendar-check"></i> Reschedule
+            </button>
+          </div>
         </div>
       </div>
-      <div class="custom-modal-footer">
-        <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
-          <i class="bi bi-x-lg"></i> Cancel
-        </button>
-        <button type="button" class="btn-modal btn-modal-primary" id="confirmScheduleBtn" disabled>
-          <i class="bi bi-calendar-check"></i> Schedule
-        </button>
+    </div>
+
+    <!-- Add Schedule Modal -->
+    <div class="modal fade" id="addScheduleModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="custom-modal-header">
+            <h5 class="custom-modal-title">
+              <i class="bi bi-calendar-plus"></i> Schedule a Blog
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="custom-modal-body">
+            <div class="schedule-modal-search">
+              <i class="bi bi-search"></i>
+              <input type="text" id="blogSearchInput" placeholder="Search blogs..." autocomplete="off">
+            </div>
+            <div class="schedule-blog-list" id="blogListContainer">
+              <div class="blog-list-loading">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+                <span>Loading blogs...</span>
+              </div>
+            </div>
+
+            <!-- Schedule form (shown when a blog is selected) -->
+            <div class="schedule-form-section" id="scheduleFormSection" style="display:none;">
+              <div class="selected-blog-info" id="selectedBlogInfo"></div>
+              <label class="schedule-form-label">Pick date & time:</label>
+              <input type="datetime-local" class="schedule-datetime-input" id="scheduleDateTime">
+              <div id="bestTimeSuggestionsAdd" class="best-time-container mt-3">
+                <div class="best-time-header">
+                  <i class="bi bi-robot"></i>
+                  <span>AI Publish Time Agent — Recommended Times</span>
+                </div>
+                <div id="bestTimeSuggestionsListAdd" class="best-time-list">
+                  <div class="best-time-loading">
+                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                    <span>Analyzing best publish times...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="custom-modal-footer">
+            <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
+              <i class="bi bi-x-lg"></i> Cancel
+            </button>
+            <button type="button" class="btn-modal btn-modal-primary" id="confirmScheduleBtn" disabled>
+              <i class="bi bi-calendar-check"></i> Schedule
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+
+  </main>
 </div>
 
-<script>
-  window.PREFETCHED_BLOGS = {{ prefetched_blogs|safe }};
-</script>
-<script src="{{ url_for('static', filename='js/pages/schedule.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/schedule.js') }}?v={{ range(10000, 99999) | random }}"></script>
 {% endblock %}

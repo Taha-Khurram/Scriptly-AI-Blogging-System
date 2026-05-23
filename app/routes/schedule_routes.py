@@ -15,36 +15,7 @@ def schedule_page():
     if user_role != 'ADMIN':
         return redirect(url_for('blog.home'))
 
-    user_id = session.get('user_id')
-    site_owner_id = db_service.get_site_owner_for_user(user_id)
-
-    # Prefetch schedule data for instant rendering
-    prefetched_blogs = []
-    try:
-        blogs = db_service.get_all_scheduled_for_calendar(site_owner_id)
-        for blog in blogs:
-            scheduled_at = blog.get('scheduled_at')
-            if not scheduled_at:
-                continue
-            if hasattr(scheduled_at, 'isoformat'):
-                display_date = scheduled_at.isoformat()
-            else:
-                display_date = str(scheduled_at)
-
-            prefetched_blogs.append({
-                "id": blog.get("id"),
-                "title": (blog.get("title") or "Untitled").replace("**", ""),
-                "category": blog.get("category", "General"),
-                "author": blog.get("author", "Unknown"),
-                "status": blog.get("status"),
-                "scheduled_at": display_date
-            })
-    except Exception as e:
-        print(f"⚠ Schedule prefetch error: {e}")
-
-    import json
-    return render_template('schedule.html', user_role=user_role, site_owner_id=site_owner_id,
-                           prefetched_blogs=json.dumps(prefetched_blogs))
+    return render_template('schedule.html', user_role=user_role)
 
 
 @schedule_bp.route('/api/schedule/list')
@@ -59,12 +30,15 @@ def schedule_list():
 
     try:
         site_owner_id = db_service.get_site_owner_for_user(user_id)
+        print(f"[Schedule List] user_id={user_id}, site_owner_id={site_owner_id}")
         blogs = db_service.get_all_scheduled_for_calendar(site_owner_id)
+        print(f"[Schedule List] Found {len(blogs)} blogs from Firestore")
 
         result = []
         for blog in blogs:
             scheduled_at = blog.get('scheduled_at')
             if not scheduled_at:
+                print(f"[Schedule List] Skipping blog {blog.get('id')} - no scheduled_at")
                 continue
 
             if hasattr(scheduled_at, 'isoformat'):
@@ -81,9 +55,12 @@ def schedule_list():
                 "scheduled_at": display_date
             })
 
+        print(f"[Schedule List] Returning {len(result)} blogs")
         return jsonify({"success": True, "blogs": result})
     except Exception as e:
         print(f"❌ Schedule list error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 

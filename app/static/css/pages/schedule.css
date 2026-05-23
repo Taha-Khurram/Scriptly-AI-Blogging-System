@@ -5,7 +5,7 @@
 /* ==================== STATS ROW ==================== */
 .schedule-stats-row {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.25rem;
     margin-bottom: 2rem;
 }
@@ -38,6 +38,7 @@
 }
 
 .schedule-stats-row .stat-icon.stat-scheduled { background: rgba(67, 24, 255, 0.1); color: var(--primary-color); }
+.schedule-stats-row .stat-icon.stat-published { background: rgba(5, 150, 105, 0.1); color: #059669; }
 .schedule-stats-row .stat-icon.stat-month { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
 
 .schedule-stats-row .stat-info {
@@ -734,7 +735,7 @@
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1200px) {
     .schedule-stats-row {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
     }
 }
 
