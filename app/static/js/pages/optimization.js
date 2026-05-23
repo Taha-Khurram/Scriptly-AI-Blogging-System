@@ -615,9 +615,12 @@
                 + '</span>'
                 + '</div>'
                 + '<div class="report-card-actions">'
-                + '<button class="report-action-btn" title="View Details" onclick="toggleReportDetails(' + idx + ')"><i class="bi bi-eye"></i></button>'
-                + '<button class="report-action-btn" title="Export Report" onclick="exportSavedReport(' + idx + ')"><i class="bi bi-download"></i></button>'
-                + '<button class="report-action-btn delete" title="Delete" onclick="deleteReport(\'' + report.id + '\', ' + idx + ')"><i class="bi bi-trash3"></i></button>'
+                + '<button class="report-dots-btn" onclick="toggleReportMenu(' + idx + ')"><i class="bi bi-three-dots-vertical"></i></button>'
+                + '<div class="report-dropdown" id="reportMenu' + idx + '">'
+                + '<button onclick="toggleReportDetails(' + idx + '); closeReportMenus();"><i class="bi bi-eye"></i> View Details</button>'
+                + '<button onclick="exportSavedReport(' + idx + '); closeReportMenus();"><i class="bi bi-download"></i> Export Report</button>'
+                + '<button class="danger" onclick="deleteReport(\'' + report.id + '\', ' + idx + '); closeReportMenus();"><i class="bi bi-trash3"></i> Delete</button>'
+                + '</div>'
                 + '</div>'
                 + '</div>'
                 + '<div class="report-details" id="reportDetails' + idx + '">'
@@ -668,6 +671,25 @@
         var el = document.getElementById('reportDetails' + idx);
         if (el) el.classList.toggle('show');
     };
+
+    window.toggleReportMenu = function(idx) {
+        var menu = document.getElementById('reportMenu' + idx);
+        var isOpen = menu && menu.classList.contains('show');
+        closeReportMenus();
+        if (!isOpen && menu) menu.classList.add('show');
+    };
+
+    window.closeReportMenus = function() {
+        document.querySelectorAll('.report-dropdown.show').forEach(function(el) {
+            el.classList.remove('show');
+        });
+    };
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.report-card-actions')) {
+            closeReportMenus();
+        }
+    });
 
     window.deleteReport = async function(reportId, idx) {
         if (!confirm('Delete this optimization report?')) return;
