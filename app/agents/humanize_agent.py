@@ -306,7 +306,8 @@ class HumanizeAgent:
         return [first_half, second_half]
 
     def _rewrite_chunk(self, chunk, topic, index):
-        """Rewrite a chunk using a prompt variant with 1 retry on timeout."""
+        """Rewrite a chunk using a prompt variant. Streams the response and
+        retries transient backend errors with exponential backoff."""
         import time
 
         chunk_words = len(chunk.split())
@@ -327,8 +328,14 @@ class HumanizeAgent:
 
         for attempt in range(HUMANIZE_MAX_RETRIES):
             try:
-                response = self.model.generate_content(prompt, **kwargs)
-                result = self._clean_response(response.text)
+                # Stream the response. Non-streaming generate_content must wait
+                # for the WHOLE generation to finish before returning, so a slow
+                # preview-model call trips the backend's single-operation
+                # deadline and 504s on the first try. Streaming returns tokens
+                # incrementally, so the request completes without ever hitting
+                # that all-or-nothing deadline.
+                raw = self._stream_text(prompt, kwargs)
+                result = self._clean_response(raw)
                 result_words = len(result.split())
 
                 orig_headings = re.findall(r'^#{1,3}\s', chunk, re.MULTILINE)
@@ -360,6 +367,26 @@ class HumanizeAgent:
                     continue
                 print(f"❌ Failed: {e}")
                 return chunk
+
+    def _stream_text(self, prompt, kwargs):
+        """
+        Generate with stream=True and accumulate the text.
+
+        Streaming sidesteps the "504 Deadline expired before operation could
+        complete" error: the backend emits tokens as they're produced instead
+        of holding the whole response until a single completion deadline.
+        """
+        response = self.model.generate_content(prompt, stream=True, **kwargs)
+        parts = []
+        for event in response:
+            # A streamed event may carry no text (e.g. a safety/finish-only
+            # chunk); guard so one empty part can't abort the whole stream.
+            try:
+                if event.text:
+                    parts.append(event.text)
+            except (ValueError, AttributeError):
+                continue
+        return "".join(parts)
 
     def _clean_response(self, text):
         """Strip code fences and preamble from LLM output."""

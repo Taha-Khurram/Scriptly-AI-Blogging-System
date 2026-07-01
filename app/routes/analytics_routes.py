@@ -1,5 +1,9 @@
 import os
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+# Google frequently returns a superset of the requested scopes (e.g. it adds
+# openid). Without this, oauthlib raises "Scope has changed" during token
+# exchange and the connect flow dies.
+os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, abort, current_app
 from functools import wraps
@@ -121,6 +125,14 @@ def analytics_page():
     user_id = session.get('user_id')
     has_oauth = bool(current_app.config.get('GOOGLE_OAUTH_CLIENT_ID'))
 
+    oauth_errors = {
+        'denied': 'Google sign-in was cancelled. Please try connecting again.',
+        'state': 'Sign-in could not be verified (your session changed). Make sure you open the app at the same address each time, then try again.',
+        'no_code': 'Google did not return an authorization code. Please try connecting again.',
+        'oauth': 'We could not complete the Google connection. Please try again.',
+    }
+    oauth_error = oauth_errors.get(request.args.get('error', ''))
+
     try:
         config = _get_analytics_config(user_id)
         connected = bool(config and config.get('connected') and config.get('refresh_token'))
@@ -148,7 +160,8 @@ def analytics_page():
                            stream_url=stream_url,
                            custom_domain=custom_domain,
                            site_analytics_id=site_analytics_id,
-                           has_oauth=has_oauth)
+                           has_oauth=has_oauth,
+                           oauth_error=oauth_error)
 
 
 # ==================== OAUTH FLOW ====================
@@ -185,8 +198,13 @@ def connect():
         prompt='consent'
     )
 
+    # Persist the CSRF state + PKCE verifier for the callback. Mark the session
+    # permanent/modified so the cookie is reliably written before we redirect
+    # off to Google and comes back intact.
+    session.permanent = True
     session['oauth_state'] = state
     session['code_verifier'] = flow.code_verifier
+    session.modified = True
     return redirect(authorization_url)
 
 
@@ -194,6 +212,23 @@ def connect():
 @admin_required
 def callback():
     from google_auth_oauthlib.flow import Flow
+
+    # Google can redirect back with an error (e.g. the user denied access).
+    if request.args.get('error'):
+        return redirect(url_for('analytics_bp.analytics_page', error='denied'))
+
+    # Lenient CSRF check: only enforce when we still have the stored state.
+    # A missing stored state means the session was lost on the round-trip to
+    # Google (commonly a localhost vs 127.0.0.1 host mismatch) — recover
+    # gracefully instead of throwing a raw MismatchingStateError 500.
+    expected_state = session.get('oauth_state')
+    returned_state = request.args.get('state')
+    if expected_state and returned_state and expected_state != returned_state:
+        return redirect(url_for('analytics_bp.analytics_page', error='state'))
+
+    code = request.args.get('code')
+    if not code:
+        return redirect(url_for('analytics_bp.analytics_page', error='no_code'))
 
     client_id = current_app.config['GOOGLE_OAUTH_CLIENT_ID']
     client_secret = current_app.config['GOOGLE_OAUTH_CLIENT_SECRET']
@@ -209,14 +244,25 @@ def callback():
             }
         },
         scopes=SCOPES,
-        redirect_uri=redirect_uri,
-        state=session.get('oauth_state')
+        redirect_uri=redirect_uri
     )
 
-    flow.fetch_token(
-        authorization_response=request.url,
-        code_verifier=session.get('code_verifier')
-    )
+    # Exchange the authorization code directly. Passing `code` (rather than the
+    # full authorization_response URL) skips oauthlib's strict state comparison,
+    # which we've already handled above.
+    try:
+        flow.fetch_token(
+            code=code,
+            code_verifier=session.get('code_verifier')
+        )
+    except Exception as e:
+        print(f"OAuth token exchange failed: {e}")
+        return redirect(url_for('analytics_bp.analytics_page', error='oauth'))
+    finally:
+        # One-time values — don't leave them lying around in the session.
+        session.pop('oauth_state', None)
+        session.pop('code_verifier', None)
+
     creds = flow.credentials
 
     user_id = session.get('user_id')

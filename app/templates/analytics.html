@@ -28,6 +28,16 @@
 
     <div class="dashboard-content-wrapper animate-fade-up">
 
+      {% if oauth_error %}
+      <div class="analytics-reconnect-banner" role="alert">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <div>
+          <strong>Google Analytics connection failed</strong>
+          <p>{{ oauth_error }}</p>
+        </div>
+      </div>
+      {% endif %}
+
       {% if not has_oauth %}
       <!-- No OAuth Configured -->
       <div class="analytics-connect-card">
