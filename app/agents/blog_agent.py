@@ -1,24 +1,25 @@
-from app.agents.outline_agent import OutlineAgent
+import re
+
 from app.agents.content_agent import ContentAgent
 from app.agents.formatting_agent import FormattingAgent
 from app.agents.seo_agent import SEOAgent
-from app.agents.humanize_agent import HumanizeAgent
 from app.utils.parallel import run_parallel_simple, TimedExecution
 
 
 class BlogAgent:
     def __init__(self):
-        self.outline_agent = OutlineAgent()
         self.content_agent = ContentAgent()
         self.formatting_agent = FormattingAgent()
         self.seo_agent = SEOAgent()
-        self.humanize_agent = HumanizeAgent()
 
-    def run_pipeline(self, user_prompt, enable_seo=False, enable_humanize=False, region="PK"):
+    def run_pipeline(self, user_prompt, enable_seo=False, region="PK"):
         """
         Optimized AI blog generation pipeline.
-        SEO is disabled by default during generation for speed.
-        Use run_seo_analysis() separately for full SEO optimization.
+
+        The blog is generated in a single model call (no separate outline
+        round-trip) for the fastest possible turnaround. Humanization is NOT
+        run here — it is applied on-demand from the drafts page instead.
+        SEO is disabled by default; use run_seo_analysis() for full optimization.
 
         Args:
             user_prompt: Topic/prompt for the blog
@@ -28,16 +29,9 @@ class BlogAgent:
         print(f"--- Starting Optimized AI Pipeline ---")
 
         try:
-            # Step 1: Generate Outline (required first)
-            with TimedExecution("Outline Generation"):
-                outline = self.outline_agent.generate_outline(user_prompt)
-
-            if not outline or not isinstance(outline, list):
-                raise ValueError("Outline generation failed or returned empty data.")
-
-            # Step 2: Generate Full Content (depends on outline)
+            # Step 1: Generate the full blog in a single call
             with TimedExecution("Content Generation"):
-                content_data = self.content_agent.generate_full_blog(outline)
+                content_data = self.content_agent.generate_blog(user_prompt)
 
             if not content_data or 'markdown' not in content_data:
                 raise KeyError("Content agent failed to return 'markdown' data.")
@@ -45,20 +39,10 @@ class BlogAgent:
             markdown_text = content_data['markdown']
             final_title = user_prompt.title()
 
-            # Step 2.5: Humanize Content (optional, before formatting)
-            if enable_humanize:
-                with TimedExecution("Humanization"):
-                    try:
-                        humanize_result = self.humanize_agent.humanize_content(
-                            markdown=markdown_text, topic=user_prompt
-                        )
-                        if humanize_result.get('humanization_applied'):
-                            markdown_text = humanize_result['markdown']
-                            print("✅ Content humanized successfully")
-                    except Exception as humanize_error:
-                        print(f"⚠️ Humanization skipped: {humanize_error}")
+            # Derive the outline from the generated section headings (no LLM call)
+            outline = re.findall(r'^##\s+(.+?)\s*$', markdown_text, re.MULTILINE)
 
-            # Step 3: Format Content (run immediately, no SEO delay)
+            # Step 2: Format Content (run immediately, no SEO delay)
             with TimedExecution("Formatting"):
                 formatted_data = self.formatting_agent.format_blog(
                     content=markdown_text,
@@ -107,7 +91,7 @@ class BlogAgent:
                     "model_used": "gemini-3-flash-preview",
                     "status": "success",
                     "seo_enabled": enable_seo,
-                    "humanized": enable_humanize,
+                    "humanized": False,
                     "target_region": region if enable_seo else None
                 }
             }

@@ -384,7 +384,6 @@ def generate_and_submit():
         data = request.get_json()
         prompt = data.get('prompt')
         auto_submit = data.get('auto_submit', False)
-        enable_humanize = data.get('enable_humanize', False)
 
         if not prompt:
             return jsonify({"success": False, "error": "Prompt is required"}), 400
@@ -398,8 +397,7 @@ def generate_and_submit():
             user_name=user_name,
             user_role=user_role,
             prompt=prompt,
-            auto_submit=auto_submit,
-            enable_humanize=enable_humanize
+            auto_submit=auto_submit
         )
 
         return jsonify({"success": True, "task_id": task_id}), 202
@@ -409,14 +407,14 @@ def generate_and_submit():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, auto_submit, enable_humanize):
+def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, auto_submit):
     """Background task that runs the full blog generation pipeline."""
     with app.app_context():
         try:
-            task_manager.update_task(task_id, 'outline', 20)
+            task_manager.update_task(task_id, 'content', 30)
 
             blog_ai = BlogAgent()
-            generated_data = blog_ai.run_pipeline(prompt, enable_seo=False, enable_humanize=enable_humanize)
+            generated_data = blog_ai.run_pipeline(prompt, enable_seo=False)
 
             if generated_data.get('status') == 'failed' or 'error' in generated_data:
                 error_msg = generated_data.get('error', 'Blog generation failed')

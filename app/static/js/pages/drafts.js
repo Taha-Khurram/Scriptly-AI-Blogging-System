@@ -455,8 +455,10 @@ async function humanizeDraft(id) {
         type: 'success',
         title: 'Content Humanized',
         message: 'Your draft has been rewritten to bypass AI detectors.',
-        duration: 5000
+        duration: 3000
       });
+      // Reload so the auto-replaced content is shown
+      setTimeout(() => window.location.reload(), 1200);
     } else {
       showToast({
         type: 'error',
