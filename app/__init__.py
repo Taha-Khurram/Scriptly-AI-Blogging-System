@@ -158,6 +158,20 @@ def create_app(config_class=Config):
             # Reset activity timestamp
             session['last_activity'] = datetime.now(timezone.utc).isoformat()
 
+    # Always serve dynamic responses fresh. Without this, the browser (and its
+    # back/forward bfcache) can hand back a stale page on navigation, leaving
+    # buttons/actions wired to outdated state so the user has to hard-refresh.
+    # Static assets are served by WhiteNoise (outside Flask), so they are not
+    # touched here and keep their long-lived cache.
+    @app.after_request
+    def add_no_cache_headers(response):
+        if request.endpoint == 'static':
+            return response
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+
     # Initialize background scheduler for scheduled blog publishing
     from app.scheduler import init_scheduler
     init_scheduler(app)

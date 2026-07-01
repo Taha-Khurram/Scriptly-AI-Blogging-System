@@ -22,7 +22,7 @@ if __name__ == "__main__":
             port=5000,
             threads=16,
             connection_limit=200,
-            channel_timeout=30,
+            channel_timeout=300,
             recv_bytes=65536,
             send_bytes=65536,
         )

@@ -437,11 +437,18 @@ async function humanizeDraft(id) {
     dropdownBtn.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div>';
   }
 
+  const restoreBtn = () => {
+    if (dropdownBtn) {
+      dropdownBtn.disabled = false;
+      dropdownBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+    }
+  };
+
   showToast({
     type: 'info',
     title: 'Humanizing Content',
-    message: 'This may take 15-20 seconds. Please wait...',
-    duration: 20000
+    message: 'Rewriting your draft. This may take a minute...',
+    duration: 6000
   });
 
   try {
@@ -450,15 +457,11 @@ async function humanizeDraft(id) {
       headers: { 'Content-Type': 'application/json' }
     });
     const data = await res.json();
-    if (data.success) {
-      showToast({
-        type: 'success',
-        title: 'Content Humanized',
-        message: 'Your draft has been rewritten to bypass AI detectors.',
-        duration: 3000
-      });
-      // Reload so the auto-replaced content is shown
-      setTimeout(() => window.location.reload(), 1200);
+
+    if (data.success && data.task_id) {
+      // Humanization runs in the background; poll for completion so the
+      // request itself is never bound by a server/HTTP timeout.
+      pollHumanizeStatus(data.task_id, restoreBtn);
     } else {
       showToast({
         type: 'error',
@@ -466,6 +469,7 @@ async function humanizeDraft(id) {
         message: data.error || 'Could not humanize content.',
         duration: 5000
       });
+      restoreBtn();
     }
   } catch (e) {
     showToast({
@@ -474,12 +478,53 @@ async function humanizeDraft(id) {
       message: 'Failed to humanize draft.',
       duration: 5000
     });
-  } finally {
-    if (dropdownBtn) {
-      dropdownBtn.disabled = false;
-      dropdownBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
-    }
+    restoreBtn();
   }
+}
+
+function pollHumanizeStatus(taskId, onDone) {
+  const pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/generate/status/${taskId}`);
+      if (res.status === 401) {
+        clearInterval(pollInterval);
+        window.location.href = '/login';
+        return;
+      }
+      const data = await res.json();
+
+      if (data.status === 'completed') {
+        clearInterval(pollInterval);
+        showToast({
+          type: 'success',
+          title: 'Content Humanized',
+          message: 'Your draft has been rewritten to bypass AI detectors.',
+          duration: 3000
+        });
+        // Reload so the auto-replaced content is shown
+        setTimeout(() => window.location.reload(), 1200);
+      } else if (data.status === 'failed') {
+        clearInterval(pollInterval);
+        showToast({
+          type: 'error',
+          title: 'Humanization Failed',
+          message: data.error || 'Could not humanize content.',
+          duration: 5000
+        });
+        if (onDone) onDone();
+      }
+    } catch (err) {
+      clearInterval(pollInterval);
+      console.error('Humanize polling error:', err);
+      showToast({
+        type: 'error',
+        title: 'Connection Error',
+        message: 'Lost connection while humanizing. Check your network.',
+        duration: 5000
+      });
+      if (onDone) onDone();
+    }
+  }, 3000);
 }
 
 async function deleteDraft(id) {

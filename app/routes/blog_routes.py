@@ -532,7 +532,12 @@ def generation_status(task_id):
 
 @blog_bp.route('/api/humanize/<blog_id>', methods=['POST'])
 def humanize_draft(blog_id):
-    """Humanize an existing draft's content post-generation."""
+    """
+    Kick off humanization of an existing draft in the background and return a
+    task_id immediately. The client polls /api/generate/status/<task_id> for
+    completion (same pattern as blog generation) so the request is never bound
+    by an HTTP/server timeout while the model runs.
+    """
     try:
         user_id = session.get('user_id')
         if not user_id:
@@ -542,7 +547,7 @@ def humanize_draft(blog_id):
         if not blog_data:
             return jsonify({"success": False, "error": "Blog not found"}), 404
 
-        # Extract markdown content
+        # Extract markdown content up-front so we can fail fast on empty drafts.
         content = blog_data.get('content', {})
         if isinstance(content, dict):
             markdown_text = content.get('markdown') or content.get('body') or ''
@@ -552,44 +557,69 @@ def humanize_draft(blog_id):
         if not markdown_text.strip():
             return jsonify({"success": False, "error": "No content to humanize"}), 400
 
-        # Run humanization
-        humanizer = HumanizeAgent()
-        result = humanizer.humanize_content(
-            markdown=markdown_text,
-            topic=blog_data.get('title', '')
-        )
-
-        if not result.get('humanization_applied'):
-            return jsonify({"success": False, "error": "Humanization failed — content unchanged"}), 500
-
-        # Re-format the humanized content
-        formatter = FormattingAgent()
-        formatted = formatter.format_blog(
-            content=result['markdown'],
+        app = current_app._get_current_object()
+        task_id = task_manager.create_task(user_id)
+        task_manager.submit(
+            task_id, _run_humanize_task,
+            app=app,
+            blog_id=blog_id,
+            markdown_text=markdown_text,
             title=blog_data.get('title', '')
         )
 
-        # Update the blog in Firestore
-        updated_content = {
-            'body': result['markdown'],
-            'html': formatted['html'],
-            'markdown': result['markdown'],
-            'toc': formatted['toc'],
-            'toc_html': formatted['toc_html']
-        }
-
-        doc_ref = db_service.db.collection(db_service.collection_name).document(blog_id)
-        doc_ref.update({
-            'content': updated_content,
-            'metadata.humanized': True,
-            'updated_at': datetime.utcnow()
-        })
-
-        return jsonify({"success": True, "message": "Content humanized successfully"})
+        return jsonify({"success": True, "task_id": task_id}), 202
 
     except Exception as e:
         print(f"❌ Humanize Route Error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+def _run_humanize_task(task_id, app, blog_id, markdown_text, title):
+    """Background task that humanizes a draft and writes the result back."""
+    with app.app_context():
+        try:
+            task_manager.update_task(task_id, 'humanizing', 30)
+
+            humanizer = HumanizeAgent()
+            result = humanizer.humanize_content(
+                markdown=markdown_text,
+                topic=title
+            )
+
+            if not result.get('humanization_applied'):
+                task_manager.fail_task(task_id, "Humanization failed — content unchanged")
+                return
+
+            task_manager.update_task(task_id, 'formatting', 80)
+
+            formatter = FormattingAgent()
+            formatted = formatter.format_blog(
+                content=result['markdown'],
+                title=title
+            )
+
+            updated_content = {
+                'body': result['markdown'],
+                'html': formatted['html'],
+                'markdown': result['markdown'],
+                'toc': formatted['toc'],
+                'toc_html': formatted['toc_html']
+            }
+
+            task_manager.update_task(task_id, 'saving', 95)
+
+            doc_ref = db_service.db.collection(db_service.collection_name).document(blog_id)
+            doc_ref.update({
+                'content': updated_content,
+                'metadata.humanized': True,
+                'updated_at': datetime.utcnow()
+            })
+
+            task_manager.complete_task(task_id, {"humanized": True})
+
+        except Exception as e:
+            print(f"❌ Background Humanize Task Error: {e}")
+            task_manager.fail_task(task_id, str(e))
 
 
 # @blog_bp.route('/api/update_status/<blog_id>', methods=['POST'])

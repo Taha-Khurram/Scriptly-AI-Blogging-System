@@ -1,7 +1,22 @@
 import re
 import random
+import inspect
 from google import generativeai as genai
 from flask import current_app
+
+
+# Raise the client deadline well above the default ~60s gRPC timeout.
+# Humanization makes up to 2 sequential model calls; a slow call was
+# surfacing as "504 Deadline Exceeded" on the first attempt.
+HUMANIZE_TIMEOUT_SECONDS = 180
+
+# `request_options` is only accepted by google-generativeai >= 0.4. Older
+# builds forward unknown kwargs into the request proto and raise, so we
+# feature-detect before passing it (mirrors ContentAgent).
+_SUPPORTS_REQUEST_OPTIONS = (
+    'request_options'
+    in inspect.signature(genai.GenerativeModel.generate_content).parameters
+)
 
 
 # ── AI word → human word replacement map ──────────────────────────
@@ -282,12 +297,13 @@ class HumanizeAgent:
         variant = PROMPT_VARIANTS[variant_num]
         prompt = variant.format(topic=topic or "this topic", section=chunk)
 
+        kwargs = {"generation_config": self.generation_config}
+        if _SUPPORTS_REQUEST_OPTIONS:
+            kwargs["request_options"] = {"timeout": HUMANIZE_TIMEOUT_SECONDS}
+
         for attempt in range(2):
             try:
-                response = self.model.generate_content(
-                    prompt,
-                    generation_config=self.generation_config
-                )
+                response = self.model.generate_content(prompt, **kwargs)
                 result = self._clean_response(response.text)
                 result_words = len(result.split())
 

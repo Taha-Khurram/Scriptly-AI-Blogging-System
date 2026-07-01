@@ -784,6 +784,7 @@ const Pjax = (() => {
 
             const response = await fetch(url, {
                 signal: currentAbortController.signal,
+                cache: 'no-store',
                 headers: { 'X-Pjax': 'true' }
             });
 

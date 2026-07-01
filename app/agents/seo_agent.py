@@ -20,15 +20,34 @@ import requests
 import os
 import re
 import math
+import inspect
 from typing import Dict, List, Optional
 from collections import Counter
 from app.utils.cache import cache
+
+
+# Raise the client deadline well above the default ~60s gRPC timeout. Full-blog
+# SEO optimization is a large prompt that routinely runs past 60s and was
+# surfacing as "504 Deadline Exceeded".
+SEO_TIMEOUT_SECONDS = 180
+
+# `request_options` is only accepted by google-generativeai >= 0.4. Older builds
+# raise on unknown kwargs, so we feature-detect (mirrors ContentAgent).
+_SUPPORTS_REQUEST_OPTIONS = (
+    'request_options'
+    in inspect.signature(genai.GenerativeModel.generate_content).parameters
+)
 
 
 class SEOAgent:
     def __init__(self):
         genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
         self.model = genai.GenerativeModel('gemini-3-flash-preview')
+
+        # Extended per-call deadline, passed to every generate_content call.
+        self._gen_kwargs = {}
+        if _SUPPORTS_REQUEST_OPTIONS:
+            self._gen_kwargs['request_options'] = {"timeout": SEO_TIMEOUT_SECONDS}
 
         # Ahrefs Keyword Research API on RapidAPI
         self.ahrefs_key = os.getenv('AHREFS_RAPIDAPI_KEY', '')
@@ -639,7 +658,7 @@ class SEOAgent:
         - Long-tail variations
         """
 
-        response = self.model.generate_content(prompt)
+        response = self.model.generate_content(prompt, **self._gen_kwargs)
         text = (response.text or "") if response else ""
         if not text.strip():
             return [topic.lower()] if topic else []
@@ -824,7 +843,7 @@ OUTPUT FORMAT - respond with ONLY this JSON structure, nothing else:
             import time as _time
             for attempt in range(3):
                 try:
-                    response = self.model.generate_content(prompt)
+                    response = self.model.generate_content(prompt, **self._gen_kwargs)
                     if response and response.text:
                         break
                 except Exception as retry_err:
