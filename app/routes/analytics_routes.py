@@ -119,17 +119,26 @@ def _extract_domain(url):
 @admin_required
 def analytics_page():
     user_id = session.get('user_id')
-    config = _get_analytics_config(user_id)
-    connected = bool(config and config.get('connected') and config.get('refresh_token'))
-    property_id = config.get('property_id', '') if config else ''
-    property_name = config.get('property_name', '') if config else ''
-    measurement_id = config.get('measurement_id', '') if config else ''
-    stream_url = config.get('stream_url', '') if config else ''
     has_oauth = bool(current_app.config.get('GOOGLE_OAUTH_CLIENT_ID'))
 
-    site_settings = db_service.get_site_settings(user_id) if connected else {}
-    custom_domain = site_settings.get('custom_domain', '') if site_settings else ''
-    site_analytics_id = site_settings.get('analytics_id', '') if site_settings else ''
+    try:
+        config = _get_analytics_config(user_id)
+        connected = bool(config and config.get('connected') and config.get('refresh_token'))
+        property_id = config.get('property_id', '') if config else ''
+        property_name = config.get('property_name', '') if config else ''
+        measurement_id = config.get('measurement_id', '') if config else ''
+        stream_url = config.get('stream_url', '') if config else ''
+
+        site_settings = db_service.get_site_settings(user_id) if connected else {}
+        custom_domain = site_settings.get('custom_domain', '') if site_settings else ''
+        site_analytics_id = site_settings.get('analytics_id', '') if site_settings else ''
+    except Exception as e:
+        # Never let a transient backend error turn navigation into a hard error
+        # page — render a safe (disconnected) state instead of a 500.
+        print(f"Analytics page load error: {e}")
+        connected = False
+        property_id = property_name = measurement_id = stream_url = ''
+        custom_domain = site_analytics_id = ''
 
     return render_template('analytics.html',
                            connected=connected,

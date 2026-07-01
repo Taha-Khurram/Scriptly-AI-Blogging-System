@@ -179,27 +179,29 @@
       {% endif %}
 
     </div>
-  </main>
-</div>
 
-<!-- Disconnect Confirmation Modal -->
-<div id="disconnectModal" class="analytics-modal-overlay" style="display:none;">
-  <div class="analytics-modal">
-    <div class="analytics-modal-icon">
-      <i class="bi bi-exclamation-triangle"></i>
+    <!-- Disconnect Confirmation Modal (kept inside .dashboard-main so Pjax
+         navigation swaps it in with the rest of the page content) -->
+    <div id="disconnectModal" class="analytics-modal-overlay" style="display:none;">
+      <div class="analytics-modal">
+        <div class="analytics-modal-icon">
+          <i class="bi bi-exclamation-triangle"></i>
+        </div>
+        <h4 class="analytics-modal-title">Disconnect Analytics?</h4>
+        <p class="analytics-modal-text">This will remove your Google Analytics connection. You can reconnect anytime.</p>
+        <div class="analytics-modal-actions">
+          <button class="btn-modal-cancel" onclick="closeDisconnectModal()">Cancel</button>
+          <button class="btn-modal-confirm" onclick="confirmDisconnect()">
+            <i class="bi bi-x-circle"></i> Disconnect
+          </button>
+        </div>
+      </div>
     </div>
-    <h4 class="analytics-modal-title">Disconnect Analytics?</h4>
-    <p class="analytics-modal-text">This will remove your Google Analytics connection. You can reconnect anytime.</p>
-    <div class="analytics-modal-actions">
-      <button class="btn-modal-cancel" onclick="closeDisconnectModal()">Cancel</button>
-      <button class="btn-modal-confirm" onclick="confirmDisconnect()">
-        <i class="bi bi-x-circle"></i> Disconnect
-      </button>
-    </div>
-  </div>
+
+  </main>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/analytics.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/pages/analytics.js') }}?v=3"></script>
 {% endblock %}

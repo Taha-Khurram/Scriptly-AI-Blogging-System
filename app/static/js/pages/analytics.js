@@ -1,6 +1,35 @@
 (function() {
+    // Pjax re-runs this script on every navigation without tearing down the
+    // previous instance. Clean up anything the prior visit left behind (most
+    // importantly the realtime polling interval) so timers don't accumulate
+    // and fire against pages they no longer belong to.
+    if (typeof window.__analyticsCleanup === 'function') {
+        window.__analyticsCleanup();
+    }
+
     var currentPeriod = '7';
     var realtimeInterval = null;
+    var destroyed = false;
+
+    function cleanup() {
+        destroyed = true;
+        if (realtimeInterval) { clearInterval(realtimeInterval); realtimeInterval = null; }
+        document.removeEventListener('pjax:complete', onPjaxNavigate);
+        if (window.__analyticsCleanup === cleanup) {
+            window.__analyticsCleanup = null;
+        }
+    }
+
+    function onPjaxNavigate() {
+        // Fired after Pjax swaps in new content. If the analytics DOM is gone,
+        // we've navigated away — stop polling and detach.
+        if (!document.getElementById('realtimeCount') && !document.getElementById('propertyList')) {
+            cleanup();
+        }
+    }
+
+    document.addEventListener('pjax:complete', onPjaxNavigate);
+    window.__analyticsCleanup = cleanup;
 
     // ==================== PROPERTY SELECTION ====================
 
@@ -81,6 +110,7 @@
 
     function initDashboard() {
         fetchAllData();
+        if (realtimeInterval) { clearInterval(realtimeInterval); }
         realtimeInterval = setInterval(fetchRealtime, 30000);
 
         document.querySelectorAll('.period-btn').forEach(function(btn) {
@@ -105,6 +135,13 @@
     }
 
     function handleReconnect(data) {
+        // Bail if this instance was torn down (Pjax navigated away) or the
+        // analytics dashboard is no longer on screen — otherwise a stale poll
+        // response could wipe out an unrelated page's content wrapper.
+        if (destroyed || !document.getElementById('realtimeCount')) {
+            cleanup();
+            return true;
+        }
         if (data.reconnect) {
             if (realtimeInterval) { clearInterval(realtimeInterval); realtimeInterval = null; }
             var wrapper = document.querySelector('.analytics-dashboard') || document.querySelector('.dashboard-content-wrapper');

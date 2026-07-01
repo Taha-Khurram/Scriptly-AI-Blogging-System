@@ -4,11 +4,18 @@ import inspect
 from google import generativeai as genai
 from flask import current_app
 
+from app.utils.parallel import run_parallel_simple
+
 
 # Raise the client deadline well above the default ~60s gRPC timeout.
-# Humanization makes up to 2 sequential model calls; a slow call was
+# Humanization rewrites each chunk in one model call; a slow call was
 # surfacing as "504 Deadline Exceeded" on the first attempt.
-HUMANIZE_TIMEOUT_SECONDS = 180
+HUMANIZE_TIMEOUT_SECONDS = 120
+
+# Transient 504/503s from the model backend are common under load. Retry a
+# few times with exponential backoff so a slow first try recovers instead of
+# silently falling back to the un-humanized original.
+HUMANIZE_MAX_RETRIES = 3
 
 # `request_options` is only accepted by google-generativeai >= 0.4. Older
 # builds forward unknown kwargs into the request proto and raise, so we
@@ -186,10 +193,14 @@ class HumanizeAgent:
     def __init__(self):
         genai.configure(api_key=current_app.config['GEMINI_API_KEY'])
         self.model = genai.GenerativeModel('gemini-3-flash-preview')
+        # A chunk is ~half a blog (~500-700 words in → ~700-1000 tokens out).
+        # Capping output well below the old 8192 bounds generation time and
+        # sharply cuts the odds of hitting the server-side 504 deadline, while
+        # still leaving generous headroom over any real chunk.
         self.generation_config = genai.types.GenerationConfig(
             temperature=0.9,
             top_p=0.88,
-            max_output_tokens=8192,
+            max_output_tokens=3072,
         )
 
     def humanize_content(self, markdown, topic=""):
@@ -221,11 +232,24 @@ class HumanizeAgent:
                 chunk_headings = len(re.findall(r'^#{1,3}\s', chunk, re.MULTILINE))
                 print(f"   Chunk {i+1}: {chunk_words} words, {chunk_headings} headings")
 
-            # Step 2: Rewrite each half with a different prompt variant
-            print(f"\n🤖 Step 2: Rewriting chunks via Gemini API")
-            rewritten = []
-            for i, chunk in enumerate(chunks):
-                rewritten.append(self._rewrite_chunk(chunk, topic, i))
+            # Step 2: Rewrite each half with a different prompt variant.
+            # Chunks are independent, so run them concurrently — this halves
+            # wall-clock time versus the old sequential loop.
+            print(f"\n🤖 Step 2: Rewriting {len(chunks)} chunk(s) via Gemini API (parallel)")
+            if len(chunks) == 1:
+                rewritten = [self._rewrite_chunk(chunks[0], topic, 0)]
+            else:
+                tasks = [
+                    (self._rewrite_chunk, (chunk, topic, i))
+                    for i, chunk in enumerate(chunks)
+                ]
+                rewritten = run_parallel_simple(tasks, max_workers=len(tasks))
+                # A failed parallel task returns None — fall back to the
+                # original chunk so we never drop content.
+                rewritten = [
+                    r if r is not None else chunks[i]
+                    for i, r in enumerate(rewritten)
+                ]
 
             # Step 3: Reassemble
             humanized = '\n\n'.join(c.strip() for c in rewritten if c.strip())
@@ -301,7 +325,7 @@ class HumanizeAgent:
         if _SUPPORTS_REQUEST_OPTIONS:
             kwargs["request_options"] = {"timeout": HUMANIZE_TIMEOUT_SECONDS}
 
-        for attempt in range(2):
+        for attempt in range(HUMANIZE_MAX_RETRIES):
             try:
                 response = self.model.generate_content(prompt, **kwargs)
                 result = self._clean_response(response.text)
@@ -318,9 +342,21 @@ class HumanizeAgent:
 
             except Exception as e:
                 error_str = str(e).lower()
-                if attempt == 0 and ('deadline' in error_str or 'timeout' in error_str or '504' in error_str):
-                    print(f"⚠️ Timeout, retrying once...", end=" ", flush=True)
-                    time.sleep(2)
+                is_transient = (
+                    'deadline' in error_str
+                    or 'timeout' in error_str
+                    or '504' in error_str
+                    or '503' in error_str
+                    or 'unavailable' in error_str
+                )
+                if attempt < HUMANIZE_MAX_RETRIES - 1 and is_transient:
+                    backoff = 2 * (attempt + 1)  # 2s, 4s
+                    print(
+                        f"⚠️ Transient error, retrying "
+                        f"({attempt + 1}/{HUMANIZE_MAX_RETRIES - 1}) in {backoff}s...",
+                        end=" ", flush=True,
+                    )
+                    time.sleep(backoff)
                     continue
                 print(f"❌ Failed: {e}")
                 return chunk
