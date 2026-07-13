@@ -18,7 +18,7 @@ SEO tooling, team collaboration, and a 13-agent AI pipeline.
 ![Analytics](https://img.shields.io/badge/Analytics-Google%20Analytics-E37400?style=flat-square&logo=googleanalytics&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
 ![Railway](https://img.shields.io/badge/Deploy-Railway-0B0D0E?style=flat-square&logo=railway&logoColor=white)
-![License](https://img.shields.io/badge/License-FYP-6E56CF?style=flat-square)
+![License](https://img.shields.io/badge/License-Proprietary%20(All%20Rights%20Reserved)-6E56CF?style=flat-square)
 
 </div>
 
@@ -298,8 +298,26 @@ reference, AI agent internals, public-site customization, and the production gui
 
 ---
 
-## 📄 License & author
+## 🤝 Contributing
+
+Contributions are accepted only from collaborators the Author has explicitly
+authorized (see the note in the license below). If that's you, read
+[CONTRIBUTING.md](CONTRIBUTING.md) for setup, coding standards, commit
+conventions, and the pull-request process.
+
+---
+
+## 📄 License
+
+**Proprietary — All Rights Reserved.** Scriptly is **not** open source. No use,
+copying, modification, deployment, or distribution is permitted **without the
+Author's prior written permission**. Unauthorized use is a violation of copyright
+law. See [LICENSE](LICENSE) for the full terms.
 
 Part of a Final Year Project (FYP) at the University.
+
+---
+
+## 👤 Author
 
 **Taha Khurram** · [GitHub](https://github.com/Taha-Khurram)

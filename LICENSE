@@ -1,0 +1,106 @@
+Scriptly — Proprietary License
+Copyright (c) 2026 Taha Khurram. All Rights Reserved.
+
+================================================================================
+NOTICE
+================================================================================
+
+This software and its associated source code, documentation, assets, and all
+related materials (collectively, the "Software") are the exclusive property of
+Taha Khurram (the "Author") and are protected by copyright law and international
+treaties. The Software was developed as part of a Final Year Project (FYP) at
+the University and is made available for viewing and evaluation purposes only.
+
+This is NOT open-source software. No license, right, or permission is granted
+except as expressly stated below.
+
+================================================================================
+1. NO PERMISSION WITHOUT PRIOR WRITTEN CONSENT
+================================================================================
+
+No part of the Software may be used, copied, reproduced, modified, adapted,
+translated, merged, published, distributed, sublicensed, sold, deployed, hosted,
+publicly displayed, or otherwise exploited, in whole or in part, in any form or
+by any means, WITHOUT the prior express written permission of the Author.
+
+This restriction applies to, without limitation:
+
+  a) Running or deploying the Software or any derivative for personal,
+     academic, commercial, or production use;
+  b) Copying or reusing any portion of the source code, algorithms, prompts,
+     agent designs, or architecture in another project;
+  c) Redistributing the Software or making it available to any third party;
+  d) Creating derivative works based on the Software;
+  e) Removing, altering, or obscuring any copyright, license, or attribution
+     notice contained in the Software.
+
+To request permission, contact the Author (see "Contact" below). Any use not
+covered by a written grant is strictly prohibited.
+
+================================================================================
+2. PERMITTED VIEWING
+================================================================================
+
+Solely for the purpose of academic evaluation and portfolio review, authorized
+individuals (e.g., project supervisors, examiners, and recruiters to whom the
+Author has provided access) may view and read the source code. This does not
+grant any right to execute, copy, modify, or distribute the Software.
+
+================================================================================
+3. CONFIDENTIALITY
+================================================================================
+
+The Software may contain confidential and proprietary information, including
+API integration patterns, prompt engineering, and system design. Recipients
+must not disclose such information to third parties without the Author's prior
+written consent.
+
+================================================================================
+4. THIRD-PARTY COMPONENTS
+================================================================================
+
+The Software depends on third-party libraries and services (e.g., Flask,
+Firebase, Google Gemini, and others listed in requirements.txt), each of which
+is governed by its own separate license. This License applies only to the
+original work authored by the Author and does not modify or supersede the
+licenses of those third-party components.
+
+================================================================================
+5. NO WARRANTY
+================================================================================
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. THE AUTHOR SHALL NOT BE LIABLE
+FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR
+THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+================================================================================
+6. TERMINATION
+================================================================================
+
+Any permission granted by the Author may be revoked at any time. Upon
+revocation or breach of this License, all rights granted terminate immediately
+and you must cease all use and destroy all copies of the Software in your
+possession or control.
+
+================================================================================
+7. GOVERNING LAW
+================================================================================
+
+This License shall be governed by and construed in accordance with the laws of
+the Islamic Republic of Pakistan, without regard to its conflict-of-law
+provisions.
+
+================================================================================
+CONTACT
+================================================================================
+
+For permission requests and inquiries:
+
+  Taha Khurram
+  GitHub: https://github.com/Taha-Khurram
+
+Unauthorized use of the Software is a violation of applicable copyright law and
+may result in legal action.
