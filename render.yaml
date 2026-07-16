@@ -1,0 +1,85 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Free plan, native Python. One web service runs everything: the Flask app,
+# the background task workers (blog generation / humanization), and the
+# in-process APScheduler auto-publisher. Because that scheduler and the
+# in-memory cache live inside the web process, we run a SINGLE worker with
+# multiple threads — extra workers would duplicate scheduled jobs and split
+# the cache.
+#
+# To deploy: push this repo to GitHub, then in the Render dashboard choose
+# "New +" → "Blueprint" and point it at the repo. Render reads this file and
+# prompts you for every env var marked `sync: false`.
+services:
+  - type: web
+    name: scriptly-ai
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    # $PORT is provided by Render. Long timeout so multi-minute AI calls that
+    # run inline aren't cut off; most heavy work is dispatched to background
+    # threads and polled, so requests themselves stay short.
+    startCommand: gunicorn main:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 300
+    healthCheckPath: /
+    envVars:
+      # --- Runtime config (safe to keep in the repo) ---
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: FLASK_APP
+        value: main.py
+
+      # --- Secrets — set these in the Render dashboard, never commit them ---
+      - key: SECRET_KEY
+        sync: false
+      # Paste the FULL service-account JSON as a single value; the app parses
+      # either a file path or a raw JSON string.
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # Firebase Web SDK (client) config
+      - key: FB_API_KEY
+        sync: false
+      - key: FB_AUTH_DOMAIN
+        sync: false
+      - key: FB_PROJECT_ID
+        sync: false
+      - key: FB_STORAGE_BUCKET
+        sync: false
+      - key: FB_SENDER_ID
+        sync: false
+      - key: FB_APP_ID
+        sync: false
+      - key: FB_MEASUREMENT_ID
+        sync: false
+
+      # RapidAPI keys (SEO / keyword research / site audit)
+      - key: RAPIDAPI_KEY
+        sync: false
+      - key: AHREFS_RAPIDAPI_KEY
+        sync: false
+      - key: SITE_AUDIT_RAPIDAPI_KEY
+        sync: false
+
+      # Email (Gmail SMTP) for newsletters / notifications
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: FROM_NAME
+        sync: false
+
+      # Google OAuth for the Analytics integration. After the first deploy,
+      # add https://<your-service>.onrender.com/... to the authorized redirect
+      # URIs in the Google Cloud console.
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false

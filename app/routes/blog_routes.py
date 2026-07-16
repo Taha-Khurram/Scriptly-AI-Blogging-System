@@ -583,25 +583,28 @@ def _run_humanize_task(task_id, app, blog_id, markdown_text, title):
             humanizer = HumanizeAgent()
             result = humanizer.humanize_content(
                 markdown=markdown_text,
-                topic=title
+                topic=title,
+                target_words=1200
             )
 
-            if not result.get('humanization_applied'):
-                task_manager.fail_task(task_id, "Humanization failed — content unchanged")
-                return
+            # Always persist the humanized output — never silently revert to the
+            # AI-generated original. The agent already keeps content safe from
+            # empty/broken rewrites internally, so whatever it returns here is
+            # what gets saved as the draft.
+            humanized_markdown = result.get('markdown') or markdown_text
 
             task_manager.update_task(task_id, 'formatting', 80)
 
             formatter = FormattingAgent()
             formatted = formatter.format_blog(
-                content=result['markdown'],
+                content=humanized_markdown,
                 title=title
             )
 
             updated_content = {
-                'body': result['markdown'],
+                'body': humanized_markdown,
                 'html': formatted['html'],
-                'markdown': result['markdown'],
+                'markdown': humanized_markdown,
                 'toc': formatted['toc'],
                 'toc_html': formatted['toc_html']
             }
@@ -1061,9 +1064,34 @@ def optimize_existing_blog(blog_id):
             # Update blog with optimized content
             optimized = result['optimized']
             new_title = optimized.get('optimized_title', title)
-            new_content = optimized.get('optimized_content', content)
+            new_markdown = optimized.get('optimized_content', content)
 
-            success = db_service.update_blog_content(blog_id, new_title, new_content)
+            # Meta Title / Meta Description generated during optimization. These
+            # are saved to the blog's SEO fields so they show up pre-filled in
+            # the Edit Draft modal. Fall back to the optimized title for the
+            # meta title; only overwrite existing values when we have new ones.
+            meta_title = (optimized.get('optimized_title') or new_title or '').strip()
+            meta_description = (optimized.get('meta_description') or '').strip()
+
+            # Re-format the optimized markdown into the same structured content
+            # dict the rest of the app expects (html/markdown/toc). This keeps
+            # the draft's shape intact instead of clobbering it with a bare
+            # string, so only the changed parts of the content are updated.
+            formatter = FormattingAgent()
+            formatted = formatter.format_blog(content=new_markdown, title=new_title)
+            new_content = {
+                'body': new_markdown,
+                'html': formatted['html'],
+                'markdown': new_markdown,
+                'toc': formatted['toc'],
+                'toc_html': formatted['toc_html']
+            }
+
+            success = db_service.update_blog_content(
+                blog_id, new_title, new_content,
+                seo_title=(meta_title or None),
+                seo_description=(meta_description or None)
+            )
 
             if success:
                 # Log activity
@@ -1098,6 +1126,8 @@ def optimize_existing_blog(blog_id):
                 "seo_grade": optimized.get('seo_grade', 'N/A'),
                 "primary_keyword": result.get('keyword_research', {}).get('primary_keyword', {}),
                 "new_title": new_title,
+                "meta_title": meta_title,
+                "meta_description": meta_description,
                 "comparison": result.get('comparison', {}),
                 "changes_made": result.get('changes_made', []),
                 "original_score": result.get('original_analysis', {}).get('seo_score', {}).get('total', 0),

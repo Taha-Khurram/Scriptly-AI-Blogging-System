@@ -16,8 +16,7 @@ SEO tooling, team collaboration, and a 13-agent AI pipeline.
 ![Firebase](https://img.shields.io/badge/Firebase-Firestore-FFCA28?style=flat-square&logo=firebase&logoColor=black)
 ![Auth](https://img.shields.io/badge/Auth-Firebase%20%2B%20Google%20OAuth-EA4335?style=flat-square&logo=googleauthenticator&logoColor=white)
 ![Analytics](https://img.shields.io/badge/Analytics-Google%20Analytics-E37400?style=flat-square&logo=googleanalytics&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
-![Railway](https://img.shields.io/badge/Deploy-Railway-0B0D0E?style=flat-square&logo=railway&logoColor=white)
+![Render](https://img.shields.io/badge/Deploy-Render-46E3B7?style=flat-square&logo=render&logoColor=white)
 ![License](https://img.shields.io/badge/License-Proprietary%20(All%20Rights%20Reserved)-6E56CF?style=flat-square)
 
 </div>
@@ -34,7 +33,7 @@ SEO tooling, team collaboration, and a 13-agent AI pipeline.
 - **📊 Google integrations** — real-time Analytics dashboard (OAuth), plus a Google Sheets Activity Agent that batches every dashboard click into a single "Blogs" tab.
 - **⚡ SEO Optimization Suite** — URL/keyword metrics via Ahrefs and full site-audit reports, all through RapidAPI.
 - **🖼️ Media Gallery & Leads** — upload/manage blog images and triage contact-form submissions with read/unread stats.
-- **🚀 Production-ready** — gzip + WhiteNoise static caching, in-memory query cache, APScheduler auto-publish, and one-command Docker / Railway / Nixpacks deploys.
+- **🚀 Production-ready** — gzip + WhiteNoise static caching, in-memory query cache, APScheduler auto-publish, and one-click Render deploys via `render.yaml`.
 
 ---
 
@@ -69,7 +68,7 @@ SEO tooling, team collaboration, and a 13-agent AI pipeline.
 | **Scheduling** | APScheduler (background auto-publish) |
 | **Static / perf** | WhiteNoise + Flask-Compress (gzip), instant.page prefetch |
 | **Server** | Gunicorn (Linux/Mac) · Waitress (Windows) |
-| **Deploy** | Docker · Railway · Nixpacks |
+| **Deploy** | Render (`render.yaml`) |
 
 ---
 
@@ -149,7 +148,7 @@ User action → frontend tracker (batched) → /api/track-activity → server qu
 ## 🚀 Quick start
 
 ### Prerequisites
-- Python 3.11 (Docker/Nixpacks build target; 3.9+ works locally)
+- Python 3.11 (Render build target, pinned in `runtime.txt`; 3.9+ works locally)
 - Firebase project with Firestore + Authentication enabled
 - Google Gemini API key
 
@@ -231,13 +230,27 @@ gunicorn main:app --workers 1 --threads 8 --timeout 300 -b 0.0.0.0:8080
 
 # Production — Waitress (Windows)
 waitress-serve --port=8080 main:app
-
-# Docker
-docker build -t scriptly .
-docker run -p 8080:8080 scriptly
 ```
 
-**Railway** — configured via `railway.json` + `Procfile`; push to deploy.
+### Deploy to Render (free tier, no card required)
+
+The repo ships a [`render.yaml`](render.yaml) Blueprint that provisions a single
+Python web service running the app, the background workers, and the APScheduler
+auto-publisher together.
+
+1. Push the repo to GitHub.
+2. In the [Render dashboard](https://dashboard.render.com/), click **New +** →
+   **Blueprint** and select the repo. Render reads `render.yaml` automatically.
+3. When prompted, fill in every secret env var (see [`.env.example`](.env.example)).
+   For `FIREBASE_SERVICE_ACCOUNT`, paste the **entire** service-account JSON as
+   the value — the app parses either a file path or a raw JSON string.
+4. Deploy. After the first build, add the `https://<your-service>.onrender.com`
+   callback to your Google OAuth authorized redirect URIs.
+
+> **Notes on the free plan:** the service sleeps after ~15 min of inactivity and
+> cold-starts on the next request; while asleep the APScheduler auto-publisher
+> does not fire. That's fine for demos — upgrade to a paid instance (or move the
+> scheduler to Render Cron) if you need always-on publishing.
 
 ---
 
@@ -285,7 +298,7 @@ FYP-main/
 ├── tests/               # Pytest suite
 ├── app.py · main.py · wsgi.py   # Entry points
 ├── config.py · requirements.txt · firestore.indexes.json
-├── Dockerfile · Procfile · railway.json · nixpacks.toml
+├── render.yaml · runtime.txt · .env.example
 └── firebase.json · .firebaserc · .gitignore
 ```
 

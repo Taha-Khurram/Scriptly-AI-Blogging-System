@@ -1859,6 +1859,13 @@ For questions about these Terms, contact us at {contact_email}.
                 cache.set(cache_key, user_id, ttl=300)
                 return user_id, self.get_site_settings(user_id)
 
+            # No site_settings document yet: if the identifier is a valid user
+            # (admin hasn't saved settings), fall back to default settings so
+            # the public site is still viewable instead of 404ing.
+            if self.get_user_by_id(identifier):
+                cache.set(cache_key, identifier, ttl=300)
+                return identifier, self.get_site_settings(identifier)
+
             return None, None
 
         except Exception as e:

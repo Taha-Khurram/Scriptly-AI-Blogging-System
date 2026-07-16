@@ -1,4 +1,5 @@
-# Railway expects main.py - this file redirects to app.py
+# WSGI entrypoint used by Gunicorn in production (`gunicorn main:app`),
+# e.g. the Render Blueprint in render.yaml.
 from app import create_app
 
 app = create_app()

@@ -166,7 +166,7 @@ class FormattingAgent:
                         'linenums': False
                     },
                     'toc': {
-                        'permalink': True,
+                        'permalink': False,
                         'slugify': self._slugify
                     }
                 }

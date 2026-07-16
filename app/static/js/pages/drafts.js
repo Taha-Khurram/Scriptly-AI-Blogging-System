@@ -429,27 +429,58 @@ async function submitForReview(id) {
   }
 }
 
-async function humanizeDraft(id) {
-  const row = document.getElementById(`row-${id}`);
-  const dropdownBtn = row ? row.querySelector('.btn-dropdown-trigger') : null;
-  if (dropdownBtn) {
-    dropdownBtn.disabled = true;
-    dropdownBtn.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div>';
+// Humanize loader stages (mirror the blog-generation loader on the create page)
+var HUMANIZE_STAGE_MESSAGES = {
+  'starting': 'Starting humanization...',
+  'humanizing': 'Humanizing content...',
+  'formatting': 'Formatting and styling...',
+  'saving': 'Saving to drafts...',
+  'completed': 'Done!'
+};
+
+function showHumanizeOverlay() {
+  const overlay = document.getElementById('humanizeOverlay');
+  if (overlay) overlay.classList.remove('d-none');
+  updateHumanizeStage('starting', 5);
+}
+
+function hideHumanizeOverlay() {
+  const overlay = document.getElementById('humanizeOverlay');
+  if (overlay) overlay.classList.add('d-none');
+  const bar = document.getElementById('humanizeProgressBar');
+  if (bar) bar.style.width = '0%';
+}
+
+function updateHumanizeStage(stage, progress) {
+  const text = document.getElementById('humanizeOverlayText');
+  if (text && HUMANIZE_STAGE_MESSAGES[stage]) {
+    text.textContent = HUMANIZE_STAGE_MESSAGES[stage];
   }
+  const bar = document.getElementById('humanizeProgressBar');
+  if (bar && typeof progress === 'number') {
+    bar.style.width = progress + '%';
+  }
+}
 
-  const restoreBtn = () => {
-    if (dropdownBtn) {
-      dropdownBtn.disabled = false;
-      dropdownBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+// Close any open Bootstrap dropdown menu.
+function closeAllDropdowns() {
+  document.querySelectorAll('.dropdown-menu.show').forEach(function (menu) {
+    const trigger = menu.parentElement
+      ? menu.parentElement.querySelector('[data-bs-toggle="dropdown"]')
+      : null;
+    if (trigger && window.bootstrap && bootstrap.Dropdown) {
+      const inst = bootstrap.Dropdown.getOrCreateInstance(trigger);
+      inst.hide();
+    } else {
+      menu.classList.remove('show');
     }
-  };
-
-  showToast({
-    type: 'info',
-    title: 'Humanizing Content',
-    message: 'Rewriting your draft. This may take a minute...',
-    duration: 6000
   });
+}
+
+async function humanizeDraft(id) {
+  // Close the dropdown and show the full-screen loader (same UX as generation).
+  closeAllDropdowns();
+  showHumanizeOverlay();
 
   try {
     const res = await fetch(`/api/humanize/${id}`, {
@@ -461,28 +492,28 @@ async function humanizeDraft(id) {
     if (data.success && data.task_id) {
       // Humanization runs in the background; poll for completion so the
       // request itself is never bound by a server/HTTP timeout.
-      pollHumanizeStatus(data.task_id, restoreBtn);
+      pollHumanizeStatus(data.task_id);
     } else {
+      hideHumanizeOverlay();
       showToast({
         type: 'error',
         title: 'Humanization Failed',
         message: data.error || 'Could not humanize content.',
         duration: 5000
       });
-      restoreBtn();
     }
   } catch (e) {
+    hideHumanizeOverlay();
     showToast({
       type: 'error',
       title: 'Error',
       message: 'Failed to humanize draft.',
       duration: 5000
     });
-    restoreBtn();
   }
 }
 
-function pollHumanizeStatus(taskId, onDone) {
+function pollHumanizeStatus(taskId) {
   const pollInterval = setInterval(async () => {
     try {
       const res = await fetch(`/api/generate/status/${taskId}`);
@@ -493,8 +524,11 @@ function pollHumanizeStatus(taskId, onDone) {
       }
       const data = await res.json();
 
+      updateHumanizeStage(data.stage, data.progress);
+
       if (data.status === 'completed') {
         clearInterval(pollInterval);
+        updateHumanizeStage('completed', 100);
         showToast({
           type: 'success',
           title: 'Content Humanized',
@@ -505,16 +539,17 @@ function pollHumanizeStatus(taskId, onDone) {
         setTimeout(() => window.location.reload(), 1200);
       } else if (data.status === 'failed') {
         clearInterval(pollInterval);
+        hideHumanizeOverlay();
         showToast({
           type: 'error',
           title: 'Humanization Failed',
           message: data.error || 'Could not humanize content.',
           duration: 5000
         });
-        if (onDone) onDone();
       }
     } catch (err) {
       clearInterval(pollInterval);
+      hideHumanizeOverlay();
       console.error('Humanize polling error:', err);
       showToast({
         type: 'error',
@@ -522,7 +557,6 @@ function pollHumanizeStatus(taskId, onDone) {
         message: 'Lost connection while humanizing. Check your network.',
         duration: 5000
       });
-      if (onDone) onDone();
     }
   }, 3000);
 }

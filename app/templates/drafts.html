@@ -317,7 +317,18 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/pages/drafts.js') }}?v=2"></script>
+<!-- Humanize Loading Overlay (mirrors the blog-generation loader) -->
+<div id="humanizeOverlay" class="humanize-overlay d-none">
+  <div class="humanize-overlay-card">
+    <div class="spinner-border text-primary" role="status"></div>
+    <div class="humanize-overlay-text" id="humanizeOverlayText">Humanizing content...</div>
+    <div class="humanize-progress">
+      <div id="humanizeProgressBar" class="humanize-progress-bar"></div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/pages/drafts.js') }}?v=3"></script>
   </main>
 </div>
 {% endblock %}

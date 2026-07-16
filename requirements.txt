@@ -1,19 +1,35 @@
-flask
-python-dotenv
-firebase-admin
-google-generativeai
-google-analytics-data
-google-analytics-admin
-google-auth-oauthlib
-requests
-gunicorn
-waitress
-whitenoise
-flask-compress
-pytrends
-markdown
-numpy
-APScheduler
-gspread
-google-auth
-pytest
+# Pinned to the versions in the working local .venv (Python 3.11).
+# Fully unpinned deps caused pip's resolver to backtrack through hundreds of
+# transitive versions on Render and fail with "resolution-too-deep". Pinning
+# both the direct deps and the shared Google/gRPC/HTTP transitive packages
+# keeps the resolver's search space small and the build fast + reproducible.
+
+# --- Direct dependencies ---
+flask==3.1.2
+python-dotenv==1.2.1
+firebase-admin==7.1.0
+google-generativeai==0.8.6
+google-analytics-data==0.21.0
+google-analytics-admin==0.28.0
+google-auth-oauthlib==1.3.1
+google-auth==2.48.0
+requests==2.32.5
+gunicorn==25.1.0
+waitress==3.0.2
+whitenoise==6.11.0
+flask-compress==1.23
+pytrends==4.9.2
+markdown==3.10.2
+numpy==2.4.4
+APScheduler==3.11.2
+gspread==6.2.1
+pytest==9.1.1
+
+# --- Shared transitive deps pinned to stop resolver backtracking ---
+google-api-core==2.29.0
+googleapis-common-protos==1.72.0
+proto-plus==1.27.1
+protobuf==5.29.6
+grpcio==1.78.0
+httpx==0.28.1
+urllib3==2.6.3

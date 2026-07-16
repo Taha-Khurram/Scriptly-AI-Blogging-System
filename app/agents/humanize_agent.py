@@ -98,7 +98,7 @@ AI_WORD_MAP = {
 _SHARED_RULES = """You are an expert Editor and Content Strategist. Transform this AI draft into human-first content that meets Google's E-E-A-T standards.
 
 CORE RULES (apply to EVERY rewrite):
-- PRESERVE LENGTH (most important): Keep the rewrite roughly the same length as the original section — target within 10% of the original word count. Do NOT summarize, condense, or drop any detail, example, or nuance; but do NOT pad with filler to inflate it either. "Short punchy sentences" means splitting one idea across more sentences, NOT deleting content. Every point in the original must still be present.
+- LENGTH (most important): Follow the TARGET LENGTH given at the end of this prompt. If the original is shorter than the target, EXPAND it with specific, relevant detail — real examples, hypothetical scenarios, insider observations, deeper explanation — until you reach the target. If it is longer, tighten it. Never pad with empty filler. Preserve EVERY fact, example, and nuance from the original — do NOT summarize, condense, or drop any point.
 - PERPLEXITY & BURSTINESS: Vary sentence length wildly. Mix short punchy lines (3-8 words) with medium explanatory ones (10-16 words). Never 3+ sentences of similar length in a row.
 - INFORMATION GAIN: Don't just rephrase. Add a specific example, a hypothetical scenario, or a nuanced "insider" observation where it fits naturally. Make the reader learn something extra.
 - REMOVE AI-ISMS: Eliminate "In conclusion," "It is important to note," "Furthermore," "In the rapidly evolving world of," "It's worth mentioning," and all similar filler.
@@ -209,7 +209,7 @@ class HumanizeAgent:
             max_output_tokens=8192,
         )
 
-    def humanize_content(self, markdown, topic=""):
+    def humanize_content(self, markdown, topic="", target_words=1200):
         """
         Main entry point. Humanize AI-generated markdown content.
         Uses max 2 API calls (blog split in half) + heavy post-processing.
@@ -217,6 +217,9 @@ class HumanizeAgent:
         Args:
             markdown: Raw AI-generated markdown text
             topic: Blog topic for context-aware rewriting
+            target_words: Desired length of the humanized blog (default 1200).
+                The target is split proportionally across chunks so the final
+                rewrite lands close to this word count.
 
         Returns:
             dict with 'markdown', 'original_markdown', 'humanization_applied'
@@ -241,12 +244,21 @@ class HumanizeAgent:
             # Step 2: Rewrite each half with a different prompt variant.
             # Chunks are independent, so run them concurrently — this halves
             # wall-clock time versus the old sequential loop.
+            # Split the overall target proportionally to each chunk's size so
+            # the reassembled blog lands near `target_words`.
+            total_chunk_words = sum(len(c.split()) for c in chunks) or 1
+            chunk_targets = [
+                max(1, round(target_words * len(c.split()) / total_chunk_words))
+                for c in chunks
+            ]
+
             print(f"\n🤖 Step 2: Rewriting {len(chunks)} chunk(s) via Gemini API (parallel)")
+            print(f"   Target: {target_words} words total → per-chunk {chunk_targets}")
             if len(chunks) == 1:
-                rewritten = [self._rewrite_chunk(chunks[0], topic, 0)]
+                rewritten = [self._rewrite_chunk(chunks[0], topic, 0, chunk_targets[0])]
             else:
                 tasks = [
-                    (self._rewrite_chunk, (chunk, topic, i))
+                    (self._rewrite_chunk, (chunk, topic, i, chunk_targets[i]))
                     for i, chunk in enumerate(chunks)
                 ]
                 rewritten = run_parallel_simple(tasks, max_workers=len(tasks))
@@ -311,9 +323,13 @@ class HumanizeAgent:
         print(f"   → Split at section {mid}: chunk 1 = sections 1-{mid}, chunk 2 = sections {mid+1}-{len(sections)}")
         return [first_half, second_half]
 
-    def _rewrite_chunk(self, chunk, topic, index):
+    def _rewrite_chunk(self, chunk, topic, index, target_words=None):
         """Rewrite a chunk using a prompt variant. Streams the response and
-        retries transient backend errors with exponential backoff."""
+        retries transient backend errors with exponential backoff.
+
+        `target_words` is the desired length of this chunk's rewrite; the model
+        is told to expand or tighten toward it.
+        """
         import time
 
         chunk_words = len(chunk.split())
@@ -323,10 +339,17 @@ class HumanizeAgent:
             print(f"   Chunk {index+1}: ⏭️  Skipped (only {chunk_words} words)")
             return chunk
 
-        print(f"   Chunk {index+1}: 🔄 Rewriting with variant {variant_num} ({chunk_words} words)...", end=" ", flush=True)
+        print(f"   Chunk {index+1}: 🔄 Rewriting with variant {variant_num} ({chunk_words} words → target {target_words})...", end=" ", flush=True)
 
         variant = PROMPT_VARIANTS[variant_num]
         prompt = variant.format(topic=topic or "this topic", section=chunk)
+        if target_words:
+            prompt += (
+                f"\n\nTARGET LENGTH: Aim for approximately {target_words} words in "
+                f"this rewritten section. If the source above is shorter, expand it "
+                f"with specific, relevant detail and examples to reach that length; "
+                f"if longer, tighten it. Keep every fact and point intact."
+            )
 
         kwargs = {"generation_config": self.generation_config}
         if _SUPPORTS_REQUEST_OPTIONS:
@@ -350,13 +373,15 @@ class HumanizeAgent:
                     print(f"⚠️ Lost all headings, keeping original")
                     return chunk
 
-                # Truncation guard: if the rewrite lost more than half the
-                # words, the model almost certainly ran out of output budget
-                # mid-generation (finish_reason=MAX_TOKENS). Keep THIS chunk's
-                # original so one truncated chunk can't drag the whole blog
-                # past the final ratio check and discard everything.
-                if result_words < chunk_words * 0.5:
-                    print(f"⚠️ Rewrite truncated ({chunk_words} → {result_words} words), keeping original")
+                # Truncation guard: if the rewrite came back far shorter than
+                # what we asked for, the model almost certainly ran out of
+                # output budget mid-generation (finish_reason=MAX_TOKENS). Keep
+                # THIS chunk's original only in that broken case so we never
+                # save a half-cut section. Compare against the target (falling
+                # back to the source length when no target is set).
+                floor = (target_words or chunk_words) * 0.4
+                if result_words < floor:
+                    print(f"⚠️ Rewrite truncated (target {target_words or chunk_words} → {result_words} words), keeping original")
                     return chunk
 
                 print(f"✅ Done ({chunk_words} → {result_words} words)")
@@ -637,30 +662,15 @@ class HumanizeAgent:
     # ── Validation ────────────────────────────────────────────────
 
     def _validate(self, original, humanized):
-        """Validate that structure and reasonable length are preserved."""
+        """Validate the humanized output.
+
+        We intentionally do NOT revert to the AI original on length changes —
+        the humanizer targets a fixed word count (~1200), so the length is
+        expected to move. The only case that falls back is a genuinely empty
+        rewrite, where there is simply nothing to save.
+        """
         if not humanized or not humanized.strip():
             print("⚠️ Humanization returned empty — using original")
             return original
-
-        orig_headings = re.findall(r'^#{1,3}\s+.+', original, re.MULTILINE)
-        new_headings = re.findall(r'^#{1,3}\s+.+', humanized, re.MULTILINE)
-
-        if len(orig_headings) > 0 and len(new_headings) == 0:
-            print("⚠️ Humanization lost all headings — using original")
-            return original
-
-        orig_words = len(original.split())
-        new_words = len(humanized.split())
-
-        # This guard only catches genuinely broken output — a truncated
-        # response (content lost) or a runaway expansion. Humanization
-        # legitimately varies length as it rewrites, so the bounds are wide;
-        # too tight and every valid rewrite gets discarded (returning the
-        # untouched original, which reads as "humanization did nothing").
-        if orig_words > 0:
-            ratio = new_words / orig_words
-            if ratio < 0.6 or ratio > 2.0:
-                print(f"⚠️ Word count ratio {ratio:.2f} out of bounds ({orig_words} → {new_words}) — using original")
-                return original
 
         return humanized

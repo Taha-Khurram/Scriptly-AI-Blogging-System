@@ -807,36 +807,89 @@ class SEOAgent:
     # =========================================
     # CONTENT OPTIMIZATION
     # =========================================
+    def _find_first_paragraph(self, content: str):
+        """Return the first real body paragraph (not a heading, list, or code)."""
+        blocks = re.split(r'\n\s*\n', content)
+        for block in blocks:
+            stripped = block.strip()
+            if not stripped:
+                continue
+            if stripped.startswith('#') or stripped.startswith('```'):
+                continue
+            if re.match(r'^\s*[-*+]\s', stripped) or re.match(r'^\s*\d+\.\s', stripped):
+                continue
+            return block
+        return None
+
+    def _apply_seo_to_content(self, content: str, primary_keyword: str,
+                              keyword_intro: str, faq_section: list) -> str:
+        """
+        Apply SEO changes ADDITIVELY to the existing content.
+
+        The original body is preserved verbatim — this never rewrites or
+        truncates it. It only:
+          1. weaves a keyword-bearing intro sentence into the first paragraph,
+             and only when the primary keyword is genuinely missing there, and
+          2. appends an FAQ section at the end (if one isn't already present).
+        """
+        updated = content.rstrip()
+
+        # 1. Ensure the primary keyword appears early in the body.
+        if primary_keyword and keyword_intro:
+            first_para = self._find_first_paragraph(updated)
+            if first_para is not None and primary_keyword.lower() not in first_para.lower():
+                intro = keyword_intro.strip()
+                if intro and not intro.endswith(('.', '!', '?')):
+                    intro += '.'
+                if intro:
+                    new_para = f"{intro} {first_para.strip()}"
+                    updated = updated.replace(first_para, new_para, 1)
+
+        # 2. Append an FAQ section (skip if the content already has one).
+        if faq_section and 'frequently asked questions' not in updated.lower():
+            faq_parts = ['## Frequently Asked Questions', '']
+            for item in faq_section:
+                question = (item.get('question') or '').strip()
+                answer = (item.get('answer') or '').strip()
+                if question and answer:
+                    faq_parts.append(f"### {question}")
+                    faq_parts.append('')
+                    faq_parts.append(answer)
+                    faq_parts.append('')
+            if len(faq_parts) > 2:
+                updated = updated.rstrip() + '\n\n' + '\n'.join(faq_parts).rstrip()
+
+        return updated
+
     def auto_implement_seo(self, title: str, content: str, keyword_data: Dict) -> Dict:
         """Automatically optimize the blog content for SEO"""
         primary_kw = keyword_data.get('primary_keyword', {})
         primary_keyword = primary_kw.get('keyword', '') if primary_kw else ''
         secondary_kws = [kw['keyword'] for kw in keyword_data.get('secondary_keywords', [])]
 
-        # Strip code blocks from content to prevent Gemini from outputting code
-        clean_content = re.sub(r'```[\s\S]*?```', '[CODE_BLOCK_PRESERVED]', content[:4000])
-        # Also strip inline code that might confuse the model
+        # Send a trimmed, code-free copy of the content to the model for CONTEXT
+        # ONLY. We no longer ask the model to rewrite the body, so this is just
+        # so it understands the topic when writing the title/meta/FAQ.
+        clean_content = re.sub(r'```[\s\S]*?```', '[code]', content[:4000])
         clean_content = re.sub(r'`[^`]+`', '[inline-code]', clean_content)
 
-        prompt = f"""TASK: Optimize this blog post for SEO. Return ONLY a JSON object.
+        prompt = f"""TASK: Generate SEO enhancements for this blog post. Do NOT rewrite or return the article body. Return ONLY a JSON object.
 
 PRIMARY KEYWORD: {primary_keyword}
 SECONDARY KEYWORDS: {', '.join(secondary_kws)}
 
 TITLE: {title}
-CONTENT (code blocks replaced with placeholders):
+CONTENT (for context only — do not rewrite it):
 {clean_content}
 
-RULES:
-1. Rewrite title to include primary keyword (50-60 chars)
-2. Place primary keyword in first paragraph and one H2 heading
-3. Write meta description (150-160 chars) with primary keyword
-4. Add FAQ section with 3 questions
-5. Keep [CODE_BLOCK_PRESERVED] placeholders in optimized_content where they appeared
-6. Write optimized_content as markdown text
+Provide these SEO additions that will be applied ON TOP of the existing content (the body itself stays unchanged):
+1. optimized_title: rewrite the title to include the primary keyword (50-60 chars)
+2. meta_description: 150-160 chars including the primary keyword
+3. keyword_intro: ONE natural sentence (15-25 words) featuring the primary keyword that can be woven in as the opening line of the article. It must read naturally and match the article's topic.
+4. faq_section: exactly 3 relevant questions, each with a concise 2-3 sentence answer
 
 OUTPUT FORMAT - respond with ONLY this JSON structure, nothing else:
-{{"optimized_title": "string", "meta_description": "string", "optimized_content": "string with markdown", "faq_section": [{{"question": "string", "answer": "string"}}]}}"""
+{{"optimized_title": "string", "meta_description": "string", "keyword_intro": "string", "faq_section": [{{"question": "string", "answer": "string"}}]}}"""
 
         try:
             response = None
@@ -914,14 +967,15 @@ OUTPUT FORMAT - respond with ONLY this JSON structure, nothing else:
                 cleaned = re.sub(r'(?<=": ")(.*?)(?="[,}\]])', lambda m: m.group(0).replace('\n', '\\n'), cleaned)
                 result = json.loads(cleaned)
 
-            # NOW analyze the actual optimized content
-            optimized_content = result.get('optimized_content', content)
-
-            # Restore original code blocks that were stripped for the prompt
-            code_blocks = re.findall(r'```[\s\S]*?```', content)
-            for block in code_blocks:
-                if '[CODE_BLOCK_PRESERVED]' in optimized_content:
-                    optimized_content = optimized_content.replace('[CODE_BLOCK_PRESERVED]', block, 1)
+            # Apply the SEO additions ON TOP of the existing content instead of
+            # replacing it. The original body is preserved verbatim — we only
+            # weave in a keyword intro (if missing) and append an FAQ section.
+            optimized_content = self._apply_seo_to_content(
+                content=content,
+                primary_keyword=primary_keyword,
+                keyword_intro=result.get('keyword_intro', ''),
+                faq_section=result.get('faq_section', [])
+            )
             result['optimized_content'] = optimized_content
 
             optimized_title = result.get('optimized_title', title)
