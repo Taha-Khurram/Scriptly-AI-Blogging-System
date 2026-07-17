@@ -13,7 +13,7 @@ class CommentAgent:
 
     def __init__(self):
         genai.configure(api_key=current_app.config['GEMINI_API_KEY'])
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
         self.generation_config = genai.types.GenerationConfig(
             temperature=0.3,
             top_p=0.9,

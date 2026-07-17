@@ -11,7 +11,7 @@ class NewsletterAgent:
 
     def __init__(self):
         genai.configure(api_key=Config.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
 
     def generate_newsletter(self, blogs: list, site_name: str = "My Blog",
                             custom_intro: str = None, topic: str = None):

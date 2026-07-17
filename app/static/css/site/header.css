@@ -58,8 +58,8 @@
 .site-logo:hover { transform: scale(1.02); }
 
 .site-logo .logo-image {
-    height: 2.6rem;
-    width: auto;
+    height: 120px;
+    width: 120px;
     object-fit: contain;
 }
 

@@ -42,7 +42,7 @@ _SUPPORTS_REQUEST_OPTIONS = (
 class SEOAgent:
     def __init__(self):
         genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
 
         # Extended per-call deadline, passed to every generate_content call.
         self._gen_kwargs = {}

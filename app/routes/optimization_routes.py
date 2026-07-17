@@ -182,7 +182,7 @@ def keyword_metrics():
 def _extract_keywords_from_content(title, content):
     """Use Gemini to extract focus keywords from blog content."""
     genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-flash-lite-latest')
 
     prompt = f"""Extract 5 high-value SEO keywords from this blog post.
 Return ONLY a comma-separated list of keywords, nothing else.

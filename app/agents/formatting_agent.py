@@ -30,8 +30,12 @@ class FormattingAgent:
         Returns:
             Dict with formatted content, TOC, reading time, etc.
         """
-        # Clean the content
-        cleaned = self._clean_content(content)
+        # Content may arrive as markdown OR as already-rendered HTML (e.g. from a
+        # WYSIWYG editor or a previous formatting pass). The markdown-specific
+        # cleaning would corrupt HTML (it rewrites '#' so it even breaks
+        # `href="#anchor"` links), so only apply it to genuine markdown.
+        is_html = self._looks_like_html(content)
+        cleaned = content if is_html else self._clean_content(content)
 
         # Generate table of contents
         toc = self._generate_toc(cleaned)
@@ -84,7 +88,13 @@ class FormattingAgent:
         return content.strip()
 
     def _generate_toc(self, content: str) -> List[Dict]:
-        """Generate table of contents from headings"""
+        """Generate table of contents from headings (markdown OR HTML).
+
+        Markdown `#` headings are preferred. If none are found, the content is
+        treated as HTML and headings are extracted from `<h1>`-`<h6>` tags so a
+        TOC is still produced (previously HTML-bodied posts lost their TOC
+        entirely because only markdown headings were recognized).
+        """
         toc = []
         heading_pattern = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
 
@@ -101,7 +111,54 @@ class FormattingAgent:
                 "slug": slug
             })
 
+        if not toc:
+            html_heading_pattern = re.compile(
+                r'<h([1-6])\b[^>]*>(.*?)</h\1>', re.IGNORECASE | re.DOTALL
+            )
+            for match in html_heading_pattern.finditer(content):
+                level = int(match.group(1))
+                # Strip any inner tags to get plain heading text
+                text = re.sub(r'<[^>]+>', '', match.group(2)).strip()
+                if not text:
+                    continue
+                toc.append({
+                    "level": level,
+                    "text": text,
+                    "slug": self._slugify(text)
+                })
+
         return toc
+
+    def _looks_like_html(self, content: str) -> bool:
+        """Heuristic: does this content contain rendered HTML block markup?"""
+        if not content:
+            return False
+        return bool(re.search(
+            r'<(article|section|div|p|h[1-6]|ul|ol|table)\b', content, re.IGNORECASE
+        ))
+
+    def _add_ids_to_html_headings(self, html: str) -> str:
+        """Inject anchor `id`s into HTML headings so TOC links resolve.
+
+        Headings that already carry an `id` are left untouched; the slug matches
+        the one produced by `_generate_toc`, so the TOC anchors line up.
+        """
+        def repl(match):
+            level = match.group(1)
+            attrs = match.group(2) or ''
+            inner = match.group(3)
+            if re.search(r'\bid\s*=', attrs, re.IGNORECASE):
+                return match.group(0)
+            text = re.sub(r'<[^>]+>', '', inner).strip()
+            if not text:
+                return match.group(0)
+            slug = self._slugify(text)
+            return f'<h{level}{attrs} id="{slug}">{inner}</h{level}>'
+
+        return re.sub(
+            r'<h([1-6])((?:\s+[^>]*)?)>(.*?)</h\1>',
+            repl, html, flags=re.IGNORECASE | re.DOTALL
+        )
 
     def _slugify(self, text: str, separator: str = '-') -> str:
         """Convert heading text to URL-friendly slug"""
@@ -143,18 +200,18 @@ class FormattingAgent:
         return max(1, round(word_count / words_per_minute))
 
     def _markdown_to_html(self, content: str) -> str:
-        """Convert markdown to HTML with proper formatting"""
-        # Add IDs to headings for anchor links
-        def add_heading_ids(content):
-            def replace_heading(match):
-                hashes = match.group(1)
-                text = match.group(2)
-                slug = self._slugify(text)
-                level = len(hashes)
-                return f'<h{level} id="{slug}">{text}</h{level}>'
+        """Convert markdown to HTML with proper formatting.
 
-            # First convert to HTML then add IDs
-            return content
+        If the content is already HTML (from a WYSIWYG editor or an earlier
+        formatting pass) it is NOT re-run through the markdown converter — doing
+        so double-wrapped it in nested <article> tags and mangled it. Instead we
+        just ensure headings have anchor ids and wrap once if not already wrapped.
+        """
+        if self._looks_like_html(content):
+            html = self._add_ids_to_html_headings(content)
+            if '<article' not in html.lower():
+                html = f'<article class="blog-content formatted">\n{html}\n</article>'
+            return html
 
         try:
             html = markdown.markdown(

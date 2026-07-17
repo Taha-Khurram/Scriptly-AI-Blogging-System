@@ -1220,7 +1220,7 @@
                                         <span><i class="bi bi-calendar3"></i> {{ blog.updated_at.strftime('%b %d, %Y') if blog.updated_at else 'Recently' }}</span>
                                     </div>
                                 </div>
-                                <button class="btn-unpublish" onclick="unpublishBlog('{{ blog.id }}')">
+                                <button type="button" class="btn-unpublish" onclick="unpublishBlog('{{ blog.id }}')">
                                     <i class="bi bi-arrow-counterclockwise"></i> Unpublish
                                 </button>
                             </div>
@@ -2623,9 +2623,6 @@
             </form>
         </div>
 
-    </main>
-</div>
-
 <!-- Custom Confirmation Modal -->
 <div class="confirm-modal-overlay" id="confirmModal">
     <div class="confirm-modal-content">
@@ -3253,4 +3250,7 @@
         }
     }
 </script>
+
+    </main>
+</div>
 {% endblock %}

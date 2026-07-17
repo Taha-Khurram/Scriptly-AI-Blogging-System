@@ -465,7 +465,7 @@
         var region = optimizeRegionSelect.value;
         optimizeBtn.disabled = true;
         optimizeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Optimizing...';
-        optimizeEmptyState.style.display = 'none';
+        if (optimizeEmptyState) optimizeEmptyState.style.display = 'none';
         optimizeResultsSection.classList.remove('show');
         optimizeLoading.style.display = 'flex';
         showActionLoader('Optimizing...');
@@ -480,7 +480,7 @@
 
             if (!response.ok || !result.success) {
                 showToast({ type: 'error', title: 'Optimization Failed', message: result.error || 'Unable to optimize this blog.' });
-                optimizeEmptyState.style.display = 'block';
+                if (optimizeEmptyState) optimizeEmptyState.style.display = 'block';
                 return;
             }
 
@@ -488,7 +488,7 @@
 
         } catch (err) {
             showToast({ type: 'error', title: 'Connection Error', message: 'Failed to connect. Please try again.' });
-            optimizeEmptyState.style.display = 'block';
+            if (optimizeEmptyState) optimizeEmptyState.style.display = 'block';
         } finally {
             hideActionLoader();
             optimizeBtn.disabled = false;
@@ -840,5 +840,124 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(dlUrl);
     }
+
+    // ========== CUSTOM SELECT ENHANCEMENT ==========
+    // Replaces the browser-native option list (which can't be styled) with a
+    // branded dropdown, while keeping the real <select> as the hidden source of
+    // truth so all existing .value reads and async option loading keep working.
+    function enhanceSelect(select) {
+        if (select.dataset.csEnhanced) return;
+        select.dataset.csEnhanced = '1';
+
+        var isGrow = select.classList.contains('draft-select');
+        var wrap = document.createElement('div');
+        wrap.className = 'cs-wrap' + (isGrow ? ' cs-wrap--grow' : ' cs-wrap--fixed');
+
+        var trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'cs-trigger';
+        trigger.setAttribute('aria-haspopup', 'listbox');
+        trigger.setAttribute('aria-expanded', 'false');
+
+        var label = document.createElement('span');
+        label.className = 'cs-label';
+        trigger.appendChild(label);
+
+        var caret = document.createElement('i');
+        caret.className = 'bi bi-chevron-down cs-caret';
+        trigger.appendChild(caret);
+
+        var panel = document.createElement('div');
+        panel.className = 'cs-panel';
+        panel.setAttribute('role', 'listbox');
+
+        select.parentNode.insertBefore(wrap, select);
+        wrap.appendChild(select);
+        wrap.appendChild(trigger);
+        wrap.appendChild(panel);
+        select.classList.add('cs-native');
+
+        function buildOptions() {
+            panel.innerHTML = '';
+            Array.prototype.forEach.call(select.options, function(opt, i) {
+                var item = document.createElement('div');
+                item.className = 'cs-option';
+                item.setAttribute('role', 'option');
+                item.dataset.index = i;
+                var text = document.createElement('span');
+                text.className = 'cs-option-text';
+                text.textContent = opt.textContent;
+                var check = document.createElement('i');
+                check.className = 'bi bi-check2 cs-option-check';
+                item.appendChild(text);
+                item.appendChild(check);
+                if (i === select.selectedIndex) item.classList.add('is-selected');
+                item.addEventListener('click', function() {
+                    select.selectedIndex = i;
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                    close();
+                });
+                panel.appendChild(item);
+            });
+        }
+
+        function markSelected() {
+            panel.querySelectorAll('.cs-option').forEach(function(el) {
+                el.classList.toggle('is-selected', Number(el.dataset.index) === select.selectedIndex);
+            });
+        }
+
+        function syncLabel() {
+            var opt = select.options[select.selectedIndex];
+            label.textContent = opt ? opt.textContent : '';
+            label.classList.toggle('cs-placeholder', !!(opt && opt.value === ''));
+        }
+
+        function open() {
+            closeAllCustomSelects();
+            buildOptions();
+            var sel = panel.querySelector('.cs-option.is-selected');
+            wrap.classList.add('cs-open');
+            trigger.setAttribute('aria-expanded', 'true');
+            if (sel) sel.scrollIntoView({ block: 'nearest' });
+        }
+        function close() {
+            wrap.classList.remove('cs-open');
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+        wrap._csClose = close;
+
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (wrap.classList.contains('cs-open')) close(); else open();
+        });
+
+        // Rebuild when the native <select> options change (drafts load async).
+        var mo = new MutationObserver(function() {
+            syncLabel();
+            if (wrap.classList.contains('cs-open')) buildOptions();
+        });
+        mo.observe(select, { childList: true });
+
+        select.addEventListener('change', function() { syncLabel(); markSelected(); });
+
+        buildOptions();
+        syncLabel();
+    }
+
+    function closeAllCustomSelects() {
+        document.querySelectorAll('.cs-wrap.cs-open').forEach(function(w) {
+            if (w._csClose) w._csClose();
+        });
+    }
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.cs-wrap')) closeAllCustomSelects();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeAllCustomSelects();
+    });
+
+    document.querySelectorAll('.draft-select, .country-select').forEach(enhanceSelect);
 
 })();

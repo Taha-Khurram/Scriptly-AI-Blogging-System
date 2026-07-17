@@ -193,8 +193,8 @@ class HumanizeAgent:
 
     def __init__(self):
         genai.configure(api_key=current_app.config['GEMINI_API_KEY'])
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
-        # gemini-2.5-flash is a THINKING model: its internal reasoning tokens
+        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
+        # gemini-flash-lite-latest is a THINKING model: its internal reasoning tokens
         # are drawn from max_output_tokens BEFORE the visible answer. Measured
         # ~2,500-3,500 thinking tokens per chunk, so a low cap (the old 3072)
         # gets fully consumed by thinking and truncates the rewrite to a

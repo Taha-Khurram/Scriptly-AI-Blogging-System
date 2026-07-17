@@ -194,6 +194,157 @@
     box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
 }
 
+/* ==================== CUSTOM SELECT ==================== */
+/* Native <select> kept as hidden source of truth once enhanced */
+select.cs-native {
+    display: none !important;
+}
+
+.cs-wrap {
+    position: relative;
+    display: flex;
+}
+
+.cs-wrap--grow {
+    flex: 1;
+    width: 100%;
+}
+
+.cs-wrap--fixed {
+    min-width: 180px;
+}
+
+.cs-trigger {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.75rem 1.15rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #1B2559;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cs-trigger:hover {
+    border-color: #c7cede;
+}
+
+.cs-wrap.cs-open .cs-trigger {
+    border-color: #4318FF;
+    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
+}
+
+.cs-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cs-label.cs-placeholder {
+    color: #a3aed0;
+    font-weight: 500;
+}
+
+.cs-caret {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    color: #4318FF;
+    transition: transform 0.2s ease;
+}
+
+.cs-wrap.cs-open .cs-caret {
+    transform: rotate(180deg);
+}
+
+.cs-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 40;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(27, 37, 89, 0.14);
+    padding: 0.4rem;
+    max-height: 260px;
+    overflow-y: auto;
+    display: none;
+    animation: csFadeIn 0.14s ease;
+}
+
+.cs-wrap.cs-open .cs-panel {
+    display: block;
+}
+
+@keyframes csFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.cs-option {
+    padding: 0.6rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #1B2559;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.cs-option:hover {
+    background: rgba(67, 24, 255, 0.07);
+    color: #4318FF;
+}
+
+.cs-option-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cs-option.is-selected {
+    background: rgba(67, 24, 255, 0.1);
+    color: #4318FF;
+    font-weight: 600;
+}
+
+.cs-option-check {
+    flex-shrink: 0;
+    font-size: 0.95rem;
+    color: #4318FF;
+    opacity: 0;
+}
+
+.cs-option.is-selected .cs-option-check {
+    opacity: 1;
+}
+
+/* Slim scrollbar for the option list */
+.cs-panel::-webkit-scrollbar {
+    width: 8px;
+}
+.cs-panel::-webkit-scrollbar-thumb {
+    background: #d6dbe8;
+    border-radius: 8px;
+}
+.cs-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
 /* Keyword Results Table */
 .kw-results-table-wrapper {
     overflow-x: auto;
@@ -833,7 +984,8 @@
         grid-template-columns: 1fr;
     }
 
-    .country-select {
+    .country-select,
+    .cs-wrap--fixed {
         min-width: unset;
         width: 100%;
     }

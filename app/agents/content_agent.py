@@ -22,7 +22,7 @@ class ContentAgent:
     def __init__(self):
         genai.configure(api_key=current_app.config['GEMINI_API_KEY'])
         # Using the stable 2026 identifier for speed and quality
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
 
     def generate_blog(self, topic):
         """

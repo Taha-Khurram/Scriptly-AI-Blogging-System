@@ -124,7 +124,7 @@
     margin-bottom: 1.1rem;
 }
 
-.footer-logo img { height: 2.8rem; width: auto; object-fit: contain; }
+.footer-logo img { height: 120px; width: 120px; object-fit: contain; }
 
 .footer-logo span {
     font-family: var(--font-display);
