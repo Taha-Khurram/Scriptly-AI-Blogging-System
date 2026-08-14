@@ -1,0 +1,192 @@
+/* ==========================================================================
+   Error screens (404 / 403)
+
+   A dead end should still feel like part of the product: same canvas, same
+   type, same pill actions. One brand-gradient moment on the code itself.
+   ========================================================================== */
+
+.error-shell {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: var(--sp-10) var(--sp-6);
+    position: relative;
+    overflow: hidden;
+}
+
+/* The same low radial wash used behind the create-blog empty state. */
+.error-shell::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(760px, 120%);
+    aspect-ratio: 1;
+    background: radial-gradient(circle, var(--accent-tint) 0%, transparent 60%);
+    pointer-events: none;
+}
+
+.error-panel {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 540px;
+    text-align: center;
+}
+
+.error-mark {
+    display: block;
+    height: 30px;
+    width: auto;
+    margin: 0 auto var(--sp-10);
+    opacity: 0.9;
+}
+
+.error-code {
+    /* inline-block so the gradient box hugs the glyphs. As a full-width block
+       the centred text samples only the middle of the ramp and loses the blue. */
+    display: inline-block;
+    font-family: var(--font-display);
+    font-size: clamp(4.5rem, 14vw, 7rem);
+    font-weight: var(--fw-medium);
+    line-height: 1;
+    letter-spacing: -0.04em;
+    /* Horizontal sweep: on a short, wide string the diagonal variant clips to
+       the middle of the ramp and loses the blue end entirely. */
+    background: var(--brand-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    margin-bottom: var(--sp-4);
+}
+
+.error-title {
+    font-family: var(--font-display);
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+    margin: 0 0 var(--sp-3);
+}
+
+.error-note {
+    font-size: var(--fs-body);
+    color: var(--text-muted);
+    line-height: var(--lh-body);
+    margin: 0 auto var(--sp-8);
+    max-width: 44ch;
+}
+
+/* --- Actions ------------------------------------------------------------ */
+.error-actions {
+    display: flex;
+    gap: var(--sp-3);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.error-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 44px;
+    padding: 0 var(--sp-6);
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-standard),
+        border-color var(--dur-fast) var(--ease-standard),
+        box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.error-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.error-btn-primary {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.error-btn-primary:hover {
+    background: var(--accent-hover);
+    color: var(--text-on-accent);
+    box-shadow: var(--elev-2);
+}
+
+.error-btn-ghost {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text-1);
+    font-family: inherit;
+}
+
+.error-btn-ghost:hover {
+    background: var(--surface-3);
+    border-color: var(--border-strong);
+    color: var(--text-strong);
+}
+
+/* --- Quick links -------------------------------------------------------- */
+.error-jump {
+    margin-top: var(--sp-10);
+    padding-top: var(--sp-6);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.error-jump-label {
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    margin: 0 0 var(--sp-4);
+}
+
+.error-jump-list {
+    display: flex;
+    gap: var(--sp-2);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.error-jump-list a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 36px;
+    padding: 0 var(--sp-4);
+    border-radius: var(--radius-pill);
+    /* surface-3, not -2: this page sits straight on the canvas, and in light
+       mode surface-2 *is* the canvas colour, so the pills would vanish. */
+    background: var(--surface-3);
+    color: var(--text-2);
+    font-size: var(--fs-sm);
+    transition: background-color var(--dur-fast) var(--ease-standard),
+        color var(--dur-fast) var(--ease-standard);
+}
+
+.error-jump-list a:hover {
+    background: var(--accent-soft);
+    color: var(--accent-on-soft);
+}
+
+.error-jump-list .material-symbols-outlined {
+    font-size: 18px;
+}
+
+@media (max-width: 480px) {
+    .error-actions {
+        flex-direction: column;
+    }
+
+    .error-btn {
+        justify-content: center;
+        width: 100%;
+    }
+}

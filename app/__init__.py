@@ -17,6 +17,7 @@ from config import Config
 from app.firebase.firebase_admin import FirebaseLoader
 from app.firebase.firestore_service import FirestoreService
 from app.utils.date_utils import format_date, format_time, format_datetime
+from app.utils.text_utils import excerpt as text_excerpt, strip_markdown
 from whitenoise import WhiteNoise
 from werkzeug.middleware.proxy_fix import ProxyFix
 from functools import wraps
@@ -98,17 +99,28 @@ def create_app(config_class=Config):
             settings.get('timezone', 'UTC')
         )
 
+    @app.template_filter('plain_text')
+    def plain_text_filter(value):
+        """Flatten Markdown/HTML content to readable prose."""
+        return strip_markdown(value)
+
+    @app.template_filter('excerpt')
+    def excerpt_filter(value, length=180):
+        """Word-boundary summary of post content, free of Markdown markers."""
+        return text_excerpt(value, length)
+
     # Context processor to inject app settings into all templates
     _ctx_db_service = FirestoreService()
 
     @app.context_processor
     def inject_app_settings():
         """Make app settings available to all templates (cached in FirestoreService)."""
+        year = datetime.now(timezone.utc).year
         try:
             app_settings = _ctx_db_service.get_app_settings()
-            return {'app_config': app_settings}
+            return {'app_config': app_settings, 'current_year': year}
         except Exception:
-            return {'app_config': {'app_name': 'Scriptly', 'tagline': ''}}
+            return {'app_config': {'app_name': 'Scriptly', 'tagline': ''}, 'current_year': year}
 
     @app.route('/')
     def index():

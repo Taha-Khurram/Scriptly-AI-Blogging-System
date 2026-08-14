@@ -53,7 +53,7 @@
               <ul class="dropdown-menu dropdown-menu-end">
                 <li>
                   <button class="dropdown-item" onclick="openViewModal('{{ draft.id }}')">
-                    <i class="bi bi-eye" style="color: #06b6d4;"></i> View Draft
+                    <i class="bi bi-eye" style="color: var(--info);"></i> View Draft
                   </button>
                 </li>
                 <li>
@@ -63,17 +63,17 @@
                 </li>
                 <li>
                   <button class="dropdown-item" onclick="humanizeDraft('{{ draft.id }}')">
-                    <i class="bi bi-shield-check" style="color: #8b5cf6;"></i> Humanize
+                    <i class="bi bi-shield-check" style="color: var(--accent);"></i> Humanize
                   </button>
                 </li>
                 <li>
                   <button class="dropdown-item" onclick="submitForReview('{{ draft.id }}')">
-                    <i class="bi bi-check-circle" style="color: #10b981;"></i> Submit for Approval
+                    <i class="bi bi-check-circle" style="color: var(--success);"></i> Submit for Approval
                   </button>
                 </li>
                 <!-- <li>
                   <button class="dropdown-item" onclick="openScheduleModal('{{ draft.id }}')">
-                    <i class="bi bi-calendar-event" style="color: #4318FF;"></i> Schedule & Submit
+                    <i class="bi bi-calendar-event" style="color: var(--accent);"></i> Schedule & Submit
                   </button>
                 </li> -->
                 <li>
@@ -270,7 +270,7 @@
       <div class="custom-modal-body">
         <p class="text-muted mb-3">Choose when you'd like this blog to be published. It will be sent to your admin for approval.</p>
         <input type="datetime-local" class="form-control" id="scheduleDateTime"
-               style="padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid #e2e8f0;">
+               style="padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
         <div id="bestTimeSuggestions" class="best-time-container mt-3">
           <div class="best-time-header">
             <i class="bi bi-robot"></i>

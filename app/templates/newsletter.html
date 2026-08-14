@@ -13,17 +13,17 @@
     }
 
     .stat-card {
-        background: white;
+        background: var(--surface-1);
         border-radius: var(--radius-lg);
         padding: 1.5rem;
         box-shadow: var(--shadow-sm);
-        border: 1px solid rgba(0, 0, 0, 0.04);
+        border: 1px solid var(--border-subtle);
     }
 
     .stat-card .stat-icon {
         width: 48px;
         height: 48px;
-        border-radius: 12px;
+        border-radius: var(--radius-md);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -33,25 +33,25 @@
 
     .stat-card .stat-value {
         font-size: 2rem;
-        font-weight: 700;
+        font-weight: 500;
         color: var(--text-primary);
         line-height: 1;
     }
 
     .stat-card .stat-label {
         font-size: 0.85rem;
-        color: #64748b;
+        color: var(--text-muted);
         margin-top: 0.25rem;
     }
 
     /* Newsletter Card */
     .newsletter-card {
-        background: white;
+        background: var(--surface-1);
         border-radius: var(--radius-lg);
         padding: 2rem;
         box-shadow: var(--shadow-sm);
         margin-bottom: 1.5rem;
-        border: 1px solid rgba(0, 0, 0, 0.04);
+        border: 1px solid var(--border-subtle);
     }
 
     .newsletter-card h3 {
@@ -61,27 +61,27 @@
         align-items: center;
         gap: 0.75rem;
         font-size: 1.25rem;
-        font-weight: 700;
+        font-weight: 500;
     }
 
     .newsletter-card h3 i {
         color: var(--primary-color);
         font-size: 1.1rem;
         padding: 0.5rem;
-        background: rgba(67, 24, 255, 0.1);
-        border-radius: 8px;
+        background: var(--accent-tint);
+        border-radius: var(--radius-sm);
     }
 
     .newsletter-card > p.text-muted {
         margin-bottom: 1.5rem;
-        color: #64748b;
+        color: var(--text-muted);
         font-size: 0.9rem;
     }
 
     /* Form Styles */
     .form-label {
         font-size: 0.8rem;
-        font-weight: 700;
+        font-weight: 500;
         color: var(--primary-color);
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -89,27 +89,27 @@
     }
 
     .form-control, .form-select {
-        border: 2px solid #e2e8f0;
-        border-radius: 10px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius-sm);
         padding: 0.75rem 1rem;
         font-size: 0.95rem;
-        color: #334155;
-        background-color: #fafbfc;
+        color: var(--text-1);
+        background-color: var(--surface-2);
         transition: all 0.2s ease;
     }
 
     .form-control:focus, .form-select:focus {
         border-color: var(--primary-color);
-        background-color: white;
-        box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.1);
+        background-color: var(--surface-1);
+        box-shadow: 0 0 0 4px var(--focus-ring);
         outline: none;
     }
 
     /* Preview Section */
     .preview-frame {
-        background: #f8fafc;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
+        background: var(--surface-2);
+        border: 2px solid var(--border);
+        border-radius: var(--radius-md);
         padding: 1rem;
         max-height: 500px;
         overflow-y: auto;
@@ -119,8 +119,8 @@
         width: 100%;
         min-height: 400px;
         border: none;
-        background: white;
-        border-radius: 8px;
+        background: var(--surface-1);
+        border-radius: var(--radius-sm);
     }
 
     /* Post Selection */
@@ -128,8 +128,8 @@
         display: flex;
         align-items: center;
         padding: 1rem;
-        border: 2px solid #e2e8f0;
-        border-radius: 10px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius-sm);
         margin-bottom: 0.75rem;
         cursor: pointer;
         transition: all 0.2s ease;
@@ -137,12 +137,12 @@
 
     .post-select-item:hover {
         border-color: var(--primary-color);
-        background: rgba(67, 24, 255, 0.02);
+        background: var(--accent-tint);
     }
 
     .post-select-item.selected {
         border-color: var(--primary-color);
-        background: rgba(67, 24, 255, 0.05);
+        background: var(--accent-tint);
     }
 
     .post-select-item input {
@@ -154,13 +154,13 @@
     }
 
     .post-select-title {
-        font-weight: 600;
+        font-weight: 500;
         color: var(--text-primary);
     }
 
     .post-select-meta {
         font-size: 0.8rem;
-        color: #94a3b8;
+        color: var(--text-faint);
     }
 
     /* Subscriber List */
@@ -169,7 +169,7 @@
         align-items: center;
         justify-content: space-between;
         padding: 0.75rem 1rem;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid var(--border-subtle);
     }
 
     .subscriber-item:last-child {
@@ -183,38 +183,38 @@
 
     .subscriber-date {
         font-size: 0.8rem;
-        color: #94a3b8;
+        color: var(--text-faint);
     }
 
     /* Buttons */
     .btn-primary {
-        background: linear-gradient(135deg, var(--primary-color) 0%, #6366f1 100%);
+        background: var(--accent);
         border: none;
         padding: 0.75rem 2rem;
-        border-radius: 10px;
-        font-weight: 600;
+        border-radius: var(--radius-sm);
+        font-weight: 500;
         font-size: 0.9rem;
         transition: all 0.2s ease;
-        box-shadow: 0 4px 14px rgba(67, 24, 255, 0.25);
+        box-shadow: var(--elev-2);
     }
 
     .btn-primary:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(67, 24, 255, 0.35);
+        box-shadow: var(--elev-2);
     }
 
     .btn-outline-primary {
         border: 2px solid var(--primary-color);
         color: var(--primary-color);
         padding: 0.7rem 1.5rem;
-        border-radius: 10px;
-        font-weight: 600;
+        border-radius: var(--radius-sm);
+        font-weight: 500;
         background: transparent;
     }
 
     .btn-outline-primary:hover {
         background: var(--primary-color);
-        color: white;
+        color: var(--text-on-accent);
     }
 
     /* Steps Indicator */
@@ -229,8 +229,8 @@
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        color: #94a3b8;
-        font-weight: 600;
+        color: var(--text-faint);
+        font-weight: 500;
     }
 
     .step.active {
@@ -248,14 +248,14 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #e2e8f0;
-        font-weight: 700;
+        background: var(--surface-3);
+        font-weight: 500;
         font-size: 0.9rem;
     }
 
     .step.active .step-number {
         background: var(--primary-color);
-        color: white;
+        color: var(--text-on-accent);
     }
 
     .step.completed .step-number {
@@ -271,20 +271,20 @@
     .history-table th {
         font-size: 0.75rem;
         text-transform: uppercase;
-        color: #64748b;
-        font-weight: 600;
+        color: var(--text-muted);
+        font-weight: 500;
         padding: 0.75rem 1rem;
-        border-bottom: 2px solid #e2e8f0;
+        border-bottom: 2px solid var(--border);
     }
 
     .history-table td {
         padding: 1rem;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid var(--border-subtle);
         color: var(--text-primary);
     }
 
     .history-table tr:hover {
-        background: #f8fafc;
+        background: var(--surface-2);
     }
 
     /* Loading States */
@@ -292,7 +292,7 @@
         display: inline-block;
         width: 20px;
         height: 20px;
-        border: 3px solid #e2e8f0;
+        border: 3px solid var(--border);
         border-top-color: var(--primary-color);
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
@@ -317,7 +317,7 @@
         left: 50%;
         margin: -10px 0 0 -10px;
         border: 3px solid transparent;
-        border-top-color: white;
+        border-top-color: var(--surface-1);
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
     }
@@ -326,7 +326,7 @@
     .empty-state {
         text-align: center;
         padding: 3rem 2rem;
-        color: #94a3b8;
+        color: var(--text-faint);
     }
 
     .empty-state i {
@@ -337,52 +337,52 @@
 
     /* Generated Content */
     .generated-content {
-        background: #f8fafc;
-        border-radius: 12px;
+        background: var(--surface-2);
+        border-radius: var(--radius-md);
         padding: 1.5rem;
         margin-top: 1rem;
     }
 
     .generated-subject {
         font-size: 1.1rem;
-        font-weight: 700;
+        font-weight: 500;
         color: var(--text-primary);
         margin-bottom: 1rem;
         padding-bottom: 1rem;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid var(--border);
     }
 
     .generated-intro {
-        color: #475569;
+        color: var(--text-2);
         line-height: 1.6;
         margin-bottom: 1rem;
     }
 
     .generated-post {
-        background: white;
-        border-radius: 8px;
+        background: var(--surface-1);
+        border-radius: var(--radius-sm);
         padding: 1rem;
         margin-bottom: 0.75rem;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--border);
     }
 
     .generated-post h5 {
-        font-weight: 600;
+        font-weight: 500;
         color: var(--text-primary);
         margin-bottom: 0.5rem;
     }
 
     .generated-post p {
-        color: #64748b;
+        color: var(--text-muted);
         font-size: 0.9rem;
         margin: 0;
     }
 
     /* Setup Alert */
     .setup-alert {
-        background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
-        border: 1px solid #fed7aa;
-        border-radius: 12px;
+        background: var(--warning-soft);
+        border: 1px solid var(--warning-border);
+        border-radius: var(--radius-md);
         padding: 1.25rem;
         margin-bottom: 1.5rem;
         display: flex;
@@ -391,27 +391,27 @@
     }
 
     .setup-alert i {
-        color: #ea580c;
+        color: var(--warning);
         font-size: 1.25rem;
         margin-top: 2px;
     }
 
     .setup-alert h5 {
-        color: #c2410c;
+        color: var(--warning);
         margin-bottom: 0.25rem;
-        font-weight: 600;
+        font-weight: 500;
     }
 
     .setup-alert p {
-        color: #9a3412;
+        color: var(--text-2);
         font-size: 0.9rem;
         margin: 0;
     }
 
     .setup-alert code {
-        background: rgba(0,0,0,0.1);
+        background: var(--surface-2);
         padding: 0.15rem 0.4rem;
-        border-radius: 4px;
+        border-radius: var(--radius-xs);
         font-size: 0.85rem;
     }
 
@@ -423,9 +423,9 @@
 
     .send-panel h5 {
         color: var(--text-primary);
-        font-weight: 700;
+        font-weight: 500;
         padding-bottom: 1rem;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid var(--border);
     }
 
     .send-panel .btn-lg {
@@ -450,13 +450,13 @@
         border: none;
         padding: 0.5rem;
         cursor: pointer;
-        color: #64748b;
-        border-radius: 6px;
+        color: var(--text-muted);
+        border-radius: var(--radius-xs);
         transition: all 0.2s ease;
     }
 
     .btn-dots:hover {
-        background: #f1f5f9;
+        background: var(--surface-3);
         color: var(--primary-color);
     }
 
@@ -464,9 +464,9 @@
         position: absolute;
         right: 0;
         top: 100%;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        background: var(--surface-1);
+        border-radius: var(--radius-sm);
+        box-shadow: var(--elev-2);
         min-width: 100px;
         z-index: 100;
         display: none;
@@ -487,12 +487,12 @@
         text-align: left;
         cursor: pointer;
         font-size: 0.9rem;
-        color: #334155;
+        color: var(--text-1);
         transition: background 0.2s ease;
     }
 
     .dropdown-menu-actions button:hover {
-        background: #f8fafc;
+        background: var(--surface-2);
         color: var(--primary-color);
     }
 
@@ -503,7 +503,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0,0,0,0.5);
+        background: var(--scrim);
         z-index: 1000;
         opacity: 0;
         visibility: hidden;
@@ -520,7 +520,7 @@
         right: 0;
         top: 0;
         bottom: 0;
-        background: white;
+        background: var(--surface-1);
         width: 600px;
         max-width: 100%;
         display: flex;
@@ -535,7 +535,7 @@
 
     .view-modal-header {
         padding: 1.25rem 1.5rem;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid var(--border);
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -543,7 +543,7 @@
 
     .view-modal-header h4 {
         margin: 0;
-        font-weight: 700;
+        font-weight: 500;
         color: var(--text-primary);
     }
 
@@ -552,7 +552,7 @@
         border: none;
         font-size: 1.5rem;
         cursor: pointer;
-        color: #64748b;
+        color: var(--text-muted);
         padding: 0.25rem;
     }
 
@@ -570,8 +570,8 @@
         width: 100%;
         height: 100%;
         min-height: 100%;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
     }
 
     /* Delete Confirmation Modal */
@@ -581,7 +581,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0,0,0,0.5);
+        background: var(--scrim);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -597,8 +597,8 @@
     }
 
     .confirm-modal-content {
-        background: white;
-        border-radius: 16px;
+        background: var(--surface-1);
+        border-radius: var(--radius-lg);
         padding: 2rem;
         width: 90%;
         max-width: 400px;
@@ -615,7 +615,7 @@
         width: 60px;
         height: 60px;
         border-radius: 50%;
-        background: #fee2e2;
+        background: var(--danger-soft);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -625,7 +625,7 @@
 
     .confirm-modal-content h4 {
         margin: 0 0 0.5rem;
-        font-weight: 700;
+        font-weight: 500;
         color: var(--text-primary);
     }
 
@@ -635,20 +635,22 @@
     }
 
     .btn-danger {
-        background: #dc3545;
+        background: var(--danger);
         border: none;
-        color: white;
+        color: var(--text-on-accent);
         padding: 0.75rem 1.5rem;
-        border-radius: 10px;
-        font-weight: 600;
+        border-radius: var(--radius-sm);
+        font-weight: 500;
     }
 
     .btn-danger:hover {
-        background: #c82333;
+        background: var(--danger);
+        filter: brightness(0.92);
     }
 
     .btn-danger:disabled {
-        background: #e57373;
+        background: var(--surface-3);
+        color: var(--text-faint);
         cursor: not-allowed;
     }
 </style>
@@ -680,21 +682,21 @@
         <!-- Stats Row -->
         <div class="stats-row">
             <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(67, 24, 255, 0.1); color: var(--primary-color);">
+                <div class="stat-icon" style="background: var(--accent-tint); color: var(--accent);">
                     <i class="bi bi-people-fill"></i>
                 </div>
                 <div class="stat-value" id="subscriber-count">{{ subscriber_count }}</div>
                 <div class="stat-label">Subscribers</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(5, 205, 153, 0.1); color: var(--success-color);">
+                <div class="stat-icon" style="background: var(--success-soft); color: var(--success);">
                     <i class="bi bi-send-fill"></i>
                 </div>
                 <div class="stat-value" id="sent-count">{{ sent_count }}</div>
                 <div class="stat-label">Newsletters Sent</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(255, 181, 71, 0.1); color: var(--warning-color);">
+                <div class="stat-icon" style="background: var(--warning-soft); color: var(--warning);">
                     <i class="bi bi-journal-text"></i>
                 </div>
                 <div class="stat-value" id="published-count">{{ published_count }}</div>
@@ -794,7 +796,7 @@
                     </div>
                 </div>
                 <div class="col-lg-4">
-                    <div class="send-panel" style="background: #f8fafc; border-radius: 12px; padding: 1.5rem; height: 100%;">
+                    <div class="send-panel" style="background: var(--surface-2); border-radius: var(--radius-md); padding: 1.5rem; height: 100%;">
                         <h5 class="mb-3"><i class="bi bi-envelope-paper me-2"></i>Ready to Send</h5>
 
                         <div class="mb-3 p-3 bg-white rounded border">

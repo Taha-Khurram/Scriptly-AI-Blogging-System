@@ -266,6 +266,12 @@
     align-items: start;
 }
 
+/* When the index is skipped (cover story is the only post), About follows the
+   cover directly — its own hairline would double up with the cover's rule. */
+.ed-cover + .ed-about {
+    border-top: none;
+}
+
 .ed-about-title {
     font-family: var(--font-display);
     font-weight: 500;

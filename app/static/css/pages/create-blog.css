@@ -22,7 +22,7 @@
   transform: translate(-50%, -50%);
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, rgba(67, 24, 255, 0.1) 0%, rgba(255, 153, 172, 0.05) 50%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.10) 0%, rgba(217, 101, 112, 0.05) 50%, transparent 70%);
   border-radius: 50%;
   z-index: 0;
   pointer-events: none;
@@ -57,23 +57,23 @@
 
 .welcome-name {
   font-size: 2rem;
-  font-weight: 700;
-  color: var(--info-color);
+  font-weight: 400;
+  color: var(--text-strong);
 }
 
 .blog-thought-heading {
   position: relative;
   z-index: 1;
-  font-size: 3.5rem;
-  font-weight: 800;
-  line-height: 1.1;
+  font-size: clamp(2.25rem, 5vw, 3.25rem);
+  font-weight: 400;
+  line-height: 1.15;
   margin-bottom: 3rem;
-  letter-spacing: -0.03em;
-  color: var(--info-color);
+  letter-spacing: 0;
+  color: var(--text-strong);
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, var(--primary-color), #ec4899);
+  background: var(--brand-gradient-diag);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -84,20 +84,22 @@
   z-index: 1;
   width: 100%;
   max-width: 720px;
-  background: white;
-  padding: 0.75rem 0.75rem 0.75rem 1.5rem;
-  border-radius: 999px;
-  box-shadow: 0 10px 40px -10px rgba(112, 144, 176, 0.2);
-  border: 1px solid rgba(112, 144, 176, 0.1);
+  background: var(--surface-2);
+  padding: 0.6rem 0.6rem 0.6rem 1.5rem;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elev-1);
+  border: 1px solid transparent;
   display: flex;
   align-items: center;
-  transition: all 0.3s ease;
+  transition: background-color var(--dur-base) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
+    border-color var(--dur-base) var(--ease-standard);
 }
 
 .prompt-box:focus-within {
-  transform: translateY(-2px);
-  box-shadow: 0 20px 40px -10px rgba(67, 24, 255, 0.15);
-  border-color: var(--primary-color);
+  background: var(--surface-1);
+  box-shadow: var(--elev-2);
+  border-color: var(--border);
 }
 
 .prompt-input {
@@ -105,7 +107,7 @@
   border: none;
   outline: none;
   font-size: 1.1rem;
-  color: var(--info-color);
+  color: var(--text-1);
   resize: none;
   max-height: 200px;
   padding: 0.5rem 0;
@@ -113,7 +115,7 @@
 }
 
 .prompt-input::placeholder {
-  color: var(--secondary-color);
+  color: var(--text-muted);
   font-weight: 400;
 }
 
@@ -122,27 +124,26 @@
   height: 48px;
   border-radius: 50%;
   background: var(--primary-color);
-  color: white;
+  color: var(--text-on-accent);
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--dur-fast) var(--ease-standard);
   margin-left: 0.75rem;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(67, 24, 255, 0.3);
+  box-shadow: none;
 }
 
 .prompt-submit:hover:not(:disabled) {
-  background: #3311db;
-  transform: scale(1.05);
+  background: var(--accent-hover);
 }
 
 .prompt-submit:disabled {
-  background: var(--secondary-color);
+  background: var(--surface-4);
+  color: var(--text-faint);
   cursor: not-allowed;
-  opacity: 0.7;
 }
 
 /* Locked/Disabled state for prompt input */
@@ -156,7 +157,7 @@
 }
 
 .prompt-box.locked {
-  background: #f8f9fc;
+  background: var(--surface-2);
   border-color: var(--secondary-color);
   opacity: 0.85;
   pointer-events: none;
@@ -176,32 +177,32 @@
   gap: 0.85rem;
   cursor: pointer;
   padding: 0.6rem 1.25rem;
-  border-radius: 999px;
-  background: white;
-  border: 1.5px solid rgba(112, 144, 176, 0.15);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  border-radius: var(--radius-pill);
+  background: var(--surface-1);
+  border: 1.5px solid var(--border);
+  box-shadow: var(--elev-2);
   transition: all 0.3s ease;
   user-select: none;
 }
 
 .humanize-toggle:hover {
-  border-color: rgba(139, 92, 246, 0.4);
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.12);
+  border-color: var(--accent);
+  box-shadow: var(--elev-2);
   transform: translateY(-1px);
 }
 
 .humanize-toggle.active {
-  border-color: #8b5cf6;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.04), rgba(139, 92, 246, 0.08));
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  box-shadow: var(--elev-2);
 }
 
 /* Toggle Track & Thumb */
 .toggle-track {
   width: 44px;
   height: 24px;
-  background: #cbd5e1;
-  border-radius: 999px;
+  background: var(--surface-4);
+  border-radius: var(--radius-pill);
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
@@ -213,19 +214,19 @@
   left: 3px;
   width: 18px;
   height: 18px;
-  background: white;
+  background: var(--surface-1);
   border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--elev-1);
 }
 
 .humanize-toggle.active .toggle-track {
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  background: var(--accent);
 }
 
 .humanize-toggle.active .toggle-thumb {
   transform: translateX(20px);
-  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.4);
+  box-shadow: var(--elev-1);
 }
 
 /* Toggle Text */
@@ -237,7 +238,7 @@
 
 .toggle-label {
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--info-color);
   display: flex;
   align-items: center;
@@ -246,12 +247,12 @@
 }
 
 .toggle-label i {
-  color: #8b5cf6;
+  color: var(--accent);
   font-size: 1rem;
 }
 
 .humanize-toggle.active .toggle-label {
-  color: #7c3aed;
+  color: var(--accent-hover);
 }
 
 .toggle-hint {

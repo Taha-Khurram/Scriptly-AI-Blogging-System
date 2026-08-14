@@ -93,6 +93,7 @@ def verify_token():
         session.update({
             'user_id': uid,
             'user_name': user_record.get('name', email.split('@')[0]),
+            'user_email': email,
             'user_role': user_record.get('role', 'ADMIN'),
             'profile_image': user_record.get('profile_image', ''),
             'logged_in': True,

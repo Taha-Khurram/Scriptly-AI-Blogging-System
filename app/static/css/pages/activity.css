@@ -11,7 +11,7 @@
 }
 
 .activity-stats-row .stat-card {
-    background: white;
+    background: var(--surface-1);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     padding: 1.25rem 1.5rem;
@@ -29,7 +29,7 @@
 .activity-stats-row .stat-icon {
     width: 48px;
     height: 48px;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -37,10 +37,10 @@
     flex-shrink: 0;
 }
 
-.activity-stats-row .stat-total { background: rgba(67, 24, 255, 0.1); color: var(--primary-color); }
-.activity-stats-row .stat-blog { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-.activity-stats-row .stat-user { background: rgba(16, 185, 129, 0.1); color: #059669; }
-.activity-stats-row .stat-other { background: rgba(100, 116, 139, 0.1); color: #64748b; }
+.activity-stats-row .stat-total { background: var(--accent-tint); color: var(--primary-color); }
+.activity-stats-row .stat-blog { background: var(--info-soft); color: var(--info); }
+.activity-stats-row .stat-user { background: var(--success-soft); color: var(--success); }
+.activity-stats-row .stat-other { background: var(--surface-3); color: var(--text-muted); }
 
 .activity-stats-row .stat-info {
     display: flex;
@@ -49,20 +49,20 @@
 
 .activity-stats-row .stat-count {
     font-size: 1.5rem;
-    font-weight: 700;
-    color: #1e293b;
+    font-weight: 500;
+    color: var(--text-strong);
     line-height: 1.2;
 }
 
 .activity-stats-row .stat-label {
     font-size: 0.8rem;
-    color: #64748b;
+    color: var(--text-muted);
     font-weight: 500;
 }
 
 /* ==================== FILTER SECTION ==================== */
 .activity-filters {
-    background: white;
+    background: var(--surface-1);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     padding: 1.5rem;
@@ -78,12 +78,12 @@
 
 .activity-filter-tabs .filter-tab {
     padding: 0.5rem 1.25rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 50px;
-    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-1);
     font-size: 0.82rem;
-    font-weight: 600;
-    color: #64748b;
+    font-weight: 500;
+    color: var(--text-muted);
     cursor: pointer;
     transition: all 0.2s ease;
     display: inline-flex;
@@ -92,16 +92,16 @@
 }
 
 .activity-filter-tabs .filter-tab:hover {
-    background: #f8fafc;
-    color: #475569;
-    border-color: #cbd5e1;
+    background: var(--surface-2);
+    color: var(--text-2);
+    border-color: var(--border-strong);
 }
 
 .activity-filter-tabs .filter-tab.active {
     background: var(--primary-color);
-    color: white;
+    color: var(--text-on-accent);
     border-color: var(--primary-color);
-    box-shadow: 0 4px 12px rgba(67, 24, 255, 0.25);
+    box-shadow: var(--elev-2);
 }
 
 .activity-filter-controls {
@@ -113,12 +113,12 @@
 
 .activity-filters .filter-select {
     padding: 0.55rem 2rem 0.55rem 0.85rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     background: var(--bg-body);
     font-size: 0.82rem;
     font-weight: 500;
-    color: #475569;
+    color: var(--text-2);
     cursor: pointer;
     min-width: 150px;
     appearance: auto;
@@ -128,7 +128,7 @@
 .activity-filters .filter-select:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
+    box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .activity-filters .filter-search-wrap {
@@ -143,36 +143,36 @@
     left: 0.85rem;
     top: 50%;
     transform: translateY(-50%);
-    color: #94a3b8;
+    color: var(--text-faint);
     font-size: 0.85rem;
 }
 
 .activity-filters .filter-search {
     width: 100%;
     padding: 0.55rem 0.85rem 0.55rem 2.25rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     background: var(--bg-body);
     font-size: 0.82rem;
-    color: #475569;
+    color: var(--text-2);
     transition: all 0.2s ease;
 }
 
 .activity-filters .filter-search:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
-    background: white;
+    box-shadow: 0 0 0 3px var(--focus-ring);
+    background: var(--surface-1);
 }
 
 .activity-filters .filter-date-btn {
     padding: 0.55rem 1rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     background: var(--bg-body);
     font-size: 0.82rem;
     font-weight: 500;
-    color: #475569;
+    color: var(--text-2);
     cursor: pointer;
     transition: all 0.2s ease;
     display: inline-flex;
@@ -187,14 +187,14 @@
 }
 
 .activity-filters .filter-date-btn.active {
-    background: rgba(67, 24, 255, 0.08);
+    background: var(--accent-tint);
     border-color: var(--primary-color);
     color: var(--primary-color);
 }
 
 /* ==================== ACTIVITY TABLE ==================== */
 .activity-container {
-    background: white;
+    background: var(--surface-1);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     overflow: hidden;
@@ -204,9 +204,9 @@
     display: flex;
     padding: 1rem 2rem;
     background: var(--bg-body);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid var(--border-subtle);
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--secondary-color);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -223,7 +223,7 @@
     display: flex;
     align-items: center;
     padding: 0.9rem 2rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    border-bottom: 1px solid var(--border-subtle);
     transition: all 0.15s ease;
 }
 
@@ -248,17 +248,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
+    font-weight: 500;
     font-size: 0.8rem;
     flex-shrink: 0;
-    color: white;
-    background: #4318FF;
+    color: var(--text-on-accent);
+    background: var(--accent);
 }
 
 .activity-user-name {
-    font-weight: 600;
+    font-weight: 500;
     font-size: 0.85rem;
-    color: #1e293b;
+    color: var(--text-strong);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -266,7 +266,7 @@
 
 .activity-action-text {
     font-size: 0.82rem;
-    color: #475569;
+    color: var(--text-2);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -274,7 +274,7 @@
 
 .activity-target-text {
     font-size: 0.82rem;
-    color: #64748b;
+    color: var(--text-muted);
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
@@ -283,7 +283,7 @@
 
 .activity-time-text {
     font-size: 0.78rem;
-    color: #94a3b8;
+    color: var(--text-faint);
     text-align: right;
     white-space: nowrap;
 }
@@ -294,19 +294,19 @@
     align-items: center;
     gap: 0.3rem;
     padding: 0.25rem 0.65rem;
-    border-radius: 50px;
+    border-radius: var(--radius-pill);
     font-size: 0.68rem;
-    font-weight: 700;
+    font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.02em;
 }
 
-.badge-type-blog { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-.badge-type-user { background: rgba(16, 185, 129, 0.1); color: #059669; }
-.badge-type-comment { background: rgba(251, 191, 36, 0.12); color: #d97706; }
-.badge-type-settings { background: rgba(100, 116, 139, 0.1); color: #64748b; }
-.badge-type-newsletter { background: rgba(139, 92, 246, 0.1); color: #7c3aed; }
-.badge-type-category { background: rgba(236, 72, 153, 0.1); color: #db2777; }
+.badge-type-blog { background: var(--info-soft); color: var(--info); }
+.badge-type-user { background: var(--success-soft); color: var(--success); }
+.badge-type-comment { background: var(--warning-soft); color: var(--warning); }
+.badge-type-settings { background: var(--surface-3); color: var(--text-muted); }
+.badge-type-newsletter { background: var(--accent-tint); color: var(--accent-hover); }
+.badge-type-category { background: var(--accent-tint); color: var(--accent); }
 
 /* ==================== PAGINATION ==================== */
 .activity-pagination {
@@ -320,12 +320,12 @@
 .activity-pagination .page-btn {
     width: 36px;
     height: 36px;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
     font-size: 0.82rem;
-    font-weight: 600;
-    color: #64748b;
+    font-weight: 500;
+    color: var(--text-muted);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -334,16 +334,16 @@
 }
 
 .activity-pagination .page-btn:hover:not(.disabled):not(.active) {
-    background: #f8fafc;
+    background: var(--surface-2);
     border-color: var(--primary-color);
     color: var(--primary-color);
 }
 
 .activity-pagination .page-btn.active {
     background: var(--primary-color);
-    color: white;
+    color: var(--text-on-accent);
     border-color: var(--primary-color);
-    box-shadow: 0 4px 12px rgba(67, 24, 255, 0.25);
+    box-shadow: var(--elev-2);
 }
 
 .activity-pagination .page-btn.disabled {
@@ -353,14 +353,14 @@
 
 .activity-pagination .page-dots {
     padding: 0 0.25rem;
-    color: #94a3b8;
+    color: var(--text-faint);
 }
 
 /* ==================== DATE MODAL ==================== */
 #dateRangeModal .custom-modal {
     border: none;
     border-radius: var(--radius-lg);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--elev-3);
     overflow: hidden;
 }
 
@@ -369,14 +369,14 @@
     justify-content: space-between;
     align-items: center;
     padding: 1.25rem 1.75rem;
-    border-bottom: 1px solid #f1f5f9;
-    background: white;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface-1);
 }
 
 #dateRangeModal .custom-modal-title {
     font-size: 1.05rem;
-    font-weight: 700;
-    color: #1e293b;
+    font-weight: 500;
+    color: var(--text-strong);
     display: flex;
     align-items: center;
     gap: 0.6rem;
@@ -389,7 +389,7 @@
 
 #dateRangeModal .custom-modal-body {
     padding: 1.5rem 1.75rem;
-    background: white;
+    background: var(--surface-1);
 }
 
 #dateRangeModal .custom-modal-footer {
@@ -397,8 +397,8 @@
     justify-content: flex-end;
     gap: 0.75rem;
     padding: 1rem 1.75rem;
-    border-top: 1px solid #f1f5f9;
-    background: #fafbfc;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--surface-2);
 }
 
 .date-range-field {
@@ -408,8 +408,8 @@
 .date-range-field .form-label {
     display: block;
     font-size: 0.75rem;
-    font-weight: 700;
-    color: #475569;
+    font-weight: 500;
+    color: var(--text-2);
     margin-bottom: 0.4rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -418,18 +418,18 @@
 .date-range-field .form-control {
     width: 100%;
     padding: 0.6rem 0.85rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     font-size: 0.85rem;
-    color: #334155;
-    background: white;
+    color: var(--text-1);
+    background: var(--surface-1);
     transition: all 0.2s ease;
 }
 
 .date-range-field .form-control:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
+    box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .date-range-presets {
@@ -438,24 +438,24 @@
     gap: 0.5rem;
     margin-top: 1rem;
     padding-top: 1rem;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid var(--border-subtle);
 }
 
 .preset-btn {
     padding: 0.45rem 0.75rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
     font-size: 0.78rem;
-    font-weight: 600;
-    color: #64748b;
+    font-weight: 500;
+    color: var(--text-muted);
     cursor: pointer;
     transition: all 0.15s ease;
     text-align: center;
 }
 
 .preset-btn:hover {
-    background: rgba(67, 24, 255, 0.05);
+    background: var(--accent-tint);
     border-color: var(--primary-color);
     color: var(--primary-color);
 }
@@ -466,8 +466,8 @@
     align-items: center;
     gap: 0.45rem;
     padding: 0.55rem 1.15rem;
-    border-radius: 10px;
-    font-weight: 600;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
     font-size: 0.82rem;
     transition: all 0.2s ease;
     border: none;
@@ -475,20 +475,20 @@
 }
 
 #dateRangeModal .btn-modal-secondary {
-    background: white;
-    color: #64748b;
-    border: 1px solid #e2e8f0;
+    background: var(--surface-1);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
 }
 
 #dateRangeModal .btn-modal-secondary:hover {
-    background: #f8fafc;
-    color: #475569;
+    background: var(--surface-2);
+    color: var(--text-2);
 }
 
 #dateRangeModal .btn-modal-primary {
     background: var(--primary-color);
-    color: white;
-    box-shadow: 0 4px 12px rgba(67, 24, 255, 0.25);
+    color: var(--text-on-accent);
+    box-shadow: var(--elev-2);
 }
 
 #dateRangeModal .btn-modal-primary:hover {
@@ -503,14 +503,14 @@
 
 .activity-empty i {
     font-size: 2.5rem;
-    color: #cbd5e1;
+    color: var(--text-faint);
     margin-bottom: 0.75rem;
     display: block;
 }
 
 .activity-empty p {
-    color: #94a3b8;
-    font-weight: 600;
+    color: var(--text-faint);
+    font-weight: 500;
     font-size: 0.9rem;
     margin: 0;
 }

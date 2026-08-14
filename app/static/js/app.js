@@ -65,6 +65,164 @@ function showToast(options) {
 window.showToast = showToast;
 
 // --------------------------------------------------------------------------
+// Theme (light / dark)
+//
+// The stored choice is applied to <html data-theme> by an inline script in
+// base.html before first paint; this layer only handles switching at runtime
+// and keeping every visible toggle in sync. No stored value means "follow the
+// OS", which is the default the token layer already implements.
+// --------------------------------------------------------------------------
+
+const THEME_KEY = 'scriptly-theme';
+
+function getStoredTheme() {
+    try {
+        return localStorage.getItem(THEME_KEY);
+    } catch (e) {
+        return null;
+    }
+}
+
+/** The theme actually on screen right now, resolving "system" to what it means. */
+function getActiveTheme() {
+    const explicit = document.documentElement.getAttribute('data-theme');
+    if (explicit === 'dark' || explicit === 'light') return explicit;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function syncThemeControls() {
+    const active = getActiveTheme();
+    const nextLabel = active === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+
+    document.querySelectorAll('[data-theme-toggle]').forEach((el) => {
+        el.setAttribute('aria-label', nextLabel);
+        el.setAttribute('title', nextLabel);
+        el.setAttribute('aria-pressed', active === 'dark' ? 'true' : 'false');
+
+        // The icon shows the theme you would switch *to*, which is the
+        // convention users read fastest.
+        const icon = el.querySelector('.material-symbols-outlined');
+        if (icon) icon.textContent = active === 'dark' ? 'light_mode' : 'dark_mode';
+
+        const label = el.querySelector('[data-theme-label]');
+        if (label) label.textContent = active === 'dark' ? 'Light theme' : 'Dark theme';
+    });
+
+    // Keep the browser chrome (address bar / title bar) on the same surface.
+    const chrome = active === 'dark' ? '#131314' : '#F0F4F9';
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+        m.setAttribute('content', chrome);
+    });
+}
+
+function setTheme(theme) {
+    if (theme === 'system') {
+        document.documentElement.removeAttribute('data-theme');
+        try { localStorage.removeItem(THEME_KEY); } catch (e) { }
+    } else {
+        document.documentElement.setAttribute('data-theme', theme);
+        try { localStorage.setItem(THEME_KEY, theme); } catch (e) { }
+    }
+    syncThemeControls();
+}
+
+function toggleTheme() {
+    setTheme(getActiveTheme() === 'dark' ? 'light' : 'dark');
+}
+
+window.setTheme = setTheme;
+window.toggleTheme = toggleTheme;
+window.getActiveTheme = getActiveTheme;
+
+document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-theme-toggle]')) {
+        e.preventDefault();
+        toggleTheme();
+    }
+});
+
+// While the user is on "system", follow the OS live.
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (!getStoredTheme()) syncThemeControls();
+});
+
+document.addEventListener('DOMContentLoaded', syncThemeControls);
+
+// --------------------------------------------------------------------------
+// Account menu
+//
+// Lives in the sidebar, which sits outside .dashboard-main and so survives
+// PJAX navigation — everything here is delegated off `document` and bound once,
+// rather than re-wired per page.
+// --------------------------------------------------------------------------
+
+function getUserMenu() {
+    return document.getElementById('userMenu');
+}
+
+function setUserMenuOpen(open) {
+    const menu = getUserMenu();
+    if (!menu) return;
+
+    menu.hidden = !open;
+    document.querySelectorAll('[data-user-menu]').forEach((el) => {
+        if (el.hasAttribute('aria-expanded')) {
+            el.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+    });
+
+    if (open) {
+        // Send focus into the menu so keyboard users land somewhere useful.
+        const first = menu.querySelector('a, button');
+        if (first) first.focus();
+    }
+}
+
+function closeUserMenu(refocus) {
+    const menu = getUserMenu();
+    if (!menu || menu.hidden) return;
+    setUserMenuOpen(false);
+    if (refocus) {
+        const trigger = document.querySelector('.user-card-avatar[data-user-menu]');
+        if (trigger) trigger.focus();
+    }
+}
+
+document.addEventListener('click', (e) => {
+    const menu = getUserMenu();
+    if (!menu) return;
+
+    if (e.target.closest('[data-user-menu]')) {
+        e.preventDefault();
+        setUserMenuOpen(menu.hidden);
+        return;
+    }
+
+    if (e.target.closest('[data-user-menu-close]')) {
+        e.preventDefault();
+        closeUserMenu(true);
+        return;
+    }
+
+    // A click on a link inside the menu should navigate, not just close.
+    if (menu.contains(e.target)) {
+        if (e.target.closest('a')) closeUserMenu(false);
+        return;
+    }
+
+    closeUserMenu(false);
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeUserMenu(true);
+});
+
+// Deliberately no resize handler: the menu is anchored to the rail in CSS, so
+// it follows the rail width on its own. Closing it on resize only meant it
+// vanished whenever the browser fired a spurious resize — a device-pixel-ratio
+// change, or a mobile address bar sliding away mid-interaction.
+
+// --------------------------------------------------------------------------
 // Page Loader Functions
 // --------------------------------------------------------------------------
 

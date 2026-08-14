@@ -44,9 +44,9 @@
                     </h2>
                     <p class="blog-card-excerpt">
                         {% if blog.content is mapping %}
-                            {{ (blog.content.body or blog.content.markdown or blog.content.text or '')|striptags|truncate(120) }}
+                            {{ (blog.content.body or blog.content.markdown or blog.content.text or '')|excerpt(120) }}
                         {% else %}
-                            {{ blog.content|striptags|truncate(120) }}
+                            {{ blog.content|excerpt(120) }}
                         {% endif %}
                     </p>
                     <div class="blog-card-footer">

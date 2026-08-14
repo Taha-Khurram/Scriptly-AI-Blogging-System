@@ -246,9 +246,9 @@
                 </h3>
                 <p class="related-card-excerpt">
                     {% if related.content is mapping %}
-                        {{ (related.content.body or related.content.markdown or related.content.text or '')|striptags|truncate(80) }}
+                        {{ (related.content.body or related.content.markdown or related.content.text or '')|excerpt(80) }}
                     {% else %}
-                        {{ related.content|striptags|truncate(80) }}
+                        {{ related.content|excerpt(80) }}
                     {% endif %}
                 </p>
                 <div class="related-card-author">

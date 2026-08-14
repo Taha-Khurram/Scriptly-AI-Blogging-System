@@ -1,0 +1,57 @@
+{#
+  The ink pane shared by every auth screen.
+
+  Pages set `brand_title` (may contain one <em> for the gradient word) and
+  `brand_lede` before including this; both fall back to the sign-in copy.
+#}
+<aside class="auth-brand">
+    <div class="auth-brand-mark">
+        <img src="{{ url_for('static', filename='images/logo-lockup.png') }}"
+             alt="{{ app_config.app_name if app_config else 'Scriptly' }}" class="logo-img">
+    </div>
+
+    <div class="auth-brand-body">
+        <span class="auth-brand-eyebrow">
+            <span class="material-symbols-outlined">auto_awesome</span>
+            AI content studio
+        </span>
+
+        <p class="auth-brand-title">
+            {{ brand_title | default('Write, review and publish <em>in one place</em>.') | safe }}
+        </p>
+
+        <p class="auth-brand-lede">
+            {{ brand_lede | default('Scriptly drafts, optimises and schedules your blog content, then hands you the
+            controls for everything that matters.') }}
+        </p>
+
+        <ul class="auth-brand-points">
+            <li class="auth-point">
+                <span class="auth-point-icon"><span class="material-symbols-outlined">edit_square</span></span>
+                <span class="auth-point-text">
+                    <span class="auth-point-title">Draft from a single prompt</span>
+                    <span class="auth-point-note">Outline, copy, SEO and cover art generated together.</span>
+                </span>
+            </li>
+            <li class="auth-point">
+                <span class="auth-point-icon"><span class="material-symbols-outlined">check_circle</span></span>
+                <span class="auth-point-text">
+                    <span class="auth-point-title">Review before anything ships</span>
+                    <span class="auth-point-note">Approval queue, revisions and role-based access.</span>
+                </span>
+            </li>
+            <li class="auth-point">
+                <span class="auth-point-icon"><span class="material-symbols-outlined">monitoring</span></span>
+                <span class="auth-point-text">
+                    <span class="auth-point-title">Publish on a schedule</span>
+                    <span class="auth-point-note">Best-time suggestions, analytics and newsletter in one flow.</span>
+                </span>
+            </li>
+        </ul>
+    </div>
+
+    <p class="auth-brand-foot">
+        &copy; {{ current_year | default(2026) }} {{ app_config.app_name if app_config else 'Scriptly' }}. Built for
+        teams who publish often.
+    </p>
+</aside>

@@ -6,7 +6,9 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/site/home.css') }}">
 {% endblock %}
 
-{% macro excerpt(blog, n) %}{% if blog.content is mapping %}{{ (blog.content.body or blog.content.markdown or blog.content.text or '')|striptags|truncate(n) }}{% else %}{{ blog.content|striptags|truncate(n) }}{% endif %}{% endmacro %}
+{# Post bodies are stored as Markdown, so excerpts go through `excerpt`, which
+   strips the syntax markers as well as any HTML. #}
+{% macro excerpt(blog, n) %}{% if blog.content is mapping %}{{ (blog.content.body or blog.content.markdown or blog.content.text or '')|excerpt(n) }}{% else %}{{ blog.content|excerpt(n) }}{% endif %}{% endmacro %}
 
 {% block content %}
 {% set cover = (featured_post if featured_post is defined and featured_post else (blogs[0] if blogs and blogs|length > 0 else None)) %}
@@ -37,14 +39,18 @@
     </a>
 </section>
 
-<!-- ==================== THE INDEX ==================== -->
+<!-- ==================== THE INDEX ====================
+     Skipped entirely when the cover story is the only post — a heading with
+     nothing under it reads as a broken page. -->
+{% set rest = blogs | rejectattr('id', 'equalto', cover.id) | list if cover else blogs %}
+{% if rest %}
 <section class="ed-index" data-animate="fade-up">
     <div class="ed-section-head">
         <h2 class="ed-kicker">{% if current_category %}More in {{ current_category }}{% else %}The Index{% endif %}</h2>
         <a class="ed-viewall" href="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true)) }}">All articles <i class="bi bi-arrow-up-right"></i></a>
     </div>
     <ol class="ed-index-list" data-animate-stagger>
-        {% for blog in blogs if not cover or blog.id != cover.id %}
+        {% for blog in rest %}
         <li class="ed-row">
             <a class="ed-row-link" href="{{ url_for('site_bp.site_post', site_identifier=settings.site_slug|default(user_id, true), slug_or_id=blog.slug or blog.id) }}">
                 <span class="ed-row-num">{{ '%02d'|format(loop.index) }}</span>
@@ -62,6 +68,7 @@
         {% endfor %}
     </ol>
 </section>
+{% endif %}
 
 {% else %}
 <!-- ==================== EMPTY STATE ==================== -->

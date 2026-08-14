@@ -1,94 +1,171 @@
 <!-- Shared Sidebar Component -->
 <nav class="dashboard-sidebar">
-    <div class="sidebar-logo" onclick="this.closest('.dashboard-sidebar').classList.toggle('expanded')">
-        <img src="{{ url_for('static', filename='images/logo_text.png') }}" alt="Scriptly" class="logo-img">
+    <div class="sidebar-head">
+        {# Rail: the mark alone, which becomes the open control on hover/focus. #}
+        <button type="button" class="sidebar-brand" title="Expand navigation" aria-label="Expand navigation"
+            onclick="(function(b){var n=b.closest('.dashboard-sidebar');var open=n.classList.toggle('expanded');try{localStorage.setItem('scriptly-nav',open?'expanded':'rail')}catch(e){}})(this)">
+            <img src="{{ url_for('static', filename='images/logo-mark.png') }}"
+                alt="{{ app_config.app_name if app_config else 'Scriptly' }}" class="sidebar-mark">
+            <span class="material-symbols-outlined sidebar-brand-icon">left_panel_open</span>
+        </button>
+
+        {# Drawer: the full lockup, with the collapse control opposite it. #}
+        <img src="{{ url_for('static', filename='images/logo-lockup.png') }}"
+            alt="{{ app_config.app_name if app_config else 'Scriptly' }}" class="sidebar-lockup">
+
+        <button type="button" class="sidebar-toggle" title="Collapse navigation" aria-label="Collapse navigation"
+            onclick="(function(b){var n=b.closest('.dashboard-sidebar');var open=n.classList.toggle('expanded');try{localStorage.setItem('scriptly-nav',open?'expanded':'rail')}catch(e){}})(this)">
+            <span class="material-symbols-outlined">left_panel_close</span>
+        </button>
     </div>
 
     <div class="sidebar-menu">
-        <a href="{{ url_for('blog.home') }}" class="nav-link" data-page="dashboard">
-            <i class="bi bi-grid-fill"></i> <span>Dashboard</span>
-        </a>
         <a href="{{ url_for('blog.create_page') }}" class="nav-link" data-page="create">
-            <i class="bi bi-plus-square-fill"></i> <span>Create Blog</span>
+            <span class="material-symbols-outlined">edit_square</span> <span class="nav-label">Create Blog</span>
+        </a>
+        <a href="{{ url_for('blog.home') }}" class="nav-link" data-page="dashboard">
+            <span class="material-symbols-outlined">dashboard</span> <span class="nav-label">Dashboard</span>
         </a>
         <a href="{{ url_for('blog.drafts_page') }}" class="nav-link" data-page="drafts">
-            <i class="bi bi-file-text-fill"></i> <span>My Drafts</span>
+            <span class="material-symbols-outlined">draft</span> <span class="nav-label">My Drafts</span>
         </a>
         <a href="{{ url_for('blogs_listing.all_blogs_page') }}" class="nav-link" data-page="all-blogs">
-            <i class="bi bi-journals"></i> <span>All Blogs</span>
+            <span class="material-symbols-outlined">article</span> <span class="nav-label">All Blogs</span>
         </a>
         <a href="{{ url_for('blog.categories_page') }}" class="nav-link" data-page="categories">
-            <i class="bi bi-tags-fill"></i> <span>Categories</span>
+            <span class="material-symbols-outlined">label</span> <span class="nav-label">Categories</span>
         </a>
         <a href="{{ url_for('gallery.gallery_page') }}" class="nav-link" data-page="gallery">
-            <i class="bi bi-images"></i> <span>Gallery</span>
+            <span class="material-symbols-outlined">photo_library</span> <span class="nav-label">Gallery</span>
         </a>
         <!-- <a href="{{ url_for('blog.seo_tools_page') }}" class="nav-link" data-page="seo">
-            <i class="bi bi-graph-up-arrow"></i> <span>SEO Tools</span>
+            <span class="material-symbols-outlined">monitoring</span> <span class="nav-label">SEO Tools</span>
         </a> -->
         <a href="{{ url_for('blog.newsletter_page') }}" class="nav-link" data-page="newsletter">
-            <i class="bi bi-envelope-paper-fill"></i> <span>Newsletter</span>
+            <span class="material-symbols-outlined">mail</span> <span class="nav-label">Newsletter</span>
         </a>
         <a href="{{ url_for('optimization.optimization_page') }}" class="nav-link" data-page="optimization">
-            <i class="bi bi-speedometer2"></i> <span>Optimization</span>
+            <span class="material-symbols-outlined">speed</span> <span class="nav-label">Optimization</span>
         </a>
 
         {% if session.get('user_role') == 'ADMIN' %}
         <div class="sidebar-separator admin-sep"></div>
-        <div class="ps-3 text-uppercase text-white-50 admin-label"
-            style="font-size: 0.7rem; letter-spacing: 1.2px; padding: 0.25rem 1.25rem; font-weight: 600;">
-            Admin
-        </div>
+        <div class="admin-label">Admin</div>
 
         <a href="{{ url_for('schedule.schedule_page') }}" class="nav-link" data-page="schedule">
-            <i class="bi bi-calendar-event"></i> <span>Schedule</span>
+            <span class="material-symbols-outlined">calendar_month</span> <span class="nav-label">Schedule</span>
         </a>
         <a href="{{ url_for('blog.site_settings_page') }}" class="nav-link" data-page="site-settings">
-            <i class="bi bi-globe2"></i> <span>Site Settings</span>
+            <span class="material-symbols-outlined">public</span> <span class="nav-label">Site Settings</span>
         </a>
         <a href="{{ url_for('blog.approval_page') }}" class="nav-link" data-page="approval">
-            <i class="bi bi-check-circle-fill"></i> <span>Approvals</span>
+            <span class="material-symbols-outlined">check_circle</span> <span class="nav-label">Approvals</span>
         </a>
         <a href="{{ url_for('blog.comments_page') }}" class="nav-link" data-page="comments">
-            <i class="bi bi-chat-dots-fill"></i> <span>Comments</span>
+            <span class="material-symbols-outlined">chat_bubble</span> <span class="nav-label">Comments</span>
         </a>
         <a href="{{ url_for('leads.leads_page') }}" class="nav-link" data-page="leads">
-            <i class="bi bi-person-lines-fill"></i> <span>Leads</span>
+            <span class="material-symbols-outlined">contacts</span> <span class="nav-label">Leads</span>
         </a>
         <a href="{{ url_for('user_bp.manage_users') }}" class="nav-link" data-page="users">
-            <i class="bi bi-people-fill"></i> <span>Users</span>
+            <span class="material-symbols-outlined">group</span> <span class="nav-label">Users</span>
         </a>
         <a href="{{ url_for('activity.activity_page') }}" class="nav-link" data-page="activity">
-            <i class="bi bi-clock-history"></i> <span>Activity</span>
+            <span class="material-symbols-outlined">history</span> <span class="nav-label">Activity</span>
         </a>
         <a href="{{ url_for('analytics_bp.analytics_page') }}" class="nav-link" data-page="analytics">
-            <i class="bi bi-bar-chart-line"></i> <span>Analytics</span>
+            <span class="material-symbols-outlined">monitoring</span> <span class="nav-label">Analytics</span>
         </a>
         {% endif %}
     </div>
 
-    <!-- User Card -->
+    <!-- Theme switch — icon in the rail, labelled row in the drawer -->
+    <button type="button" class="sidebar-theme-toggle" data-theme-toggle aria-pressed="false"
+        aria-label="Switch to dark theme" title="Switch to dark theme">
+        <span class="material-symbols-outlined">dark_mode</span>
+        <span class="nav-label" data-theme-label>Dark theme</span>
+    </button>
+
+    <!-- User Card — opens the account menu -->
+    {% set display_name = session.get('user_name', 'User').split('@')[0] %}
     <div class="sidebar-user-card">
-        <a href="{{ url_for('auth_bp.profile_page') }}" class="user-card-avatar" title="Edit Profile">
+        <button type="button" class="user-card-avatar" data-user-menu aria-haspopup="dialog" aria-expanded="false"
+            aria-controls="userMenu" title="Account">
             {% if session.get('profile_image') %}
-            <img src="{{ session.get('profile_image') }}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+            <img src="{{ session.get('profile_image') }}" alt="">
             {% else %}
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <circle cx="10" cy="7.5" r="3.5" fill="white"/>
-                <path d="M3 18.5c0-3.87 3.13-7 7-7s7 3.13 7 7" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <circle cx="10" cy="7.5" r="3.5" fill="white" />
+                <path d="M3 18.5c0-3.87 3.13-7 7-7s7 3.13 7 7" stroke="white" stroke-width="1.8" fill="none"
+                    stroke-linecap="round" />
             </svg>
             {% endif %}
-        </a>
-        <a href="{{ url_for('auth_bp.profile_page') }}" class="user-card-info" style="text-decoration:none;">
-            <span class="user-card-name">{{ session.get('user_name', 'User').split('@')[0] }}</span>
+            <span class="visually-hidden">Account menu for {{ display_name }}</span>
+        </button>
+        <button type="button" class="user-card-info" data-user-menu tabindex="-1" aria-hidden="true">
+            <span class="user-card-name">{{ display_name }}</span>
             <span class="user-card-role">{{ session.get('user_role', 'User') | capitalize }}</span>
-        </a>
-        <a href="{{ url_for('auth_bp.logout') }}" class="user-card-logout" title="Logout">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M6.75 15.75H3.75C3.35218 15.75 2.97064 15.592 2.68934 15.3107C2.40804 15.0294 2.25 14.6478 2.25 14.25V3.75C2.25 3.35218 2.40804 2.97064 2.68934 2.68934C2.97064 2.40804 3.35218 2.25 3.75 2.25H6.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 12.75L15.75 9L12 5.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M15.75 9H6.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+        </button>
+        <a href="{{ url_for('auth_bp.logout') }}" class="user-card-logout" title="Sign out">
+            <span class="material-symbols-outlined">logout</span>
         </a>
     </div>
 </nav>
+
+<!-- Account menu. Lives outside <nav> because the rail clips its overflow;
+     position:fixed escapes that, and the sidebar persists across PJAX so the
+     menu and its listeners survive navigation. -->
+<div class="user-menu" id="userMenu" role="dialog" aria-modal="false" aria-label="Account" hidden>
+    <div class="user-menu-head">
+        {% if session.get('user_email') %}
+        <span class="user-menu-email" title="{{ session.get('user_email') }}">{{ session.get('user_email') }}</span>
+        {% else %}
+        <span class="user-menu-email">Signed in</span>
+        {% endif %}
+        <button type="button" class="user-menu-close" data-user-menu-close aria-label="Close account menu">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+    </div>
+
+    <div class="user-menu-identity">
+        <a href="{{ url_for('auth_bp.profile_page') }}" class="user-menu-avatar" title="Change photo">
+            {% if session.get('profile_image') %}
+            <img src="{{ session.get('profile_image') }}" alt="">
+            {% else %}
+            <svg width="36" height="36" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <circle cx="10" cy="7.5" r="3.5" fill="white" />
+                <path d="M3 18.5c0-3.87 3.13-7 7-7s7 3.13 7 7" stroke="white" stroke-width="1.8" fill="none"
+                    stroke-linecap="round" />
+            </svg>
+            {% endif %}
+            <span class="user-menu-avatar-edit"><span class="material-symbols-outlined">photo_camera</span></span>
+        </a>
+
+        <p class="user-menu-greeting">Hi, {{ display_name }}!</p>
+        <span class="user-menu-role">{{ session.get('user_role', 'User') | capitalize }}</span>
+
+        <a href="{{ url_for('auth_bp.profile_page') }}" class="user-menu-primary">Manage your profile</a>
+    </div>
+
+    <div class="user-menu-row">
+        <button type="button" class="user-menu-action" data-theme-toggle aria-pressed="false">
+            <span class="material-symbols-outlined">dark_mode</span>
+            <span data-theme-label>Dark theme</span>
+        </button>
+        <a href="{{ url_for('auth_bp.logout') }}" class="user-menu-action">
+            <span class="material-symbols-outlined">logout</span>
+            Sign out
+        </a>
+    </div>
+</div>
+
+<!-- Restore the rail/drawer choice before first paint so it never flashes open -->
+<script>
+    (function () {
+        try {
+            if (localStorage.getItem('scriptly-nav') === 'expanded') {
+                document.querySelector('.dashboard-sidebar').classList.add('expanded');
+            }
+        } catch (e) { }
+    })();
+</script>

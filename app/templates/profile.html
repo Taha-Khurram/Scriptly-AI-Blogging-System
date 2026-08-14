@@ -4,57 +4,52 @@
 
 {% block extra_css %}
 <style>
+    /* Identity on the left, editable details on the right — the same two-card
+       split the rest of the admin screens use. */
     .profile-page {
-        max-width: 600px;
-        margin: 0 auto;
-        padding: 2rem 0;
-    }
-
-    .profile-header {
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-
-    .profile-back-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: #64748b;
-        text-decoration: none;
-        padding: 0.5rem 1rem;
-        border-radius: 10px;
-        transition: all 0.15s ease;
-        margin-bottom: 1rem;
-    }
-
-    .profile-back-btn:hover {
-        color: var(--primary-color, #4318FF);
-        background: rgba(67, 24, 255, 0.06);
-    }
-
-    .profile-header h1 {
-        font-size: 1.75rem;
-        font-weight: 800;
-        color: #1e293b;
-    }
-
-    .profile-header p {
-        color: #64748b;
-        font-size: 0.9rem;
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr);
+        gap: var(--sp-6);
+        align-items: start;
+        max-width: 1040px;
     }
 
     .profile-card {
-        background: white;
-        border-radius: 16px;
-        padding: 2.5rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04);
+        background: var(--surface-1);
+        border-radius: var(--radius-lg);
+        padding: var(--sp-8);
+        box-shadow: var(--elev-1);
+    }
+
+    .profile-card-head {
+        margin-bottom: var(--sp-6);
+    }
+
+    .profile-card-title {
+        font-size: var(--fs-h3);
+        font-weight: var(--fw-medium);
+        color: var(--text-strong);
+        margin: 0 0 var(--sp-1);
+    }
+
+    .profile-card-note {
+        font-size: var(--fs-sm);
+        color: var(--text-muted);
+        margin: 0;
+        line-height: var(--lh-body);
+    }
+
+    .profile-info-list {
+        margin-bottom: var(--sp-6);
+    }
+
+    .profile-actions {
+        display: flex;
+        justify-content: flex-end;
     }
 
     .profile-avatar-section {
         text-align: center;
-        margin-bottom: 2rem;
     }
 
     .profile-avatar-wrapper {
@@ -71,8 +66,8 @@
         height: 100%;
         border-radius: 50%;
         overflow: hidden;
-        border: 3px solid #e2e8f0;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: 3px solid var(--border);
+        background: var(--brand-gradient-diag);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -80,7 +75,7 @@
     }
 
     .profile-avatar-wrapper:hover .profile-avatar-preview {
-        border-color: var(--primary-color, #4318FF);
+        border-color: var(--primary-color, var(--accent));
     }
 
     .profile-avatar-preview img {
@@ -97,7 +92,7 @@
         position: absolute;
         inset: 0;
         border-radius: 50%;
-        background: rgba(0, 0, 0, 0.4);
+        background: var(--scrim);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -116,7 +111,7 @@
 
     .profile-avatar-hint {
         font-size: 0.8rem;
-        color: #94a3b8;
+        color: var(--text-faint);
     }
 
     .profile-avatar-actions {
@@ -128,40 +123,42 @@
 
     .profile-avatar-actions button {
         font-size: 0.8rem;
-        font-weight: 600;
+        font-weight: 500;
         padding: 0.35rem 0.85rem;
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         border: none;
         cursor: pointer;
         transition: all 0.15s ease;
     }
 
     .btn-change-avatar {
-        background: rgba(67, 24, 255, 0.08);
-        color: var(--primary-color, #4318FF);
+        background: var(--accent-tint);
+        color: var(--primary-color, var(--accent));
     }
 
     .btn-change-avatar:hover {
-        background: rgba(67, 24, 255, 0.15);
+        background: var(--accent-tint);
     }
 
     .btn-remove-avatar {
-        background: rgba(239, 68, 68, 0.08);
-        color: #ef4444;
+        background: var(--danger-soft);
+        color: var(--danger);
     }
 
     .btn-remove-avatar:hover {
-        background: rgba(239, 68, 68, 0.15);
+        background: var(--danger-soft);
     }
 
     .profile-form-group {
         margin-bottom: 1.5rem;
     }
 
+    /* Same micro-label as the read-only rows below, one step stronger because
+       this one is editable. Accent is reserved for actions, not labels. */
     .profile-form-group label {
         font-size: 0.8rem;
-        font-weight: 700;
-        color: var(--primary-color, #4318FF);
+        font-weight: var(--fw-medium);
+        color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 0.5px;
         margin-bottom: 0.5rem;
@@ -170,25 +167,25 @@
 
     .profile-form-group input {
         width: 100%;
-        border: 2px solid #e2e8f0;
-        border-radius: 10px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius-sm);
         padding: 0.75rem 1rem;
         font-size: 0.95rem;
-        color: #334155;
-        background-color: #fafbfc;
+        color: var(--text-1);
+        background-color: var(--surface-2);
         transition: all 0.2s ease;
     }
 
     .profile-form-group input:hover {
-        border-color: #cbd5e1;
-        background-color: white;
+        border-color: var(--border-strong);
+        background-color: var(--surface-1);
     }
 
     .profile-form-group input:focus {
         outline: none;
-        border-color: var(--primary-color, #4318FF);
-        background-color: white;
-        box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
+        border-color: var(--primary-color, var(--accent));
+        background-color: var(--surface-1);
+        box-shadow: 0 0 0 3px var(--focus-ring);
     }
 
     .profile-info-row {
@@ -196,7 +193,7 @@
         align-items: center;
         justify-content: space-between;
         padding: 0.75rem 0;
-        border-bottom: 1px solid #f1f5f9;
+        border-bottom: 1px solid var(--border-subtle);
     }
 
     .profile-info-row:last-child {
@@ -205,36 +202,36 @@
 
     .profile-info-label {
         font-size: 0.8rem;
-        font-weight: 600;
-        color: #94a3b8;
+        font-weight: 500;
+        color: var(--text-faint);
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
 
     .profile-info-value {
         font-size: 0.9rem;
-        color: #475569;
+        color: var(--text-2);
         font-weight: 500;
     }
 
     .profile-save-btn {
-        width: 100%;
-        padding: 0.85rem;
+        min-width: 160px;
+        height: 44px;
+        padding: 0 var(--sp-8);
         border: none;
-        border-radius: 12px;
-        background: linear-gradient(135deg, var(--primary-color, #4318FF) 0%, #6366f1 100%);
-        color: white;
-        font-size: 0.95rem;
-        font-weight: 700;
+        border-radius: var(--radius-pill);
+        background: var(--accent);
+        color: var(--text-on-accent);
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-medium);
         cursor: pointer;
-        transition: all 0.2s ease;
-        box-shadow: 0 4px 12px rgba(67, 24, 255, 0.25);
-        margin-top: 0.5rem;
+        transition: background-color var(--dur-fast) var(--ease-standard),
+            box-shadow var(--dur-fast) var(--ease-standard);
     }
 
     .profile-save-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(67, 24, 255, 0.35);
+        background: var(--accent-hover);
+        box-shadow: var(--elev-2);
     }
 
     .profile-save-btn:disabled {
@@ -248,9 +245,9 @@
         bottom: 2rem;
         right: 2rem;
         padding: 0.85rem 1.5rem;
-        border-radius: 12px;
+        border-radius: var(--radius-md);
         font-size: 0.9rem;
-        font-weight: 600;
+        font-weight: 500;
         z-index: 10060;
         transform: translateY(20px);
         opacity: 0;
@@ -264,20 +261,20 @@
     }
 
     .profile-toast.success {
-        background: #10b981;
+        background: var(--success);
         color: white;
     }
 
     .profile-toast.error {
-        background: #ef4444;
-        color: white;
+        background: var(--danger);
+        color: var(--text-on-accent);
     }
 
     /* Image Picker Modal */
     .image-picker-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(15, 23, 42, 0.6);
+        background: var(--scrim);
         backdrop-filter: blur(4px);
         display: flex;
         align-items: center;
@@ -295,12 +292,12 @@
     }
 
     .image-picker-modal {
-        background: white;
-        border-radius: 16px;
+        background: var(--surface-1);
+        border-radius: var(--radius-lg);
         width: 100%;
         max-width: 640px;
         max-height: 80vh;
-        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.16);
+        box-shadow: var(--elev-3);
         transform: translateY(10px) scale(0.97);
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         overflow: hidden;
@@ -317,13 +314,13 @@
         align-items: center;
         justify-content: space-between;
         padding: 1.25rem 1.5rem;
-        border-bottom: 1px solid #f1f5f9;
+        border-bottom: 1px solid var(--border-subtle);
     }
 
     .image-picker-title {
         font-size: 1rem;
-        font-weight: 700;
-        color: #1e293b;
+        font-weight: 500;
+        color: var(--text-strong);
         margin: 0;
         display: flex;
         align-items: center;
@@ -333,21 +330,21 @@
     .image-picker-close {
         width: 32px;
         height: 32px;
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         border: none;
         background: transparent;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        color: #94a3b8;
+        color: var(--text-faint);
         transition: all 0.15s ease;
         font-size: 0.9rem;
     }
 
     .image-picker-close:hover {
-        background: #f1f5f9;
-        color: #475569;
+        background: var(--surface-3);
+        color: var(--text-2);
     }
 
     .image-picker-body {
@@ -372,7 +369,7 @@
     }
 
     .image-picker-item:hover {
-        border-color: var(--primary-color, #4318FF);
+        border-color: var(--primary-color, var(--accent));
         transform: scale(1.03);
     }
 
@@ -385,22 +382,22 @@
     .image-picker-empty {
         text-align: center;
         padding: 2rem 1rem;
-        color: #94a3b8;
+        color: var(--text-faint);
         font-size: 0.85rem;
     }
 
     .image-picker-footer {
         padding: 0.85rem 1.5rem;
-        border-top: 1px solid #f1f5f9;
-        background: #fafbfc;
-        border-radius: 0 0 16px 16px;
+        border-top: 1px solid var(--border-subtle);
+        background: var(--surface-2);
+        border-radius: 0 0 var(--radius-lg) var(--radius-lg);
         text-align: center;
     }
 
     .image-picker-upload-link {
         font-size: 0.8rem;
-        font-weight: 600;
-        color: var(--primary-color, #4318FF);
+        font-weight: 500;
+        color: var(--primary-color, var(--accent));
         text-decoration: none;
         display: inline-flex;
         align-items: center;
@@ -412,35 +409,50 @@
         opacity: 0.8;
     }
 
-    @media (max-width: 768px) {
+    /* The identity card stops earning its column before the canvas does. */
+    @media (max-width: 1100px) {
         .profile-page {
-            padding: 1rem 0;
+            grid-template-columns: 1fr;
+            max-width: 620px;
         }
+    }
 
+    @media (max-width: 768px) {
         .profile-card {
-            padding: 1.5rem;
-            border-radius: 12px;
+            padding: var(--sp-6);
+            border-radius: var(--radius-md);
         }
 
         .profile-avatar-wrapper {
             width: 100px;
             height: 100px;
         }
+
+        .profile-save-btn {
+            width: 100%;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="profile-page" data-page="profile">
-    <div class="profile-header">
-        <a href="{{ url_for('blog.home') }}" class="profile-back-btn">
-            <i class="bi bi-arrow-left"></i> Back to Dashboard
-        </a>
-        <h1>My Profile</h1>
-        <p>Manage your display name and profile image</p>
-    </div>
+<div class="dashboard-layout">
 
-    <div class="profile-card">
+    {% include 'partials/sidebar.html' %}
+
+    <main class="dashboard-main">
+
+        <header class="dashboard-header">
+            <div>
+                <div class="header-welcome-text">Account</div>
+                <h1 class="header-title">My Profile</h1>
+            </div>
+        </header>
+
+        <div class="profile-page" data-page="profile">
+
+    <!-- Identity -->
+    <div class="profile-card profile-card-identity">
         <!-- Avatar Section -->
         <div class="profile-avatar-section">
             <div class="profile-avatar-wrapper" onclick="openProfileImagePicker()">
@@ -479,6 +491,14 @@
             </div>
             {% endif %}
         </div>
+    </div>
+
+    <!-- Details -->
+    <div class="profile-card">
+        <div class="profile-card-head">
+            <h2 class="profile-card-title">Account details</h2>
+            <p class="profile-card-note">Your display name is what teammates see on drafts, comments and approvals.</p>
+        </div>
 
         <!-- Display Name -->
         <div class="profile-form-group">
@@ -487,7 +507,7 @@
         </div>
 
         <!-- Read-only Info -->
-        <div style="margin-bottom: 1.5rem;">
+        <div class="profile-info-list">
             <div class="profile-info-row">
                 <span class="profile-info-label">Email</span>
                 <span class="profile-info-value">{{ user.get('email', '') }}</span>
@@ -500,9 +520,11 @@
 
         <input type="hidden" id="profileImage" value="{{ user.get('profile_image', '') }}">
 
-        <button class="profile-save-btn" onclick="saveProfile()" id="profileSaveBtn">
-            Save Changes
-        </button>
+        <div class="profile-actions">
+            <button class="profile-save-btn" onclick="saveProfile()" id="profileSaveBtn">
+                Save Changes
+            </button>
+        </div>
     </div>
 </div>
 
@@ -528,8 +550,10 @@
 </div>
 
 <!-- Toast -->
-<div class="profile-toast" id="profileToast"></div>
+        <div class="profile-toast" id="profileToast"></div>
 
+    </main>
+</div>
 {% endblock %}
 
 {% block extra_js %}

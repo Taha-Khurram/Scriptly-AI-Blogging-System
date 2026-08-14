@@ -4,14 +4,14 @@
 
 /* Welcome Banner */
 .welcome-banner {
-    background: linear-gradient(135deg, #868CFF 0%, #4318FF 100%);
+    background: var(--brand-gradient-diag);
     border-radius: var(--radius-lg);
     padding: 2.5rem;
-    color: white;
+    color: var(--text-on-accent);
     position: relative;
     overflow: hidden;
     margin-bottom: 2rem;
-    box-shadow: 0 10px 30px rgba(67, 24, 255, 0.3);
+    box-shadow: var(--elev-3);
 }
 
 .welcome-banner h2 {
@@ -32,7 +32,7 @@
     bottom: -50px;
     width: 200px;
     height: 200px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.12);
     border-radius: 50%;
 }
 
@@ -64,7 +64,7 @@
 
 /* Stats Cards */
 .stat-card {
-    background: white;
+    background: var(--surface-1);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     display: flex;
@@ -89,9 +89,9 @@
     font-size: 1.5rem;
 }
 
-.icon-purple { background: rgba(67, 24, 255, 0.1); color: var(--primary-color); }
-.icon-green { background: rgba(5, 205, 153, 0.1); color: var(--success-color); }
-.icon-orange { background: rgba(255, 181, 71, 0.1); color: var(--warning-color); }
+.icon-purple { background: var(--accent-tint); color: var(--primary-color); }
+.icon-green { background: var(--success-soft); color: var(--success-color); }
+.icon-orange { background: var(--warning-soft); color: var(--warning-color); }
 
 /* ==================== BLOG LIST CARDS GRID ==================== */
 .dashboard-cards-grid {
@@ -114,7 +114,7 @@
 
 /* ==================== LIST CARD ==================== */
 .dashboard-list-card {
-    background: white;
+    background: var(--surface-1);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     overflow: hidden;
@@ -127,13 +127,13 @@
     justify-content: space-between;
     align-items: center;
     padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .list-card-title {
     font-size: 1rem;
-    font-weight: 700;
-    color: #1e293b;
+    font-weight: 500;
+    color: var(--text-strong);
     margin: 0;
     display: flex;
     align-items: center;
@@ -147,20 +147,20 @@
 
 .list-card-viewall {
     font-size: 0.78rem;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--primary-color);
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
     padding: 0.35rem 0.75rem;
-    border-radius: 50px;
-    background: rgba(67, 24, 255, 0.06);
+    border-radius: var(--radius-pill);
+    background: var(--accent-tint);
     transition: all 0.2s ease;
 }
 
 .list-card-viewall:hover {
-    background: rgba(67, 24, 255, 0.12);
+    background: var(--accent-tint);
     color: var(--primary-color);
 }
 
@@ -175,12 +175,12 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.85rem 1.5rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    border-bottom: 1px solid var(--border-subtle);
     transition: background 0.15s ease;
 }
 
 .list-card-item:hover {
-    background: #f8fafc;
+    background: var(--surface-2);
 }
 
 .list-card-item:last-child {
@@ -198,8 +198,8 @@
 
 .list-card-item-title {
     font-size: 0.875rem;
-    font-weight: 600;
-    color: #1e293b;
+    font-weight: 500;
+    color: var(--text-strong);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -207,7 +207,7 @@
 
 .list-card-item-meta {
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: var(--text-faint);
     font-weight: 500;
 }
 
@@ -216,9 +216,9 @@
     display: inline-flex;
     align-items: center;
     padding: 0.25rem 0.6rem;
-    border-radius: 50px;
+    border-radius: var(--radius-pill);
     font-size: 0.68rem;
-    font-weight: 700;
+    font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.02em;
     white-space: nowrap;
@@ -226,23 +226,23 @@
 }
 
 .badge-draft {
-    background: rgba(100, 116, 139, 0.1);
-    color: #64748b;
+    background: var(--surface-3);
+    color: var(--text-muted);
 }
 
 .badge-under_review {
-    background: rgba(251, 191, 36, 0.12);
-    color: #d97706;
+    background: var(--warning-soft);
+    color: var(--warning);
 }
 
 .badge-published {
-    background: rgba(16, 185, 129, 0.1);
-    color: #059669;
+    background: var(--success-soft);
+    color: var(--success);
 }
 
 .badge-rejected {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
+    background: var(--danger-soft);
+    color: var(--danger);
 }
 
 /* ==================== EMPTY STATE ==================== */
@@ -257,13 +257,13 @@
 
 .list-card-empty i {
     font-size: 2rem;
-    color: #cbd5e1;
+    color: var(--text-faint);
     margin-bottom: 0.5rem;
 }
 
 .list-card-empty p {
     font-size: 0.85rem;
-    color: #94a3b8;
+    color: var(--text-faint);
     font-weight: 500;
     margin: 0;
 }

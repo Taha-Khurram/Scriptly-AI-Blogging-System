@@ -4,7 +4,7 @@
 
 /* Local overrides for Category List */
 .categories-container {
-  background: white;
+  background: var(--surface-1);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   overflow: visible;
@@ -14,9 +14,9 @@
   display: flex;
   padding: 1.25rem 2rem;
   background: transparent;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--secondary-color);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -28,7 +28,7 @@
   display: flex;
   align-items: center;
   padding: 1.25rem 2rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
   transition: var(--transition-base);
 }
 
@@ -44,7 +44,7 @@
 
 .col-name {
   flex: 2;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--info-color);
 }
 
@@ -66,14 +66,14 @@
 /* Badge styling */
 .badge-status {
   padding: 0.35rem 1rem;
-  border-radius: 30px;
+  border-radius: var(--radius-pill);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
 .badge-active {
-  background: rgba(5, 205, 153, 0.1);
+  background: var(--success-soft);
   color: var(--success-color);
 }
 
@@ -87,20 +87,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: var(--text-faint);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-dropdown-trigger:hover {
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--surface-3);
+  color: var(--text-muted);
 }
 
 .dropdown-menu {
   border: none;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2);
   padding: 0.5rem;
   min-width: 180px;
 }
@@ -110,16 +110,16 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.65rem 1rem;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 0.9rem;
   font-weight: 500;
-  color: #334155;
+  color: var(--text-1);
   transition: all 0.15s ease;
 }
 
 .dropdown-item:hover {
-  background: #f8fafc;
-  color: #1e293b;
+  background: var(--surface-2);
+  color: var(--text-strong);
 }
 
 .dropdown-item i {
@@ -129,17 +129,17 @@
 }
 
 .dropdown-item.text-danger {
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .dropdown-item.text-danger:hover {
-  background: #fef2f2;
-  color: #dc2626;
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .dropdown-divider {
   margin: 0.35rem 0;
-  border-color: #f1f5f9;
+  border-color: var(--border-subtle);
 }
 
 /* Modal Tweaks */
