@@ -2,10 +2,18 @@
  * Categories Page JavaScript
  */
 
-// Initialize Bootstrap dropdowns (required after PJAX navigation)
-document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach(el => {
-  new bootstrap.Dropdown(el);
-});
+// Bootstrap's dropdowns are NOT initialised here on purpose.
+//
+// This file used to open with `new bootstrap.Dropdown(el)` for every trigger.
+// bootstrap.bundle is loaded with `defer`, so on a hard page load it has not
+// executed yet when this script runs — the constructor threw
+// "bootstrap is not defined" and took the whole file down with it, leaving the
+// form handlers and the search unbound. (It only appeared to work when arriving
+// via PJAX, which injects this script after Bootstrap is ready.)
+//
+// The loop was never needed: Bootstrap's data-api is a delegated listener on
+// document, so `data-bs-toggle="dropdown"` works on markup added later. The
+// drafts and all-blogs listings rely on exactly that.
 
 // Add Category
 document.getElementById('addCategoryForm').addEventListener('submit', async (e) => {
@@ -144,14 +152,65 @@ async function deleteCategory(id) {
   }
 }
 
-// Simple Search Filter
-document.getElementById('searchInput').addEventListener('keyup', function () {
-  const value = this.value.toLowerCase();
-  document.querySelectorAll('.category-item').forEach(item => {
-    const text = item.querySelector('.col-name').innerText.toLowerCase();
-    item.style.setProperty('display', text.includes(value) ? 'flex' : 'none', 'important');
-  });
-});
+// --------------------------------------------------------------------------
+// Header search
+//
+// Driven by the page header's `page-search` event rather than a keyup handler
+// of its own, and it toggles the `hidden` attribute instead of writing
+// `display: flex !important` inline — that old inline style fought the row's
+// own grid layout and could not be undone by CSS.
+//
+// The listener goes through an AbortController the next run of this file
+// aborts, because PJAX re-injects the script on every visit.
+// --------------------------------------------------------------------------
+(function categoriesSearch() {
+  if (window.__categoriesAbort) {
+    try { window.__categoriesAbort.abort(); } catch (e) { }
+  }
+  const controller = new AbortController();
+  window.__categoriesAbort = controller;
+
+  document.addEventListener('page-search', (e) => {
+    const q = ((e.detail && e.detail.value) || '').trim().toLowerCase();
+    const rows = document.querySelectorAll('#categoriesList .category-item');
+    if (!rows.length) return;
+
+    let shown = 0;
+    rows.forEach((row) => {
+      const hit = !q || (row.dataset.search || '').indexOf(q) !== -1;
+      row.hidden = !hit;
+      if (hit) shown++;
+    });
+
+    const none = document.querySelector('#categoriesList [data-noresults]');
+    if (none) none.hidden = shown !== 0;
+  }, { signal: controller.signal });
+
+  // syncThemeControls only runs on DOMContentLoaded, which PJAX never fires.
+  if (typeof window.syncThemeControls === 'function') window.syncThemeControls();
+})();
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// The shared status pill, so a blog carries the same badge here as on the
+// listings. Bootstrap's *-subtle utilities carry Bootstrap's palette, not ours.
+function statusPill(status) {
+  const map = {
+    DRAFT: 'Draft',
+    UNDER_REVIEW: 'Under review',
+    PUBLISHED: 'Published',
+    REJECTED: 'Rejected'
+  };
+  const key = (status || 'DRAFT').toUpperCase();
+  const label = map[key] || map.DRAFT;
+  const cls = map[key] ? key.toLowerCase() : 'draft';
+  return `<span class="status-pill status-${cls}">${label}</span>`;
+}
 
 // View Blogs in Category
 async function viewCategoryBlogs(categoryId, categoryName) {
@@ -171,37 +230,27 @@ async function viewCategoryBlogs(categoryId, categoryName) {
     document.getElementById('blogsListLoading').classList.add('d-none');
 
     if (data.success && data.blogs.length > 0) {
-      const tbody = document.getElementById('blogsListBody');
-      tbody.innerHTML = '';
+      const body = document.getElementById('blogsListBody');
 
-      data.blogs.forEach(blog => {
-        const status = (blog.status || 'DRAFT').toUpperCase();
-        let statusBadge;
-        if (status === 'PUBLISHED') {
-          statusBadge = '<span class="badge bg-success-subtle text-success rounded-pill px-3">Published</span>';
-        } else if (status === 'UNDER_REVIEW') {
-          statusBadge = '<span class="badge bg-info-subtle text-info rounded-pill px-3">Under Review</span>';
-        } else if (status === 'REJECTED') {
-          statusBadge = '<span class="badge bg-danger-subtle text-danger rounded-pill px-3">Rejected</span>';
-        } else {
-          statusBadge = '<span class="badge bg-warning-subtle text-warning rounded-pill px-3">Draft</span>';
-        }
-
+      // Rendered as the same .data-row the listings use, with the shared
+      // status pill — a blog should not look like a different kind of thing
+      // just because it is being viewed inside a modal.
+      body.innerHTML = data.blogs.map((blog) => {
+        const title = escapeHtml(blog.title || 'Untitled');
         const createdAt = blog.created_at
           ? new Date(blog.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
           : '—';
 
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td class="fw-medium">${blog.title}</td>
-          <td>${statusBadge}</td>
-          <td class="text-muted small">${createdAt}</td>
-        `;
-        tbody.appendChild(row);
-      });
+        return `
+          <div class="data-row">
+            <span class="row-title">${title}</span>
+            ${statusPill(blog.status)}
+            <span class="row-time">${createdAt}</span>
+          </div>`;
+      }).join('');
 
       document.getElementById('blogsListContent').classList.remove('d-none');
-      document.getElementById('blogsCount').textContent = `${data.count} blog${data.count !== 1 ? 's' : ''} found`;
+      document.getElementById('blogsCount').textContent = `${data.count} blog${data.count !== 1 ? 's' : ''}`;
     } else {
       document.getElementById('blogsListEmpty').classList.remove('d-none');
     }

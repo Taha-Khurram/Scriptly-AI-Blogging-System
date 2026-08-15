@@ -201,21 +201,236 @@ document.addEventListener('DOMContentLoaded', syncThemeControls);
         if (box) box.classList.toggle('has-value', input.value.trim() !== '');
     }
 
+    // ---- Results dropdown --------------------------------------------------
+    //
+    // The header renders it but does not know what a result *is*: a page
+    // answers `page-search` with `page-search-results` and this fills the
+    // panel from that. Pages that stay silent never open it, which is why the
+    // dropdown can ship in the shared partial without touching every screen.
+
+    const RESULT_LIMIT = 8;
+
+    function getSearchPanel() {
+        return document.querySelector('[data-page-search-panel]');
+    }
+
+    function resultsOpen() {
+        const panel = getSearchPanel();
+        return !!panel && !panel.hidden;
+    }
+
+    function setExpanded(open, active) {
+        const input = getSearchInput();
+        if (!input) return;
+        input.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open && active && active.id) input.setAttribute('aria-activedescendant', active.id);
+        else input.removeAttribute('aria-activedescendant');
+    }
+
+    function closeResults() {
+        const panel = getSearchPanel();
+        if (!panel || panel.hidden) return;
+        panel.hidden = true;
+        panel.innerHTML = '';
+        setExpanded(false);
+    }
+
+    function resultOptions() {
+        const panel = getSearchPanel();
+        if (!panel || panel.hidden) return [];
+        return Array.from(panel.querySelectorAll('.page-search-result, .page-search-foot'));
+    }
+
+    function activeOption() {
+        return resultOptions().find((el) => el.classList.contains('is-active')) || null;
+    }
+
+    function activate(target) {
+        resultOptions().forEach((el) => {
+            const on = el === target;
+            el.classList.toggle('is-active', on);
+            if (el.getAttribute('role') === 'option') {
+                el.setAttribute('aria-selected', on ? 'true' : 'false');
+            }
+        });
+        setExpanded(true, target);
+        if (target) target.scrollIntoView({ block: 'nearest' });
+    }
+
+    function moveActive(step) {
+        const opts = resultOptions();
+        if (!opts.length) return;
+        const at = opts.indexOf(activeOption());
+        // Wrap in both directions: from nothing selected, Down lands on the
+        // first row and Up on the last.
+        const next = ((at === -1 ? (step > 0 ? -1 : 0) : at) + step + opts.length) % opts.length;
+        activate(opts[next]);
+    }
+
+    // The query is user content coming back through the DOM, so matches are
+    // marked up by splicing text nodes rather than by building HTML.
+    function withHighlight(text, query) {
+        const frag = document.createDocumentFragment();
+        const needle = query.toLowerCase();
+        const hay = text.toLowerCase();
+
+        let from = 0;
+        let at = needle ? hay.indexOf(needle) : -1;
+        while (at !== -1) {
+            if (at > from) frag.appendChild(document.createTextNode(text.slice(from, at)));
+            const hit = document.createElement('mark');
+            hit.className = 'page-search-hit';
+            hit.textContent = text.slice(at, at + needle.length);
+            frag.appendChild(hit);
+            from = at + needle.length;
+            at = hay.indexOf(needle, from);
+        }
+        frag.appendChild(document.createTextNode(text.slice(from)));
+        return frag;
+    }
+
+    function resultNode(item, id, query) {
+        const row = document.createElement('a');
+        row.className = 'page-search-result';
+        row.id = id;
+        row.href = item.href || '#';
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', 'false');
+
+        if (item.mark) {
+            const mark = document.createElement('span');
+            mark.className = 'page-search-result-mark';
+            mark.setAttribute('aria-hidden', 'true');
+            mark.textContent = item.mark;
+            row.appendChild(mark);
+        }
+
+        const main = document.createElement('span');
+        main.className = 'page-search-result-main';
+
+        const title = document.createElement('span');
+        title.className = 'page-search-result-title';
+        title.appendChild(withHighlight(String(item.title || 'Untitled'), query));
+        main.appendChild(title);
+
+        if (item.meta) {
+            const meta = document.createElement('span');
+            meta.className = 'page-search-result-meta';
+            meta.textContent = item.meta;
+            main.appendChild(meta);
+        }
+
+        row.appendChild(main);
+
+        if (item.status) {
+            const pill = document.createElement('span');
+            pill.className = 'status-pill status-' + String(item.status).toLowerCase();
+            pill.textContent = item.statusLabel || item.status;
+            row.appendChild(pill);
+        }
+
+        return row;
+    }
+
+    function renderResults(detail) {
+        const panel = getSearchPanel();
+        const input = getSearchInput();
+        if (!panel || !input) return;
+
+        const query = String(detail.query != null ? detail.query : input.value).trim();
+        if (!query) {
+            closeResults();
+            return;
+        }
+
+        const items = (detail.items || []).slice(0, detail.limit || RESULT_LIMIT);
+        panel.innerHTML = '';
+
+        if (items.length) {
+            items.forEach((item, i) => {
+                panel.appendChild(resultNode(item, panel.id + '-opt-' + i, query));
+            });
+        } else {
+            const empty = document.createElement('p');
+            empty.className = 'page-search-empty';
+            empty.textContent = detail.empty || 'Nothing here matches “' + query + '”.';
+            panel.appendChild(empty);
+        }
+
+        if (detail.footer && detail.footer.href) {
+            const foot = document.createElement('a');
+            foot.className = 'page-search-foot';
+            foot.id = panel.id + '-foot';
+            foot.href = detail.footer.href;
+            foot.textContent = detail.footer.label || 'See all results';
+            panel.appendChild(foot);
+        }
+
+        panel.hidden = false;
+        setExpanded(true);
+        activate(null);
+
+        // Bound on the panel rather than the document so it costs nothing while
+        // the dropdown is closed. Re-adding the same function to the same
+        // element is a no-op, and PJAX throws the element away with its
+        // listener, so this stays a single live binding.
+        panel.addEventListener('mouseover', onPanelHover);
+    }
+
+    // Pointer and keyboard share one cursor: hovering a row makes it the row
+    // Enter would open, so the two cannot disagree about what is selected.
+    function onPanelHover(e) {
+        const row = e.target.closest('.page-search-result, .page-search-foot');
+        if (row) activate(row);
+    }
+
+    document.addEventListener('page-search-results', (e) => {
+        renderResults((e && e.detail) || {});
+    });
+
     document.addEventListener('input', (e) => {
         const input = e.target.closest('[data-page-search] .page-search-input');
         if (!input) return;
         syncSearchState(input);
+        if (!input.value.trim()) closeResults();
         emitSearch(input.value, false);
     });
 
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('[data-page-search-clear]')) return;
+    // Re-ask on focus so returning to a field that still holds a query brings
+    // its results back instead of leaving the reader staring at a dead box.
+    document.addEventListener('focusin', (e) => {
+        const box = e.target.closest && e.target.closest('[data-page-search]');
+        if (!box) {
+            closeResults();
+            return;
+        }
         const input = getSearchInput();
-        if (!input) return;
-        input.value = '';
-        syncSearchState(input);
-        emitSearch('', false);
-        input.focus();
+        if (input && e.target === input && input.value.trim() && !resultsOpen()) {
+            emitSearch(input.value, false);
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('[data-page-search-clear]')) {
+            const input = getSearchInput();
+            if (!input) return;
+            input.value = '';
+            syncSearchState(input);
+            closeResults();
+            emitSearch('', false);
+            input.focus();
+            return;
+        }
+
+        // Closing tears the anchor out of the document, so it has to wait for
+        // the delegated PJAX handler further down this file to see the click.
+        if (e.target.closest('.page-search-result, .page-search-foot')) {
+            setTimeout(closeResults, 0);
+            return;
+        }
+
+        // A click on the panel's own padding or scrollbar is not a dismissal.
+        if (!e.target.closest('[data-page-search]')) closeResults();
     });
 
     document.addEventListener('keydown', (e) => {
@@ -224,13 +439,32 @@ document.addEventListener('DOMContentLoaded', syncThemeControls);
 
         const inField = document.activeElement === input;
 
+        if (inField && resultsOpen() && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            e.preventDefault();
+            moveActive(e.key === 'ArrowDown' ? 1 : -1);
+            return;
+        }
+
         if (inField && e.key === 'Enter') {
             e.preventDefault();
+            // A highlighted row wins over the page's own submit handling —
+            // the reader picked that result, not the query.
+            const chosen = activeOption();
+            if (chosen) {
+                chosen.click();
+                closeResults();
+                return;
+            }
             emitSearch(input.value, true);
             return;
         }
 
         if (inField && e.key === 'Escape') {
+            // One dismissal per press: the panel first, the query second.
+            if (resultsOpen()) {
+                closeResults();
+                return;
+            }
             if (input.value) {
                 input.value = '';
                 syncSearchState(input);
@@ -273,6 +507,149 @@ document.addEventListener('DOMContentLoaded', syncThemeControls);
 
     document.addEventListener('DOMContentLoaded', refresh);
     document.addEventListener('pjax:complete', refresh);
+})();
+
+// --------------------------------------------------------------------------
+// Select pill
+//
+// Drives the .select-pill / .menu pair: a listbox we own, wrapped around a
+// native <select> that stays the value holder. Choosing an item writes through
+// to the select and fires a real `change` event, so page code keeps reading
+// `.value` and listening for `change` exactly as it did with a bare select.
+//
+// Everything is delegated off `document` and re-read at event time — the pills
+// live inside .dashboard-main, which PJAX rebuilds on every navigation.
+// --------------------------------------------------------------------------
+
+(function initSelectPill() {
+
+    function pillOf(el) { return el.closest('[data-select-pill]'); }
+    function menuOf(pill) { return pill.querySelector('.menu'); }
+    function selectOf(pill) { return pill.querySelector('select'); }
+    function triggerOf(pill) { return pill.querySelector('[data-select-trigger]'); }
+
+    function closeAll(except) {
+        document.querySelectorAll('[data-select-pill]').forEach((pill) => {
+            if (pill === except) return;
+            const menu = menuOf(pill);
+            if (menu && !menu.hidden) {
+                menu.hidden = true;
+                const trigger = triggerOf(pill);
+                if (trigger) trigger.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    // Mark the item matching the select's current value. Done on every open so
+    // the menu is correct even when the value was changed elsewhere — a "Clear
+    // all" button, say, or a query string on load.
+    function syncItems(pill) {
+        const select = selectOf(pill);
+        if (!select) return;
+        pill.querySelectorAll('.menu-item').forEach((item) => {
+            const on = item.dataset.value === select.value;
+            item.classList.toggle('is-selected', on);
+            item.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+    }
+
+    function open(pill) {
+        const menu = menuOf(pill);
+        const trigger = triggerOf(pill);
+        if (!menu) return;
+
+        closeAll(pill);
+        syncItems(pill);
+        menu.hidden = false;
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+
+        const selected = menu.querySelector('.menu-item.is-selected') || menu.querySelector('.menu-item');
+        if (selected) selected.focus();
+    }
+
+    function close(pill, refocus) {
+        const menu = menuOf(pill);
+        const trigger = triggerOf(pill);
+        if (menu) menu.hidden = true;
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'false');
+            if (refocus) trigger.focus();
+        }
+    }
+
+    function choose(pill, item) {
+        const select = selectOf(pill);
+        if (select && select.value !== item.dataset.value) {
+            select.value = item.dataset.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        syncItems(pill);
+        close(pill, true);
+    }
+
+    document.addEventListener('click', (e) => {
+        const trigger = e.target.closest('[data-select-trigger]');
+        if (trigger) {
+            e.preventDefault();
+            const pill = pillOf(trigger);
+            const menu = menuOf(pill);
+            if (menu && menu.hidden) open(pill); else close(pill, false);
+            return;
+        }
+
+        const item = e.target.closest('.menu-item');
+        if (item && pillOf(item)) {
+            e.preventDefault();
+            choose(pillOf(item), item);
+            return;
+        }
+
+        // Anywhere else dismisses.
+        if (!e.target.closest('[data-select-pill]')) closeAll(null);
+    });
+
+    document.addEventListener('keydown', (e) => {
+        const pill = pillOf(e.target);
+        if (!pill) return;
+
+        const menu = menuOf(pill);
+        if (!menu) return;
+
+        if (e.key === 'Escape') {
+            if (!menu.hidden) { e.preventDefault(); close(pill, true); }
+            return;
+        }
+
+        const onTrigger = !!e.target.closest('[data-select-trigger]');
+
+        if (menu.hidden) {
+            if (onTrigger && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                open(pill);
+            }
+            return;
+        }
+
+        const items = Array.from(menu.querySelectorAll('.menu-item'));
+        const at = items.indexOf(e.target.closest('.menu-item'));
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            (items[at + 1] || items[0]).focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            (items[at - 1] || items[items.length - 1]).focus();
+        } else if (e.key === 'Home') {
+            e.preventDefault();
+            items[0].focus();
+        } else if (e.key === 'End') {
+            e.preventDefault();
+            items[items.length - 1].focus();
+        }
+    });
+
+    // A menu left open across a PJAX navigation would be orphaned mid-air.
+    document.addEventListener('pjax:complete', () => closeAll(null));
 })();
 
 // --------------------------------------------------------------------------
@@ -590,22 +967,32 @@ const Pjax = (() => {
                 <div class="skeleton-table-row"><div class="skeleton skeleton-text" style="width:32%;"></div><div class="skeleton" style="width:40px;height:22px;border-radius:12px;"></div><div class="skeleton skeleton-text" style="width:12%;"></div><div class="skeleton skeleton-text" style="width:8%;"></div></div>
             </div>`,
 
-        // Gallery: header + upload zone + image grid
+        // Gallery: header + filter/sort toolbar + tile grid with captions.
+        // The upload zone this used to draw is gone — uploading is a header
+        // action and a drag-anywhere overlay now, so a 110px block at the top
+        // would promise a control the real page does not have.
         gallery: `
             <header class="dashboard-header skeleton-header">
                 <div><div class="skeleton skeleton-text" style="height:14px;width:100px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:150px;"></div></div>
+                <div class="skeleton" style="width:120px;height:40px;border-radius:999px;"></div>
             </header>
-            <div class="skeleton" style="width:100%;height:110px;border-radius:12px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:center;">
+            <div class="skeleton-filter-bar">
+                <div class="skeleton" style="width:56px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:62px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:62px;height:34px;border-radius:999px;"></div>
+                <div style="flex:1"></div>
+                <div class="skeleton" style="width:150px;height:38px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:76px;height:38px;border-radius:999px;"></div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;">
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:70%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:55%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:65%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:60%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:72%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:58%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:66%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:62%;margin-top:10px;"></div></div>
             </div>`,
 
         // Newsletter: header + 3 stat cards + newsletter creation card + subscribers

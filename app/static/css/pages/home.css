@@ -43,6 +43,11 @@
 
 /* ==========================================================================
    CARD PRIMITIVES
+
+   .card-head / .card-title / .card-link / .seg-tabs / .data-row / .status-pill
+   / .list-empty / .reveal all live in dashboard.css §12 now — drafts and
+   all-blogs compose from the same set. Only what is specific to this screen
+   is below.
    ========================================================================== */
 
 .hero-card,
@@ -53,61 +58,6 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--elev-1);
     transition: box-shadow var(--dur-base) var(--ease-standard);
-}
-
-.card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-4);
-    padding: var(--sp-6) var(--sp-6) 0;
-}
-
-.card-head.is-stacked {
-    flex-wrap: wrap;
-    row-gap: var(--sp-4);
-}
-
-.card-title {
-    margin: 0;
-    font-size: var(--fs-h3);
-    font-weight: var(--fw-medium);
-    color: var(--text-strong);
-    letter-spacing: -0.01em;
-}
-
-.card-link {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    padding: var(--sp-1) var(--sp-3);
-    border-radius: var(--radius-pill);
-    font-size: var(--fs-xs);
-    font-weight: var(--fw-medium);
-    color: var(--accent);
-    text-decoration: none;
-    white-space: nowrap;
-    transition: var(--transition-base);
-}
-
-.card-link:hover {
-    background: var(--accent-tint);
-    color: var(--accent);
-}
-
-.card-link i {
-    font-size: 0.9em;
-    transition: transform var(--dur-fast) var(--ease-standard);
-}
-
-.card-link:hover i {
-    transform: translateX(2px);
-}
-
-/* Entrance — staggered by --reveal-delay on each card */
-.reveal {
-    animation: fadeInUp var(--dur-slow) var(--ease-standard) both;
-    animation-delay: var(--reveal-delay, 0ms);
 }
 
 /* ==========================================================================
@@ -553,67 +503,6 @@ a.hero-nudge.is-live:hover {
     padding-bottom: var(--sp-4);
 }
 
-/* Segmented control. Active takes --accent-soft, the same treatment the nav
-   rail gives its current item, so "selected" looks the same everywhere. */
-.work-tabs {
-    display: flex;
-    gap: var(--sp-1);
-    padding: var(--sp-1);
-    border-radius: var(--radius-pill);
-    background: var(--surface-2);
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-
-.work-tabs::-webkit-scrollbar {
-    display: none;
-}
-
-.work-tab {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-4);
-    border: 0;
-    border-radius: var(--radius-pill);
-    background: none;
-    font-family: inherit;
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-medium);
-    color: var(--text-muted);
-    white-space: nowrap;
-    cursor: pointer;
-    transition: var(--transition-base);
-}
-
-.work-tab:hover {
-    color: var(--text-strong);
-}
-
-.work-tab.is-active {
-    background: var(--accent-soft);
-    color: var(--accent-on-soft);
-}
-
-.work-tab:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-}
-
-.tab-count {
-    padding: 1px 7px;
-    border-radius: var(--radius-pill);
-    background: var(--surface-3);
-    font-size: var(--fs-2xs);
-    font-variant-numeric: tabular-nums;
-    color: var(--text-muted);
-}
-
-.work-tab.is-active .tab-count {
-    background: var(--surface-1);
-    color: var(--accent-on-soft);
-}
-
 .work-panels {
     flex: 1;
     display: flex;
@@ -631,113 +520,9 @@ a.hero-nudge.is-live:hover {
     display: none;
 }
 
-.work-empty {
+/* Centres the empty state in whatever height the stretched row hands it */
+.work-panel .list-empty {
     margin: auto 0;
-}
-
-.work-rows {
-    display: grid;
-    gap: 2px;
-}
-
-.work-row {
-    display: grid;
-    grid-template-columns: 36px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--sp-4);
-    padding: var(--sp-3);
-    border-radius: var(--radius-sm);
-    text-decoration: none;
-    transition: background var(--dur-fast) var(--ease-standard);
-}
-
-.work-row:hover {
-    background: var(--surface-2);
-}
-
-.work-row[hidden] {
-    display: none;
-}
-
-.work-row-mark {
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-xs);
-    background: var(--surface-3);
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-medium);
-    color: var(--text-2);
-}
-
-.work-row-main {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.work-row-title {
-    font-size: var(--fs-body);
-    font-weight: var(--fw-medium);
-    color: var(--text-strong);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.work-row-meta {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-width: 0;
-    font-size: var(--fs-xs);
-    color: var(--text-muted);
-}
-
-.work-row-cat {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.work-row-sep {
-    color: var(--text-faint);
-}
-
-.work-row-time {
-    white-space: nowrap;
-    color: var(--text-faint);
-}
-
-/* --- Status pills — the reserved status palette, always with a label ---- */
-.status-pill {
-    padding: var(--sp-1) var(--sp-3);
-    border-radius: var(--radius-pill);
-    font-size: var(--fs-2xs);
-    font-weight: var(--fw-medium);
-    white-space: nowrap;
-}
-
-.status-draft {
-    background: var(--surface-3);
-    color: var(--text-muted);
-}
-
-.status-under_review {
-    background: var(--warning-soft);
-    color: var(--warning);
-}
-
-.status-published {
-    background: var(--success-soft);
-    color: var(--success);
-}
-
-.status-rejected {
-    background: var(--danger-soft);
-    color: var(--danger);
 }
 
 /* auto pins the link to the bottom of the panel, so a three-row list and an
@@ -780,34 +565,6 @@ a.hero-nudge.is-live:hover {
 
 .work-noresults[hidden] {
     display: none;
-}
-
-.work-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--sp-3);
-    padding: var(--sp-12) var(--sp-4);
-    text-align: center;
-}
-
-.work-empty-icon {
-    display: grid;
-    place-items: center;
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    background: var(--surface-2);
-    color: var(--text-faint);
-    font-size: 22px;
-}
-
-.work-empty p {
-    margin: 0;
-    max-width: 22rem;
-    font-size: var(--fs-sm);
-    line-height: var(--lh-body);
-    color: var(--text-faint);
 }
 
 /* ==========================================================================
@@ -951,18 +708,18 @@ a.hero-nudge.is-live:hover {
         justify-content: center;
     }
 
-    .work-row {
+    .work-panel .data-row {
         grid-template-columns: 32px minmax(0, 1fr);
         row-gap: var(--sp-2);
     }
 
-    .work-row-mark {
+    .work-panel .row-mark {
         width: 32px;
         height: 32px;
     }
 
     /* The pill drops under the title rather than squeezing it to nothing */
-    .work-row .status-pill {
+    .work-panel .data-row .status-pill {
         grid-column: 2;
         justify-self: start;
     }

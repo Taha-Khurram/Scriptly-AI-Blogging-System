@@ -4,7 +4,7 @@
 {% block title %}Dashboard | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/home.css') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/home.css') }}?v=3">
 {% endblock %}
 
 {% block content %}
@@ -56,16 +56,17 @@
 'REJECTED': 'Rejected',
 'DRAFT': 'Draft'
 } %}
-<a class="work-row" href="{{ url_for('blogs_listing.all_blogs_page') }}"
+{% set mark = title | replace('*', '') | trim %}
+<a class="data-row" href="{{ url_for('blogs_listing.all_blogs_page') }}"
     data-search="{{ (title ~ ' ' ~ (blog.category or '')) | lower }}">
-    <span class="work-row-mark" aria-hidden="true">{{ title[0] | upper }}</span>
-    <span class="work-row-main">
-        <span class="work-row-title">{{ title }}</span>
-        <span class="work-row-meta">
-            <span class="work-row-cat">{{ blog.category or 'Uncategorized' }}</span>
+    <span class="row-mark" aria-hidden="true">{{ (mark[0] if mark else '?') | upper }}</span>
+    <span class="row-main">
+        <span class="row-title">{{ title }}</span>
+        <span class="row-meta">
+            <span class="row-cat">{{ blog.category or 'Uncategorized' }}</span>
             {% if stamp %}
-            <span class="work-row-sep" aria-hidden="true">·</span>
-            <time class="work-row-time" datetime="{{ stamp }}" data-relative>{{ stamp[:10] }}</time>
+            <span class="row-sep" aria-hidden="true">·</span>
+            <time class="row-time" datetime="{{ stamp }}" data-relative>{{ stamp[:10] }}</time>
             {% endif %}
         </span>
     </span>
@@ -74,8 +75,8 @@
 {% endmacro %}
 
 {% macro work_empty(icon, message) %}
-<div class="work-empty">
-    <span class="work-empty-icon"><i class="bi bi-{{ icon }}"></i></span>
+<div class="list-empty">
+    <span class="list-empty-icon"><i class="bi bi-{{ icon }}"></i></span>
     <p>{{ message }}</p>
 </div>
 {% endmacro %}
@@ -239,18 +240,18 @@
                 <header class="card-head is-stacked">
                     <h2 class="card-title" id="workHeading">Recent work</h2>
 
-                    <div class="work-tabs" role="tablist" aria-label="Filter recent work">
+                    <div class="seg-tabs" role="tablist" aria-label="Filter recent work">
                         <button type="button" role="tab" id="tab-all" aria-controls="panel-all" aria-selected="true"
-                            class="work-tab is-active" data-tab="all">
-                            All <span class="tab-count">{{ all_blogs | length }}</span>
+                            class="seg-tab is-active" data-tab="all">
+                            All <span class="seg-count">{{ all_blogs | length }}</span>
                         </button>
                         <button type="button" role="tab" id="tab-review" aria-controls="panel-review"
-                            aria-selected="false" tabindex="-1" class="work-tab" data-tab="review">
-                            In review <span class="tab-count">{{ pending_blogs | length }}</span>
+                            aria-selected="false" tabindex="-1" class="seg-tab" data-tab="review">
+                            In review <span class="seg-count">{{ pending_blogs | length }}</span>
                         </button>
                         <button type="button" role="tab" id="tab-published" aria-controls="panel-published"
-                            aria-selected="false" tabindex="-1" class="work-tab" data-tab="published">
-                            Published <span class="tab-count">{{ published_blogs | length }}</span>
+                            aria-selected="false" tabindex="-1" class="seg-tab" data-tab="published">
+                            Published <span class="seg-count">{{ published_blogs | length }}</span>
                         </button>
                     </div>
                 </header>
@@ -259,7 +260,7 @@
 
                     <div class="work-panel" id="panel-all" role="tabpanel" aria-labelledby="tab-all" data-panel="all">
                         {% if all_blogs %}
-                        <div class="work-rows">
+                        <div class="data-rows">
                             {% for blog in all_blogs %}{{ work_row(blog) }}{% endfor %}
                         </div>
                         <p class="work-noresults" data-noresults hidden>No recent work matches that search.</p>
@@ -274,7 +275,7 @@
                     <div class="work-panel" id="panel-review" role="tabpanel" aria-labelledby="tab-review"
                         data-panel="review" hidden>
                         {% if pending_blogs %}
-                        <div class="work-rows">
+                        <div class="data-rows">
                             {% for blog in pending_blogs %}{{ work_row(blog, 'UNDER_REVIEW') }}{% endfor %}
                         </div>
                         <p class="work-noresults" data-noresults hidden>Nothing in review matches that search.</p>
@@ -289,7 +290,7 @@
                     <div class="work-panel" id="panel-published" role="tabpanel" aria-labelledby="tab-published"
                         data-panel="published" hidden>
                         {% if published_blogs %}
-                        <div class="work-rows">
+                        <div class="data-rows">
                             {% for blog in published_blogs %}{{ work_row(blog, 'PUBLISHED') }}{% endfor %}
                         </div>
                         <p class="work-noresults" data-noresults hidden>Nothing published matches that search.</p>
@@ -356,5 +357,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/home.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/pages/home.js') }}?v=3"></script>
 {% endblock %}

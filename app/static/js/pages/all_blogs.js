@@ -17,11 +17,26 @@ var initialLoadDone = false;
     applyUrlParams();
     setupFilterTabs();
     setupControls();
+    setupCalendar();
+    // Reflect anything the URL handed us (the dashboard links in with ?status=
+    // and the header search with ?search=) before the first paint settles.
+    updateFilterChrome();
     if (window.location.search) {
         loadBlogs();
     } else {
         initialLoadDone = true;
+        // Server-rendered first page: convert its stamps the same way
+        // renderBlogRow does, so paint one and paint two agree.
+        document.querySelectorAll('#blogsList time[data-relative]').forEach(function (el) {
+            const stamp = el.getAttribute('datetime');
+            const text = relativeDate(stamp);
+            if (!text) return;
+            el.title = formatDate(stamp);
+            el.textContent = text;
+        });
     }
+    // syncThemeControls only runs on DOMContentLoaded, which PJAX never fires.
+    if (typeof window.syncThemeControls === 'function') window.syncThemeControls();
 })();
 
 function applyUrlParams() {
@@ -29,10 +44,10 @@ function applyUrlParams() {
     var status = params.get('status');
     if (status) {
         currentStatus = status;
-        document.querySelectorAll('.blogs-filter-tabs .filter-tab').forEach(function(tab) {
-            tab.classList.remove('active');
+        document.querySelectorAll('.blogs-filter-tabs .seg-tab').forEach(function(tab) {
+            tab.classList.remove('is-active');
             if (tab.dataset.filter === status) {
-                tab.classList.add('active');
+                tab.classList.add('is-active');
             }
         });
     }
@@ -51,12 +66,13 @@ function applyUrlParams() {
 // ==================== FILTER TABS ====================
 
 function setupFilterTabs() {
-    document.querySelectorAll('.blogs-filter-tabs .filter-tab').forEach(tab => {
+    document.querySelectorAll('.blogs-filter-tabs .seg-tab').forEach(tab => {
         tab.addEventListener('click', function () {
-            document.querySelectorAll('.blogs-filter-tabs .filter-tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
+            document.querySelectorAll('.blogs-filter-tabs .seg-tab').forEach(t => t.classList.remove('is-active'));
+            this.classList.add('is-active');
             currentStatus = this.dataset.filter;
             currentPage = 1;
+            updateFilterChrome();
             loadBlogs();
         });
     });
@@ -64,11 +80,75 @@ function setupFilterTabs() {
 
 // ==================== CONTROLS ====================
 
+// ==================== FILTER CHROME ====================
+//
+// Keeps the pills showing what is actually applied, and only offers "Clear all"
+// when there is something to clear. Status is deliberately excluded from the
+// "is anything applied" test: "All" is its resting state, not a filter.
+
+function updateFilterChrome() {
+    const catPill = document.querySelector('[data-pill="category"]');
+    const catValue = document.getElementById('categoryFilterValue');
+
+    if (catPill && catValue) {
+        const on = currentCategory && currentCategory !== 'all';
+        catPill.classList.toggle('is-active', !!on);
+        catValue.hidden = !on;
+        catValue.textContent = on ? currentCategory : '';
+    }
+
+    const datePill = document.getElementById('dateFilterBtn');
+    if (datePill) datePill.classList.toggle('is-active', !!(currentDateFrom || currentDateTo));
+
+    const clearBtn = document.getElementById('clearFiltersBtn');
+    if (clearBtn) {
+        const anyApplied = (currentStatus && currentStatus !== 'all')
+            || (currentCategory && currentCategory !== 'all')
+            || !!currentSearch
+            || !!currentDateFrom
+            || !!currentDateTo;
+        clearBtn.hidden = !anyApplied;
+    }
+}
+
+function clearAllFilters() {
+    currentStatus = 'all';
+    currentCategory = 'all';
+    currentSearch = '';
+    currentDateFrom = '';
+    currentDateTo = '';
+    currentPage = 1;
+
+    document.querySelectorAll('.blogs-filter-tabs .seg-tab').forEach(function (tab) {
+        tab.classList.toggle('is-active', tab.dataset.filter === 'all');
+    });
+
+    const cat = document.getElementById('categoryFilter');
+    if (cat) cat.value = 'all';
+
+    const search = document.getElementById('searchInput');
+    if (search) {
+        search.value = '';
+        // The header component owns the field's own chrome (the clear button).
+        const box = search.closest('[data-page-search]');
+        if (box) box.classList.remove('has-value');
+    }
+
+    const dateBtn = document.getElementById('dateFilterBtn');
+    const dateLabel = document.getElementById('dateFilterLabel');
+    if (dateBtn) dateBtn.classList.remove('is-active');
+    if (dateLabel) dateLabel.textContent = 'Date range';
+
+    updateFilterChrome();
+    loadBlogs();
+}
+
 function setupControls() {
     const categorySelect = document.getElementById('categoryFilter');
     categorySelect.addEventListener('change', function () {
         currentCategory = this.value;
         currentPage = 1;
+        updateFilterChrome();
         loadBlogs();
     });
 
@@ -78,6 +158,7 @@ function setupControls() {
         searchTimeout = setTimeout(() => {
             currentSearch = this.value.trim();
             currentPage = 1;
+            updateFilterChrome();
             loadBlogs();
         }, 300);
     });
@@ -88,9 +169,9 @@ function setupControls() {
 async function loadBlogs() {
     const listEl = document.getElementById('blogsList');
     listEl.innerHTML = `
-        <div class="text-center py-5">
+        <div class="blogs-state">
             <div class="spinner-border spinner-border-sm text-primary opacity-50"></div>
-            <p class="text-secondary fw-medium mt-2 mb-0">Loading blogs...</p>
+            <p class="mb-0">Loading blogs…</p>
         </div>`;
 
     try {
@@ -110,57 +191,67 @@ async function loadBlogs() {
         if (data.success && data.blogs && data.blogs.length > 0) {
             listEl.innerHTML = data.blogs.map(renderBlogRow).join('');
             renderPagination(data.total, data.page, data.per_page);
+            updateResultSummary(data.total, data.page, data.per_page);
         } else {
+            updateResultSummary(0, 1, perPage);
             listEl.innerHTML = `
-                <div class="blogs-empty">
-                    <i class="bi bi-journals"></i>
-                    <p>No blogs found.</p>
+                <div class="list-empty">
+                    <span class="list-empty-icon"><i class="bi bi-journals"></i></span>
+                    <p>No blogs found. Try a different status, category or date range.</p>
                 </div>`;
             document.getElementById('blogsPagination').innerHTML = '';
         }
     } catch (err) {
         console.error('Error loading blogs:', err);
         listEl.innerHTML = `
-            <div class="text-center py-4 text-danger">
-                <i class="bi bi-exclamation-circle"></i> Failed to load blogs.
+            <div class="blogs-state is-error">
+                <i class="bi bi-exclamation-circle"></i>
+                <p class="mb-0">Failed to load blogs.</p>
             </div>`;
     }
 }
 
 // ==================== RENDER ROW ====================
 
+// Mirrors the row the template renders for the first page, so a filtered or
+// paginated list is indistinguishable from a fresh load. Titles are no longer
+// truncated in JS — the CSS ellipsis does it, which keeps the full text
+// selectable and correct at every column width.
 function renderBlogRow(blog) {
     const id = blog.id;
     const title = escapeHtml(blog.title || 'Untitled');
     const authorName = escapeHtml(blog.author_name || blog.user_name || 'Unknown');
-    const initial = authorName.charAt(0).toUpperCase();
+    // The blog's initial, not the author's — on a single-author site every row
+    // would otherwise carry the same letter. Asterisks are stripped so a title
+    // that arrives with markdown emphasis still yields a letter.
+    const mark = (blog.title || 'Untitled').replace(/\*/g, '').trim();
+    const initial = (mark.charAt(0) || '?').toUpperCase();
     const category = escapeHtml(blog.category || 'Uncategorized');
     const status = blog.status || 'DRAFT';
-    const updatedAt = formatDate(blog.updated_at || blog.created_at);
+    const stamp = blog.updated_at || blog.created_at;
+    const updatedAt = relativeDate(stamp);
+    const exactAt = escapeHtml(formatDate(stamp));
 
     return `
-    <div class="blog-row" id="row-${id}">
-        <div class="col-blog-title">
-            <span class="blog-title-cell" title="${title}">${truncate(title, 45)}</span>
-        </div>
-        <div class="col-blog-author">
-            <div class="blog-author-cell">
-                <div class="blog-author-avatar">${initial}</div>
-                <span class="blog-author-name">${truncate(authorName, 20)}</span>
-            </div>
-        </div>
-        <div class="col-blog-category">
-            <span class="blog-category-badge">${category}</span>
-        </div>
-        <div class="col-blog-status">
-            ${getStatusBadge(status)}
-        </div>
-        <div class="col-blog-date">
-            <span class="blog-date-cell">${updatedAt}</span>
-        </div>
-        <div class="col-blog-actions">
+    <div class="data-row blog-row" id="row-${id}">
+        <span class="row-mark" aria-hidden="true">${escapeHtml(initial)}</span>
+
+        <button type="button" class="row-open" onclick="openEditModal('${id}')" title="Edit &ldquo;${title}&rdquo;">
+            <span class="row-title blog-title-cell">${title}</span>
+            <span class="row-meta">
+                <span>${authorName}</span>
+                <span class="row-sep" aria-hidden="true">·</span>
+                <span>${category}</span>
+            </span>
+        </button>
+
+        ${getStatusBadge(status)}
+        <span class="row-time blog-date-cell" title="${exactAt}">${updatedAt}</span>
+
+        <div class="row-trail">
             <div class="dropdown">
-                <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                    aria-label="More actions for ${title}">
                     <i class="bi bi-three-dots-vertical"></i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
@@ -185,13 +276,26 @@ function renderBlogRow(blog) {
 
 function getStatusBadge(status) {
     const statusMap = {
-        'DRAFT': { label: 'Draft', cls: 'status-badge-draft' },
-        'UNDER_REVIEW': { label: 'Under Review', cls: 'status-badge-under_review' },
-        'PUBLISHED': { label: 'Published', cls: 'status-badge-published' },
-        'REJECTED': { label: 'Rejected', cls: 'status-badge-rejected' }
+        'DRAFT': { label: 'Draft', cls: 'status-draft' },
+        'UNDER_REVIEW': { label: 'Under review', cls: 'status-under_review' },
+        'PUBLISHED': { label: 'Published', cls: 'status-published' },
+        'REJECTED': { label: 'Rejected', cls: 'status-rejected' }
     };
     const info = statusMap[status] || statusMap['DRAFT'];
-    return `<span class="blog-status-badge ${info.cls}"><i class="bi bi-circle-fill"></i> ${info.label}</span>`;
+    return `<span class="status-pill ${info.cls}">${info.label}</span>`;
+}
+
+// The card head carries the same "count + page" pair the drafts list does, so
+// the two screens read as one listing with different contents.
+function updateResultSummary(total, page, perPage) {
+    const count = document.getElementById('blogsCount');
+    if (count) count.textContent = total;
+
+    const note = document.getElementById('blogsPageNote');
+    if (note) {
+        const totalPages = Math.ceil(total / perPage);
+        note.textContent = totalPages > 1 ? `Page ${page} of ${totalPages}` : '';
+    }
 }
 
 // ==================== PAGINATION ====================
@@ -202,19 +306,19 @@ function renderPagination(total, page, perPage) {
     if (totalPages <= 1) { container.innerHTML = ''; return; }
 
     let html = '';
-    html += `<button class="page-btn ${page <= 1 ? 'disabled' : ''}" onclick="goToPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>
+    html += `<button class="pager-btn ${page <= 1 ? 'is-disabled' : ''}" onclick="goToPage(${page - 1})" ${page <= 1 ? 'disabled' : ''} aria-label="Previous page">
         <i class="bi bi-chevron-left"></i>
     </button>`;
 
     for (let i = 1; i <= totalPages; i++) {
         if (i === 1 || i === totalPages || (i >= page - 1 && i <= page + 1)) {
-            html += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            html += `<button class="pager-btn ${i === page ? 'is-active' : ''}" onclick="goToPage(${i})" ${i === page ? 'aria-current="page"' : ''}>${i}</button>`;
         } else if (i === page - 2 || i === page + 2) {
-            html += `<span class="page-dots">...</span>`;
+            html += `<span class="pager-dots">…</span>`;
         }
     }
 
-    html += `<button class="page-btn ${page >= totalPages ? 'disabled' : ''}" onclick="goToPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>
+    html += `<button class="pager-btn ${page >= totalPages ? 'is-disabled' : ''}" onclick="goToPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''} aria-label="Next page">
         <i class="bi bi-chevron-right"></i>
     </button>`;
 
@@ -229,41 +333,264 @@ function goToPage(page) {
 
 // ==================== DATE RANGE MODAL ====================
 
+// Each preset is a pure function of "today", so the same definitions drive both
+// setting a range and recognising one that is already set.
+const DATE_PRESETS = {
+    today: 0,
+    week: 7,
+    month: 30,
+    quarter: 90
+};
+
+// Local, not toISOString(). toISOString() converts to UTC first, so anywhere
+// behind UTC "today" comes back as yesterday for most of the day.
+function isoLocal(date) {
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return date.getFullYear() + '-' + m + '-' + d;
+}
+
+function isoDaysAgo(days) {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return isoLocal(d);
+}
+
+function todayIso() {
+    return isoLocal(new Date());
+}
+
+function parseIso(iso) {
+    if (!iso) return null;
+    const [y, m, d] = iso.split('-').map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+}
+
+// ==================== CALENDAR ====================
+//
+// A range picker over the two hidden inputs. Selection is two clicks: the
+// first sets the start and arms the range, the second closes it — and picking
+// a second date before the first swaps them rather than rejecting the click.
+
+var calCursor = new Date();   // month on screen
+var calPicking = false;       // start chosen, waiting for the end
+var calPreview = '';          // hovered day while picking
+
+function calFrom() { return document.getElementById('dateFrom').value; }
+function calTo() { return document.getElementById('dateTo').value; }
+
+function setRange(from, to) {
+    document.getElementById('dateFrom').value = from || '';
+    document.getElementById('dateTo').value = to || '';
+    paintCalendar();
+    syncDateChrome();
+}
+
+// Building and painting are separate on purpose. Hovering while picking
+// repaints the band on every mousemove, and rebuilding the grid's innerHTML
+// that often would destroy the very button the pointer is over — losing
+// :hover, losing focus, and flickering. buildCalendar() runs on a month
+// change; paintCalendar() only rewrites class names on cells that already
+// exist.
+function buildCalendar() {
+    const grid = document.querySelector('[data-cal-grid]');
+    if (!grid) return;
+
+    const title = document.querySelector('[data-cal-title]');
+    if (title) {
+        title.textContent = calCursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    // Start on the Sunday on or before the 1st, then lay out six full weeks so
+    // the grid never changes height as the month changes.
+    const first = new Date(calCursor.getFullYear(), calCursor.getMonth(), 1);
+    const start = new Date(first);
+    start.setDate(1 - first.getDay());
+
+    let html = '';
+    for (let i = 0; i < 42; i++) {
+        const day = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+        html += '<div class="cal-cell" data-cell="' + isoLocal(day) + '">' +
+            '<button type="button" class="cal-day" data-iso="' + isoLocal(day) + '" ' +
+            'aria-label="' + day.toLocaleDateString('en-US', { dateStyle: 'full' }) + '">' +
+            day.getDate() + '</button></div>';
+    }
+    grid.innerHTML = html;
+    paintCalendar();
+}
+
+function paintCalendar() {
+    const grid = document.querySelector('[data-cal-grid]');
+    if (!grid) return;
+
+    const cal = document.querySelector('[data-calendar]');
+    if (cal) cal.classList.toggle('is-picking', calPicking);
+
+    const from = calFrom();
+    const open = calPicking && !calTo();
+    const to = calTo() || (open ? calPreview : '');
+    const lo = from && to ? (from <= to ? from : to) : from;
+    const hi = from && to ? (from <= to ? to : from) : '';
+    const today = todayIso();
+    const month = calCursor.getMonth();
+
+    grid.querySelectorAll('.cal-cell').forEach(function (cell) {
+        const iso = cell.dataset.cell;
+        const day = parseIso(iso);
+
+        cell.classList.toggle('is-outside', day.getMonth() !== month);
+        cell.classList.toggle('is-today', iso === today);
+        cell.classList.toggle('is-in-range', !!(lo && hi && iso > lo && iso < hi && !open));
+        cell.classList.toggle('is-preview', !!(lo && hi && iso > lo && iso < hi && open));
+        cell.classList.toggle('is-start', !!(lo && iso === lo));
+        cell.classList.toggle('is-end', !!(iso === (hi || lo) && (hi || lo)));
+    });
+}
+
+function onDayClick(iso) {
+    if (!calPicking && !(calFrom() && !calTo())) {
+        // Fresh selection: this is the start, and the range is open.
+        calPicking = true;
+        calPreview = iso;
+        setRange(iso, '');
+        return;
+    }
+
+    const start = calFrom();
+    calPicking = false;
+    calPreview = '';
+    setRange(iso < start ? iso : start, iso < start ? start : iso);
+}
+
+function setupCalendar() {
+    const cal = document.querySelector('[data-calendar]');
+    if (!cal) return;
+
+    // Bound to the calendar element, which PJAX replaces with the page — so no
+    // document-level listener survives to fire against a dead DOM.
+    cal.addEventListener('click', function (e) {
+        if (e.target.closest('[data-cal-prev]')) {
+            calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() - 1, 1);
+            buildCalendar();
+            return;
+        }
+        if (e.target.closest('[data-cal-next]')) {
+            calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 1);
+            buildCalendar();
+            return;
+        }
+        const day = e.target.closest('.cal-day');
+        if (day) onDayClick(day.dataset.iso);
+    });
+
+    cal.addEventListener('mouseover', function (e) {
+        const day = e.target.closest('.cal-day');
+        if (!day || !calPicking) return;
+        calPreview = day.dataset.iso;
+        paintCalendar();
+    });
+
+    cal.addEventListener('keydown', function (e) {
+        const day = e.target.closest('.cal-day');
+        if (!day) return;
+
+        const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+        if (!step) return;
+        e.preventDefault();
+
+        const next = parseIso(day.dataset.iso);
+        next.setDate(next.getDate() + step);
+
+        // Follow the focus into the next month when it walks off the edge.
+        if (next.getMonth() !== calCursor.getMonth() || next.getFullYear() !== calCursor.getFullYear()) {
+            calCursor = new Date(next.getFullYear(), next.getMonth(), 1);
+            buildCalendar();
+        }
+
+        const target = cal.querySelector('.cal-day[data-iso="' + isoLocal(next) + '"]');
+        if (target) target.focus();
+    });
+}
+
 function openDateModal() {
-    document.getElementById('dateFrom').value = currentDateFrom;
-    document.getElementById('dateTo').value = currentDateTo;
+    calPicking = false;
+    calPreview = '';
+    // Open on the month the range ends in, so an existing selection is on
+    // screen instead of "today" with the choice scrolled out of view.
+    calCursor = parseIso(currentDateTo) || parseIso(currentDateFrom) || new Date();
+    buildCalendar();
+    setRange(currentDateFrom, currentDateTo);
+
     const modal = new bootstrap.Modal(document.getElementById('dateRangeModal'));
     modal.show();
 }
 
 function setDatePreset(preset) {
-    const today = new Date();
-    const toStr = today.toISOString().split('T')[0];
-    let fromStr = '';
+    calPicking = false;
+    calPreview = '';
 
-    switch (preset) {
-        case 'today':
-            fromStr = toStr;
-            break;
-        case 'week':
-            const week = new Date(today);
-            week.setDate(week.getDate() - 7);
-            fromStr = week.toISOString().split('T')[0];
-            break;
-        case 'month':
-            const month = new Date(today);
-            month.setDate(month.getDate() - 30);
-            fromStr = month.toISOString().split('T')[0];
-            break;
-        case 'all':
-            fromStr = '';
-            document.getElementById('dateFrom').value = '';
-            document.getElementById('dateTo').value = '';
-            return;
+    if (preset === 'all') {
+        setRange('', '');
+        return;
     }
 
-    document.getElementById('dateFrom').value = fromStr;
-    document.getElementById('dateTo').value = toStr;
+    const to = todayIso();
+    const from = preset === 'year'
+        ? new Date().getFullYear() + '-01-01'
+        : isoDaysAgo(DATE_PRESETS[preset] || 0);
+
+    calCursor = parseIso(to);
+    buildCalendar();
+    setRange(from, to);
+}
+
+// Which preset, if any, the current field values correspond to. Lets the modal
+// show the active range on reopen instead of six identical buttons.
+function matchingPreset(from, to) {
+    if (!from && !to) return 'all';
+    if (to !== todayIso()) return null;
+
+    for (const key in DATE_PRESETS) {
+        if (from === isoDaysAgo(DATE_PRESETS[key])) return key;
+    }
+    if (from === new Date().getFullYear() + '-01-01') return 'year';
+    return null;
+}
+
+function describeRange(from, to) {
+    const pretty = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-US',
+        { month: 'short', day: 'numeric', year: 'numeric' });
+
+    if (!from && !to) return 'Showing all time';
+    if (from && !to) return 'Showing from ' + pretty(from);
+    if (!from && to) return 'Showing up to ' + pretty(to);
+    if (from === to) return 'Showing ' + pretty(from);
+    return 'Showing ' + pretty(from) + ' – ' + pretty(to);
+}
+
+// Keeps the preset highlight, the summary line and the Apply button in step
+// with the current selection.
+function syncDateChrome() {
+    const from = calFrom();
+    const to = calTo();
+
+    const active = matchingPreset(from, to);
+    document.querySelectorAll('.date-preset').forEach(function (btn) {
+        btn.classList.toggle('is-active', btn.dataset.preset === active);
+    });
+
+    const summary = document.getElementById('dateSummary');
+    const half = !!(from && !to);
+    if (summary) {
+        summary.textContent = half ? 'Pick the end of the range' : describeRange(from, to);
+        summary.classList.toggle('is-hint', half);
+    }
+
+    // A half-open range would silently become "everything since", so Apply
+    // waits until the second date is in.
+    const apply = document.getElementById('dateApplyBtn');
+    if (apply) apply.disabled = half;
 }
 
 function applyDateFilter() {
@@ -275,30 +602,33 @@ function applyDateFilter() {
     const label = document.getElementById('dateFilterLabel');
 
     if (currentDateFrom || currentDateTo) {
-        btn.classList.add('active');
-        const from = currentDateFrom ? formatShortDate(currentDateFrom) : '...';
-        const to = currentDateTo ? formatShortDate(currentDateTo) : '...';
-        label.textContent = `${from} - ${to}`;
+        btn.classList.add('is-active');
+        const from = currentDateFrom ? formatShortDate(currentDateFrom) : 'Any';
+        const to = currentDateTo ? formatShortDate(currentDateTo) : 'Any';
+        label.textContent = `${from} – ${to}`;
     } else {
-        btn.classList.remove('active');
-        label.textContent = 'Date Range';
+        btn.classList.remove('is-active');
+        label.textContent = 'Date range';
     }
 
     bootstrap.Modal.getInstance(document.getElementById('dateRangeModal')).hide();
+    updateFilterChrome();
     loadBlogs();
 }
 
 function clearDateFilter() {
-    document.getElementById('dateFrom').value = '';
-    document.getElementById('dateTo').value = '';
+    calPicking = false;
+    calPreview = '';
+    setRange('', '');
     currentDateFrom = '';
     currentDateTo = '';
     currentPage = 1;
 
-    document.getElementById('dateFilterBtn').classList.remove('active');
-    document.getElementById('dateFilterLabel').textContent = 'Date Range';
+    document.getElementById('dateFilterBtn').classList.remove('is-active');
+    document.getElementById('dateFilterLabel').textContent = 'Date range';
 
     bootstrap.Modal.getInstance(document.getElementById('dateRangeModal')).hide();
+    updateFilterChrome();
     loadBlogs();
 }
 
@@ -312,6 +642,33 @@ function formatDate(timestamp) {
     } catch {
         return '';
     }
+}
+
+// Relative "when", matching the drafts list. The absolute date stays on the
+// element's title attribute, so the exact value is never lost — including at
+// widths where the column itself is hidden.
+function relativeDate(timestamp) {
+    if (!timestamp) return '';
+    const then = new Date(timestamp);
+    if (isNaN(then.getTime())) return '';
+
+    const secs = (Date.now() - then.getTime()) / 1000;
+    if (secs < 90) return 'just now';
+
+    const mins = Math.round(secs / 60);
+    if (mins < 60) return mins + ' min ago';
+
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return hours === 1 ? 'an hour ago' : hours + ' hours ago';
+
+    const days = Math.round(hours / 24);
+    if (days === 1) return 'yesterday';
+    if (days < 7) return days + ' days ago';
+    if (days < 30) {
+        const weeks = Math.round(days / 7);
+        return weeks === 1 ? 'a week ago' : weeks + ' weeks ago';
+    }
+    return formatDate(timestamp);
 }
 
 function formatShortDate(dateStr) {
@@ -505,8 +862,9 @@ async function saveModalChanges() {
             // Update the row title in place without a full reload
             const titleCell = document.querySelector(`#row-${currentEditingId} .blog-title-cell`);
             if (titleCell) {
-                titleCell.textContent = truncate(updatedTitle, 45);
-                titleCell.setAttribute('title', updatedTitle);
+                titleCell.textContent = updatedTitle;
+                const opener = titleCell.closest('.row-open');
+                if (opener) opener.setAttribute('title', `Edit “${updatedTitle}”`);
             }
             bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
             saveBtn.disabled = false;

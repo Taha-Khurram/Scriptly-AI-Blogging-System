@@ -189,7 +189,7 @@
     // Recent-work tabs
     // ----------------------------------------------------------------------
 
-    const tabs = Array.from(root.querySelectorAll('.work-tab'));
+    const tabs = Array.from(root.querySelectorAll('.seg-tab'));
     const panels = Array.from(root.querySelectorAll('.work-panel'));
 
     function selectTab(name, focus) {
@@ -227,13 +227,18 @@
     // result is already correct when the reader switches tabs, and Enter hands
     // the query off to All Blogs, which can search the whole collection rather
     // than the five rows on this screen.
+    //
+    // The same query also answers back with `page-search-results`, which is
+    // what fills the header's dropdown: the rows the reader wants are usually
+    // in the panel they are not looking at, and the dropdown flattens all
+    // three into one ranked list without making them hunt through the tabs.
     // ----------------------------------------------------------------------
 
     function filter(query) {
         const q = query.trim().toLowerCase();
 
         panels.forEach((panel) => {
-            const rows = Array.from(panel.querySelectorAll('.work-row'));
+            const rows = Array.from(panel.querySelectorAll('.data-row'));
             if (!rows.length) return;
 
             let shown = 0;
@@ -251,6 +256,65 @@
         });
     }
 
+    function text(row, selector) {
+        const el = row.querySelector(selector);
+        return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+    }
+
+    // Every panel holds its own copy of a row, so the same post can be matched
+    // three times over; data-search is the row's identity here because it is
+    // built from exactly the fields the dropdown shows.
+    function collect(q) {
+        const seen = new Set();
+        const hits = [];
+
+        root.querySelectorAll('.data-row').forEach((row) => {
+            const haystack = row.dataset.search || '';
+            if (haystack.indexOf(q) === -1 || seen.has(haystack)) return;
+            seen.add(haystack);
+
+            const title = text(row, '.row-title');
+            const pill = row.querySelector('.status-pill');
+            const status = pill
+                ? (pill.className.match(/status-([a-z_]+)/) || [, ''])[1]
+                : '';
+
+            hits.push({
+                title: title,
+                meta: text(row, '.row-meta'),
+                href: row.getAttribute('href'),
+                mark: text(row, '.row-mark'),
+                status: status,
+                statusLabel: pill ? pill.textContent.trim() : '',
+                // A title that opens with the query is what the reader most
+                // likely meant; a category-only match is the weakest hit.
+                rank: title.toLowerCase().indexOf(q) === 0 ? 0
+                    : title.toLowerCase().indexOf(q) !== -1 ? 1 : 2
+            });
+        });
+
+        return hits.sort((a, b) => a.rank - b.rank);
+    }
+
+    function announce(query) {
+        const q = query.trim().toLowerCase();
+        const card = root.querySelector('[data-search-url]');
+
+        document.dispatchEvent(new CustomEvent('page-search-results', {
+            detail: {
+                query: query,
+                items: q ? collect(q) : [],
+                empty: 'Nothing in recent work matches that.',
+                // Recent work is only the last few posts, so every query keeps
+                // a way out to the collection that holds the rest.
+                footer: card ? {
+                    label: 'Search all blogs for “' + query.trim() + '”',
+                    href: card.dataset.searchUrl + '?search=' + encodeURIComponent(query.trim())
+                } : null
+            }
+        }));
+    }
+
     document.addEventListener('page-search', (e) => {
         const value = (e.detail && e.detail.value) || '';
 
@@ -264,6 +328,7 @@
         }
 
         filter(value);
+        announce(value);
     }, { signal });
 
     // Keep the header's theme button in sync — syncThemeControls only runs on

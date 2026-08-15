@@ -3029,34 +3029,119 @@ For questions about these Terms, contact us at {contact_email}.
             print(f"❌ Error saving gallery image: {e}")
             return None
 
-    def get_gallery_images(self, user_id, page=1, per_page=20):
+    # Search / facet / sort all run in Python rather than in Firestore. That is
+    # not a shortcut taken here — this method has always streamed the user's
+    # whole collection and sorted it in memory, because Firestore cannot order
+    # by one field while filtering on another without a composite index per
+    # combination. Since the full list is already materialised, filtering it
+    # costs nothing extra and buys search across the entire library instead of
+    # only the page on screen.
+    GALLERY_SORTS = {
+        'newest': (lambda i: i.get('created_at') or '', True),
+        'oldest': (lambda i: i.get('created_at') or '', False),
+        'name': (lambda i: (i.get('filename') or '').lower(), False),
+        'name_desc': (lambda i: (i.get('filename') or '').lower(), True),
+        'largest': (lambda i: int(i.get('size') or 0), True),
+        'smallest': (lambda i: int(i.get('size') or 0), False),
+    }
+
+    @staticmethod
+    def _gallery_ext(image):
+        """Normalised file type for one image: jpg | png | gif | webp | other.
+
+        Read from the stored filename and, failing that, from the generated
+        URL — the URL always carries an extension because upload builds it,
+        while `filename` is whatever the visitor's file was called.
+        """
+        for candidate in (image.get('filename'), image.get('url')):
+            if candidate and '.' in candidate:
+                ext = candidate.rsplit('.', 1)[1].lower().strip()
+                if ext == 'jpeg':
+                    return 'jpg'
+                if ext in ('jpg', 'png', 'gif', 'webp'):
+                    return ext
+        return 'other'
+
+    def get_gallery_images(self, user_id, page=1, per_page=20,
+                           search=None, file_type='all', sort='newest'):
         try:
             query = self.db.collection('gallery_images').where(
                 filter=FieldFilter('user_id', '==', user_id)
             )
-            docs = list(query.stream())
-            docs.sort(key=lambda d: d.to_dict().get('created_at', ''), reverse=True)
-
-            total = len(docs)
-            start = (page - 1) * per_page
-            end = start + per_page
-            page_docs = docs[start:end]
 
             images = []
-            for doc in page_docs:
+            for doc in query.stream():
                 data = doc.to_dict()
                 data['id'] = doc.id
                 images.append(data)
 
+            library_total = len(images)
+
+            term = (search or '').strip().lower()
+            if term:
+                images = [i for i in images if term in (i.get('filename') or '').lower()]
+
+            # Facet counts are taken after the search and *before* the type
+            # filter, so each tab reports what choosing it would actually show
+            # rather than collapsing to 0 the moment another tab is active.
+            type_counts = {}
+            for image in images:
+                key = self._gallery_ext(image)
+                type_counts[key] = type_counts.get(key, 0) + 1
+
+            matched_size = sum(int(i.get('size') or 0) for i in images)
+
+            wanted = (file_type or 'all').lower()
+            if wanted != 'all':
+                images = [i for i in images if self._gallery_ext(i) == wanted]
+
+            key_fn, reverse = self.GALLERY_SORTS.get(sort, self.GALLERY_SORTS['newest'])
+            images.sort(key=key_fn, reverse=reverse)
+
+            total = len(images)
+            per_page = max(1, per_page)
+            total_pages = (total + per_page - 1) // per_page
+
+            # Clamp rather than trust: deleting the last item on the last page
+            # would otherwise leave the caller asking for a page that no longer
+            # exists and getting an empty grid back.
+            page = max(1, min(int(page or 1), total_pages or 1))
+            start = (page - 1) * per_page
+
             return {
-                'images': images,
+                'images': images[start:start + per_page],
                 'total': total,
+                'library_total': library_total,
+                'matched_size': matched_size,
+                'type_counts': type_counts,
                 'page': page,
-                'total_pages': (total + per_page - 1) // per_page
+                'per_page': per_page,
+                'total_pages': total_pages,
             }
         except Exception as e:
             print(f"❌ Error fetching gallery images: {e}")
-            return {'images': [], 'total': 0, 'page': 1, 'total_pages': 0}
+            return {
+                'images': [], 'total': 0, 'library_total': 0, 'matched_size': 0,
+                'type_counts': {}, 'page': 1, 'per_page': per_page, 'total_pages': 0,
+            }
+
+    def get_gallery_image(self, image_id):
+        """Read one image's metadata without touching it.
+
+        Exists so a caller can check ownership *before* deleting rather than
+        after — `delete_gallery_image` removes the document and then hands back
+        what it removed, which is too late to refuse the request.
+        """
+        try:
+            doc = self.db.collection('gallery_images').document(image_id).get()
+            if not doc.exists:
+                return None
+            data = doc.to_dict()
+            data['id'] = doc.id
+            return data
+        except Exception as e:
+            print(f"❌ Error fetching gallery image: {e}")
+            return None
 
     def delete_gallery_image(self, image_id):
         try:

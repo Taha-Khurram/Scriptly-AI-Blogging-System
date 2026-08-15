@@ -287,20 +287,252 @@ same border and radius tokens.
 
 ### Content library — `all_blogs.html`, `drafts.html`
 
+Both sit under the same sticky page header as the dashboard and compose from
+the §12 listing primitives, so a row reads identically on all three screens.
+Neither is a table any more: the old column headers and flex cells are gone in
+favour of the dashboard's row idiom, which degrades to narrow widths by
+dropping columns instead of scrolling sideways.
+
 ```
-┌ filter card ─────────────────────────────────────────────┐
-│ (All) (Drafts) (Under Review) (Published)   ← pills      │
-│ [category ▾]  [🔍 search        ]  [📅 any date]         │
-└──────────────────────────────────────────────────────────┘
-┌ table card ──────────────────────────────────────────────┐
-│ TITLE            AUTHOR      CATEGORY   STATUS   DATE  ⋮ │
-│ row (hover → --surface-2)   ◍ avatar   pill    • pill    │
-└──────────────────────────────────────────────────────────┘
-              ‹  1  2  3  ›   ← pill page buttons
+╔ page header ═══════════════════════════════════════════════════╗
+║ Content management                                             ║
+║ H1 All Blogs          [🔍 search ⌘K]   ( ☾ )   ( ✦ New blog )  ║
+╚════════════════════════════════════════════════════════════════╝
+┌ filter bar ────────────────────────────────────────────────────┐
+│ (All)(Draft)(Under review)(Published)   [⛁ Category ▾] [📅 ▾]  │
+└────────────────────────────────────────────────────────────────┘
+   …once applied, each pill states its own value:
+┌────────────────────────────────────────────────────────────────┐
+│ (All)(Draft)(•Published•)      [⛁ Growth ▾] [📅 Jul 1 – Aug 15]│
+│                                                  × Clear all   │
+└────────────────────────────────────────────────────────────────┘
+┌ listing card ──────────────────────────────────────────────────┐
+│ Blogs (25)                                        Page 1 of 3  │
+│ ▣  Title                          ● Published    yesterday   ⋮ │
+│    author · category                                           │
+│ …                                                              │
+│                       ‹ 1 2 3 ›                                │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-Active filter tab and active page button are `--accent` + `--text-on-accent`;
-status badges use the status `-soft` fill with the solid colour as text.
+**The filter bar.** Status is the primary dimension, so it stays a permanently
+visible segmented control. Everything else is a **filter pill** — a control that
+renders its own current value, so the applied query is readable without opening
+anything: resting it says `Category`, applied it says `Growth` and takes
+`--accent-soft`, the same "selected" treatment the nav rail and the status tabs
+use. `Clear all` exists only while something is applied.
+
+The category pill opens a **listbox we own** (`.select-pill` + `.menu`), not a
+native select popup — the browser draws that one itself, so it cannot take the
+product's surfaces, radius or type, and on a forced dark theme over a light OS
+it renders white-on-blue against the dark canvas. The native `<select>` stays in
+the DOM as the value holder: choosing an item writes through to it and fires a
+real `change` event, so `all_blogs.js` keeps reading `.value` and listening for
+`change` exactly as it did. Behaviour (open, dismiss, ⌘-less arrow/Home/End
+navigation, focus return) is the `initSelectPill` module in `app.js`.
+
+**The date range modal** is a presets rail beside a calendar — the arrangement
+every analytics tool converged on, because the two are alternatives rather than
+steps: most sessions end at the rail and never touch the grid.
+
+```
+┌ Date range ─────────────────────────────────── × ┐
+│ Today        │  ‹      August 2026      ›        │
+│ Last 7 days  │  Su Mo Tu We Th Fr Sa             │
+│ ▸Last 30 days│  ░░ ░░ ░░ ░░ ░░ ░░  1             │
+│ Last 90 days │   2  3  4  5  6  7  8             │
+│ This year    │   9 10 11 12 13 14 (15)           │
+│ All time     │  16 17 …                          │
+├──────────────┴───────────────────────────────────┤
+│ Showing Jul 16 – Aug 15, 2026    [Clear] [Apply] │
+└──────────────────────────────────────────────────┘
+```
+
+The rail is a fixed 176px so "Last 90 days" never wraps and the grid keeps a
+stable width as the month changes; below 560px it becomes a row of chips above
+the calendar. The preset matching the current selection is highlighted, so
+reopening shows the range in force rather than six identical rows, and the
+footer's summary is the label for what Apply is about to do.
+
+The calendar is ours, not `<input type="date">`. That control brings the
+browser's own popup — unstylable, and single-date only, so a *range* meant two
+disconnected pickers. Two hidden inputs (`#dateFrom` / `#dateTo`) remain as the
+value holders the rest of the JS reads; the grid writes to them.
+
+- Two clicks: the first opens the range, the second closes it. Picking a second
+  date **before** the first swaps the endpoints rather than rejecting the click.
+- While a range is half-open, Apply is disabled and the summary says *Pick the
+  end of the range* — a half range would otherwise submit as "everything since".
+- Hovering previews the band; arrow keys move day by day and follow the focus
+  into the next month.
+- Six full weeks always render, so the modal never changes height mid-month.
+- **Building and painting are separate.** Hovering repaints the band constantly,
+  and rebuilding the grid's `innerHTML` that often destroys the very button the
+  pointer is over — losing `:hover`, losing focus, flickering. `buildCalendar()`
+  runs on a month change; `paintCalendar()` only rewrites class names.
+- The band is drawn on the **cell** and the endpoints on the **button** inside
+  it. That is what lets the highlight run continuously across a week while the
+  ends stay circular.
+- Dates are formatted with a local `isoLocal()`, never `toISOString()` — the
+  latter converts to UTC first, so anywhere behind UTC "today" comes back as
+  yesterday for most of the day.
+
+Both listings put the same pair in the card head — a `.card-count` of matching
+records and a `.card-note` of `Page n of m` — and both render **relative**
+timestamps (`yesterday`, `2 weeks ago`) with the absolute date kept on the
+element's `title`, so nothing is lost at the widths where that column is hidden.
+
+**All Blogs.** The header's search field carries `id="searchInput"` — the id
+`all_blogs.js` already binds its debounced query to — so the page has one search
+box rather than a header one and a filter-bar one that mean different things.
+It queries the API, not the rendered rows. The monogram is the *author's*
+initial, which is the column the old table spent 150px on. Rows are rendered
+both server-side (first page) and by `renderBlogRow` (every filter and page
+after), and the two must stay identical.
+
+**Drafts.** Same shell, with the row's trailing area carrying two hover-revealed
+shortcuts (preview, submit) beside the ⋮ menu — the menu still lists every
+action, so nothing depends on hover, and the shortcuts are hidden below 700px
+where the row has no room for them. The header's search filters the rendered
+rows client-side, since a draft list is one page of ten.
+
+Pagination on drafts is **new**: `/drafts` had been paginating server-side since
+it was written but rendered no controls, so page 2 onward was unreachable.
+
+### Categories — `categories.html`
+
+The same shell and the same rows: a category is one more record, with an
+article count where a blog carries a status. The old four-column table
+(Name / Usage Stats / **Status** / Actions) is gone — that status column said
+"Active" on every row and encoded nothing.
+
+Three things were broken rather than merely dated, and are fixed:
+
+- **The modals and the page script sat outside `.dashboard-main`.** PJAX swaps
+  only that element's innerHTML, so arriving from anywhere in the app dropped
+  them entirely and Rename / Delete / View blogs failed until a hard reload.
+  They now live inside it, like every other screen's.
+- **There was no way to create a category.** The header button had been
+  commented out, though `POST /api/categories` and the Add modal both worked.
+  It is back as the header's primary action.
+- **`categories.js` opened with `new bootstrap.Dropdown(el)`.** Bootstrap loads
+  with `defer`, so on a hard page load it was not defined yet — the constructor
+  threw and took the rest of the file with it, leaving the form handlers and
+  the search unbound. (It only appeared to work when *arriving by PJAX*, which
+  injects the script after Bootstrap is ready.) The loop was never needed:
+  Bootstrap's data-api is delegated off document.
+
+The search also stopped writing `display: flex !important` inline — that fought
+the row's own grid and could not be undone by CSS — and now toggles `hidden`
+through the header's `page-search` event like the other listings.
+
+### Media library — `gallery.html`
+
+The same shell again — sticky page header, filter bar, listing card — because a
+stored image is one more record. What is different is that a record you pick by
+*looking* needs a grid, so the card holds tiles rather than rows, with a list
+view behind a toggle for when the question is "which one is 4MB".
+
+```
+╔ page header ═══════════════════════════════════════════════════╗
+║ Media library                                                  ║
+║ H1 Gallery         [🔍 search ⌘K]    ( ☾ )    ( ⬆ Upload )     ║
+╚════════════════════════════════════════════════════════════════╝
+┌ toolbar ───────────────────────────────────────────────────────┐
+│ (All 128)(JPG 71)(PNG 46)(WebP 11)      [⇅ Newest ▾] [▦|☰]     │
+└────────────────────────────────────────────────────────────────┘
+   …and while anything is selected, the same card becomes:
+┌────────────────────────────────────────────────────────────────┐
+│ (×) 3 selected          [Select page] [Copy URLs] [🗑 Delete]  │
+└────────────────────────────────────────────────────────────────┘
+┌ library card ──────────────────────────────────────────────────┐
+│ Images (128)                              Page 1 of 6 · 34.2 MB│
+│  ▢ ▢ ▢ ▢ ▢ ▢     ← square thumb, name + weight always visible  │
+│  ▢ ▢ ▢ ▢ ▢ ▢                                                   │
+│                    ‹ 1 2 3 … 6 ›                               │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Upload is an action, not a landing strip.** The old screen kept a dashed
+dropzone pinned above the grid at all times — ~200px of the first screen spent
+on a control that matters for the few seconds an upload starts. It is now the
+header's primary action, plus a drag-anywhere overlay that appears only while
+files are actually over the window, plus the empty state's CTA. `dragenter` and
+`dragleave` fire for every child element the pointer crosses, so the overlay is
+driven by a depth counter (enters minus leaves) and reset on `drop` and on
+window blur — a drag that ends outside the window cannot strand it on screen.
+
+**The upload tray** is docked bottom-right with one row per file: its own
+thumbnail (an object URL, revoked when the row finishes), its own progress from
+`xhr.upload.onprogress`, and its own outcome. The single anonymous bar it
+replaces could not say *which* of five files had failed. Files are validated in
+the browser before the request — a 12MB photo used to upload in full and only
+then be refused — and three upload at a time, because strictly sequential left
+the connection idle between files.
+
+**Selection** is Photos-style rather than a mode: with nothing selected a click
+opens the preview, once anything is selected a click toggles. ⌘/Ctrl-click
+toggles regardless, Shift-click takes the range from the anchor, `⌘A` takes the
+page, `Delete` opens the confirm and `Escape` clears. Bulk delete is one request
+(`POST /api/gallery/images/bulk-delete`), not one per image, and anything the
+caller does not own is skipped and reported rather than aborting the batch.
+
+**The tile** is transparent at rest, fills with `--surface-2` on hover and
+`--accent-tint` + an accent border when selected — the Drive/Photos idiom. A
+permanent `--surface-2` block behind every tile put a second card inside the
+card, which against `--surface-1` in dark mode is a 4% step that reads as grime
+rather than structure. Filename and weight sit *below* the thumbnail and are
+always visible; the checkbox and copy button ride a top-down scrim inside the
+frame, because they sit over an arbitrary photograph and neither can be relied
+on to land on something dark.
+
+Every overlay control lives inside `.media-frame`, the square that holds the
+thumbnail. The opener used to be `inset: 0` with a hand-tuned `bottom: 44px` to
+clear the caption — a number that silently broke the hit area whenever the
+caption's height changed.
+
+**The checked mark is a real tick**: two adjacent borders of a box, rotated 45°,
+taking their colour from `currentColor`. It was briefly two full-length diagonal
+gradients, which is an ✗ rather than a ✓ — a checkbox drawn as a cross reads as
+"rejected" on a control that means "chosen". A styled `appearance: none` input
+cannot hold the tick as a child and pseudo-elements on replaced elements are not
+guaranteed to render, so the input sits transparent on top as the control and a
+sibling `.media-check-box` span is the visual.
+
+**The preview** is the image on a checkerboard stage beside its facts, with
+`‹ ›` and arrow keys walking the library without closing. Dimensions are read
+off the loaded element's `naturalWidth`/`naturalHeight` — nothing in the upload
+pipeline stores them, and adding an imaging dependency to learn two integers is
+not worth it when the browser has already decoded the file. Copy comes in three
+formats (URL, Markdown, HTML) and all three copy the **absolute** URL: the
+stored value is a site-relative `/static/…` path, which pastes as a broken
+image anywhere off-origin — the old copy button handed that path over as-is.
+
+Four things were broken rather than merely dated, and are fixed:
+
+- **Ownership was checked after the delete.** `delete_gallery_image` removed the
+  document and *then* returned it for the route to compare `user_id` — so any
+  signed-in account could destroy another account's image metadata and be told
+  "403" once it was already gone. `get_gallery_image` now answers that question
+  first.
+- **Every page number was rendered.** `renderPagination` looped `1..totalPages`,
+  so a 40-page library drew 40 buttons across the card. It takes the `.pager`
+  window the listings use — never more than five buttons.
+- **There was no search, filter or sort**, on the one screen in the product
+  whose records have no titles to scan. Search, the type facet and the sort all
+  run server-side over the whole collection, so they reach past the 24 tiles on
+  screen, and all three live in the query string so a filtered library survives
+  a reload and can be linked to.
+- **Deleting the last item on a page stranded you** on an empty grid. The data
+  layer clamps an out-of-range page to the last real one and reports which page
+  it actually returned.
+
+The size string is rendered twice — by Jinja for the first paint and by
+`formatBytes()` for every re-render — and the two must agree. They did not:
+Jinja's `round` is Python's, which rounds half to *even*, while `Math.round`
+rounds half *up*, so a 248,320-byte file painted as "242 KB" and silently became
+"243 KB" on the first client render. The template uses `(x + 0.5) | int`, which
+is exactly `Math.round` for positive values.
 
 ### Scheduling / publishing — `schedule.html`, `approval_queue.html`
 
@@ -401,14 +633,32 @@ Reusable pieces, all token-driven:
 | Card head | `.card-head` / `.card-title` / `.card-link` | title row + pill "view all" link |
 | Stacked bar | `.viz-stack` / `.viz-seg` | ordinal ramp, 2px surface gaps, 4px outer ends |
 | Chart legend | `.viz-legend` | swatch · label · count · share — doubles as the table view |
-| Segmented tabs | `.work-tabs` / `.work-tab` | active = `--accent-soft`, same as the nav rail's current item |
-| Work row | `.work-row` | monogram · title/meta · status pill |
+| Segmented tabs | `.seg-tabs` / `.seg-tab` / `.seg-count` | active = `--accent-soft`, same as the nav rail's current item |
+| Card shell | `.surface-card` | `--surface-1` + `--elev-1` + `--radius-lg` |
+| Row | `.data-row` / `.row-mark` / `.row-main` / `.row-title` / `.row-meta` | monogram · title/meta · trailing; pages restate only `grid-template-columns` |
+| Row opener | `.row-open` | the main column as a button, for rows that open a modal |
+| Row quick action | `.row-action` | revealed on row hover/focus; always duplicated in the ⋮ menu |
+| Empty state | `.list-empty` / `.list-empty-icon` | medallion + one sentence |
+| Pager | `.pager` / `.pager-btn` / `.pager-dots` | pill buttons, `.is-active` = accent |
 | Action tile | `.action-tile` | 2-up grid; `.is-lead` takes `--accent-soft` |
 | List card | `.dashboard-list-card` | header + rows + empty state |
 | Status pill | `.list-card-badge`, `.blog-status-badge`, `.status-badge` | `-soft` fill + solid text |
-| Filter pill | `.filter-tab` | active = accent |
-| Table | `.blogs-container` / `.blog-row` | hairline dividers, `--surface-2` hover |
-| Pagination | `.page-btn` | pill buttons |
+| Modal shell | `.app-modal` / `-head` / `-body` / `-foot` / `-title` / `-close` / `-note` | Bootstrap's machinery, our chrome |
+| Modal field | `.app-field` / `.app-field-hint` | soft fill, focus lifts to `--surface-1` |
+| Modal button | `.app-btn` | `.is-primary` / `.is-ghost` / `.is-danger` pills |
+| Filter bar | `.filter-bar` / `.filter-bar-controls` | segmented tabs + filter pills on one card; in dashboard.css §12 since the gallery became its second user |
+| Media tile | `.media-tile` / `.media-thumb` / `.media-caption` | square thumb on a checkerboard, name + weight always visible |
+| Tile selection | `.media-check` / `.media-checkbox` | corner checkbox, drawn tick so it inverts with the accent |
+| View toggle | `.view-toggle` / `.view-toggle-btn` | grid ↔ list, remembered in `localStorage` |
+| Selection bar | `.gallery-selection-bar` / `.selection-count` | replaces the filters in place while a selection exists |
+| Drop overlay | `.drop-overlay` | whole-canvas drop target, shown only mid-drag |
+| Upload tray | `.upload-tray` / `.upload-item` | docked queue, one progress bar and one outcome per file |
+| Preview | `.preview-stage` / `.preview-rail` / `.preview-facts` | image beside its metadata and copy formats |
+| Filter pill | `.filter-pill` / `.filter-pill-value` / `.filter-pill-caret` | states its own value; `.is-active` = `--accent-soft` |
+| Select pill | `.select-pill` / `.menu` / `.menu-item` / `.menu-check` | our own listbox wrapped around a real `<select>`; see below |
+| Clear filters | `.filter-clear` | ghost text button, present only while something is applied |
+| Date range | `.date-modal` / `.date-preset` / `.date-summary` | presets, then calendar, then what Apply will do |
+| Range calendar | `.cal` / `.cal-cell` / `.cal-day` | band on the cell, endpoints on the button; `.is-start` / `.is-end` / `.is-in-range` / `.is-preview` |
 | Prompt entry | `.prompt-box` / `.prompt-submit` | soft-filled, 28px |
 | Toast | `.custom-toast` | `--elev-3`, gradient progress line |
 | Skeleton | `.skeleton*` | accent-tinted shimmer |
@@ -522,6 +772,27 @@ so a typo would otherwise ship silently. `--check` is the CI form.
   (what the error screen's pills do). Check both themes before calling it done.
 - **The gradient is rationed.** Branding, the hero banner, gradient headline text,
   and agent-working indicators. Nothing else.
+- **Declare `color-scheme`, not just the tokens.** Some controls the browser
+  draws itself — the `<input type="date">` calendar, scrollbars, native select
+  popups — ignore CSS colours entirely and follow `color-scheme`. Tokenising a
+  screen is not enough: forcing `data-theme="dark"` on a light OS leaves those
+  widgets white until the theme blocks also set `color-scheme: dark`.
+- **`animation-fill-mode: both` on a card is a stacking-context trap.** Keeping
+  the final keyframe applied keeps its `transform` applied, which makes the card
+  a stacking context forever — and a dropdown opened inside it then paints
+  *under* the next card no matter what z-index it carries. `.reveal` uses
+  `backwards`, because its last keyframe is already the element's natural state.
+  If a popover is mysteriously behind a sibling, look for a lingering transform
+  before reaching for a bigger z-index.
+- **Scope a shared component's modifier under its block.** `.status-pill.status-draft`,
+  never a bare `.status-draft` — drafts.css already owns that name for the badge
+  in its preview modal, and page CSS loads *after* dashboard.css, so the
+  unscoped version would silently repaint every pill on the page. The same trap
+  in reverse cost a working button: the page header's label span was called
+  `.action-label`, which home.css already used for the quick-action tiles, and
+  its `color` won over inheritance and left white text on a light-blue pill.
+  Where a component cannot control its children's class names, pin them with
+  `.block > * { color: inherit }`.
 - **Status colour is for state, never for a chart series.** A badge that says
   "Published" in green is state. A bar segment coloured green because it happens
   to be the third one is not — and the system's `--success`/`--warning` pair is
@@ -535,6 +806,34 @@ so a typo would otherwise ship silently. `--check` is the CI form.
   if the frame loop is throttled to a crawl. Same principle for the pipeline bar:
   the CSS renders the real widths and JS zeroes them for one frame to start the
   transition, so a page without JS still shows true proportions.
+- **`div.textContent` → `div.innerHTML` is not an attribute escaper.** It
+  encodes `&`, `<` and `>` and leaves both quote characters alone, which is safe
+  for text and unsafe the moment the result is interpolated into
+  `title="…"` / `alt="…"` / `aria-label="…"` / `data-*="…"`. A gallery filename
+  or a blog title containing `"` closes the attribute and the rest injects.
+  `gallery.js` escapes all five characters, exactly as Jinja's autoescape does —
+  which is also what keeps its client markup byte-identical to the server's.
+  **`all_blogs.js`, `categories.js`, `comments.js`, `activity.js`, `leads.js`,
+  `schedule.js`, `analytics.js` and `site/comments.js` still use the two-line
+  version and still build attributes with it.**
+- **On-media controls do not take a theme.** `--media-*` / `--on-media` are the
+  one token group that must not be redefined per theme: what sits behind them is
+  a photograph, not a surface, so a light-mode value would put dark chrome on a
+  dark photo half the time. Anything overlaying an image uses those; anything
+  overlaying a surface uses the surface tokens.
+- **The same value rendered twice must round the same way.** Jinja's `round`
+  filter is Python's — half to *even* — while JS `Math.round` is half *up*. A
+  file of exactly 242.5 KB therefore painted one way from the server and
+  another from the client, with nothing in between to explain the change. Where
+  a template and a script both format the same figure, `(x + 0.5) | int` is the
+  Jinja spelling of `Math.round`, and the pair needs a test that walks values
+  either side of `.5` rather than a spot check.
+- **A hover-only control is unreachable on touch and invisible to the eye that
+  needs it.** The gallery's filename and file size sit under the tile
+  permanently rather than inside a hover overlay — the filename is the thing you
+  came to the tile to read. Where a control genuinely is hover-revealed (the
+  tile checkbox, the row's quick actions), it needs a `@media (hover: none)`
+  block that pins it visible, exactly as `.row-action` has.
 - **Weight ≤ 600.** Reach for size, colour or spacing before bold.
 - **Elevation over borders.** A 1px `--border-subtle` divider is fine; a heavy
   stroke is not.

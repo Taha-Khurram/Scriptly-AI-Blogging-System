@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Drafts | ScriptlyAI{% endblock %}
+{% block title %}Drafts | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/drafts.css') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/drafts.css') }}?v=3">
 {% endblock %}
 
 {% block content %}
@@ -12,323 +13,379 @@
   {% include 'partials/sidebar.html' %}
 
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <div class="header-welcome-text">Manage Content</div>
-        <h1 class="header-title">My Drafts</h1>
-      </div>
-      <div>
-        <a href="{{ url_for('blog.create_page') }}" class="btn btn-primary d-flex align-items-center gap-2 text-white">
-          <i class="bi bi-plus-lg"></i> New Draft
-        </a>
-      </div>
-    </header>
 
-    <div class="dashboard-content-wrapper animate-fade-up">
+    {% call page_header(
+    title='My Drafts',
+    eyebrow='Manage content',
+    search=true,
+    search_placeholder='Search drafts',
+    search_id='draftsSearch') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-primary">
+      <i class="bi bi-plus-lg" aria-hidden="true"></i>
+      <span class="page-header-label">New draft</span>
+    </a>
+    {% endcall %}
+
+    <section class="surface-card drafts-card reveal" aria-labelledby="draftsHeading">
+      <header class="card-head">
+        <h2 class="card-title" id="draftsHeading">
+          Drafts <span class="card-count">{{ drafts | length }}</span>
+        </h2>
+        {% if total_pages and total_pages > 1 %}
+        <span class="card-note">Page {{ current_page }} of {{ total_pages }}</span>
+        {% endif %}
+      </header>
+
+      {# .drafts-container and .draft-row are load-bearing: drafts.js finds the
+         list through them when a row is deleted. #}
       <div class="drafts-container">
-        <div class="drafts-header">
-          <div class="col-title">Title</div>
-          <div class="col-tags">Category</div>
-          <div class="col-status">Last Updated</div>
-          <div class="col-actions">Actions</div>
-        </div>
+        {% if drafts %}
+        <div class="data-rows">
+          {% for draft in drafts %}
+          {% set title = (draft.title or 'Untitled').replace('**', '') %}
+          {# Drafts come back as real datetimes, not the ISO strings the other
+             listings carry, and str(datetime) is not a format every browser's
+             Date parser accepts — so normalise before it reaches the markup. #}
+          {% set raw = draft.updated_at or draft.created_at %}
+          {% set stamp = raw if raw is string else (raw.isoformat() if raw else '') %}
+          <div class="data-row draft-row" id="row-{{ draft.id }}"
+            data-search="{{ (title ~ ' ' ~ (draft.category or '')) | lower }}">
 
-        {% for draft in drafts %}
-        <div class="draft-row" id="row-{{ draft.id }}">
-          <div class="col-title title text-truncate pe-3">
-            {{ draft.title.replace('**', '') if draft.title else 'Untitled' }}
-          </div>
-          <div class="  col-tags">
-            <span class="badge-tag">{{ draft.category or 'General' }}</span>
-          </div>
-          <div class="col-status">
-            {{ draft.updated_at.strftime('%Y-%m-%d %H:%M') }}
-          </div>
+            {% set mark = title | replace('*', '') | trim %}
+            <span class="row-mark" aria-hidden="true">{{ (mark[0] if mark else '?') | upper }}</span>
 
-          <div class="col-actions">
-            <div class="dropdown">
-              <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-three-dots-vertical"></i>
+            <button type="button" class="row-open" onclick="openEditModal('{{ draft.id }}')"
+              title="Edit “{{ title }}”">
+              <span class="row-title">{{ title }}</span>
+              <span class="row-meta">
+                <span>{{ draft.category or 'General' }}</span>
+              </span>
+            </button>
+
+            {# Its own column rather than a clause in the meta line, so the
+               timestamps align down the list the way All Blogs' do. #}
+            <time class="row-time" datetime="{{ stamp }}" data-relative>{{ stamp[:10] }}</time>
+
+            <div class="row-trail">
+              {# Shortcuts to two of the menu's items — the menu still carries
+                 everything, so nothing here is the only way to reach an action. #}
+              <button type="button" class="row-action" onclick="openViewModal('{{ draft.id }}')"
+                aria-label="Preview {{ title }}" title="Preview">
+                <i class="bi bi-eye" aria-hidden="true"></i>
               </button>
-              <ul class="dropdown-menu dropdown-menu-end">
-                <li>
-                  <button class="dropdown-item" onclick="openViewModal('{{ draft.id }}')">
-                    <i class="bi bi-eye" style="color: var(--info);"></i> View Draft
-                  </button>
-                </li>
-                <li>
-                  <button class="dropdown-item" onclick="openEditModal('{{ draft.id }}')">
-                    <i class="bi bi-pencil-square" style="color: var(--primary-color);"></i> Edit Draft
-                  </button>
-                </li>
-                <li>
-                  <button class="dropdown-item" onclick="humanizeDraft('{{ draft.id }}')">
-                    <i class="bi bi-shield-check" style="color: var(--accent);"></i> Humanize
-                  </button>
-                </li>
-                <li>
-                  <button class="dropdown-item" onclick="submitForReview('{{ draft.id }}')">
-                    <i class="bi bi-check-circle" style="color: var(--success);"></i> Submit for Approval
-                  </button>
-                </li>
-                <!-- <li>
-                  <button class="dropdown-item" onclick="openScheduleModal('{{ draft.id }}')">
-                    <i class="bi bi-calendar-event" style="color: var(--accent);"></i> Schedule & Submit
-                  </button>
-                </li> -->
-                <li>
-                  <hr class="dropdown-divider">
-                </li>
-                <li>
-                  <button class="dropdown-item text-danger" onclick="deleteDraft('{{ draft.id }}')">
-                    <i class="bi bi-x-circle"></i> Delete
-                  </button>
-                </li>
-              </ul>
+              <button type="button" class="row-action" onclick="submitForReview('{{ draft.id }}')"
+                aria-label="Submit {{ title }} for approval" title="Submit for approval">
+                <i class="bi bi-send" aria-hidden="true"></i>
+              </button>
+
+              <div class="dropdown">
+                <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                  aria-label="More actions for {{ title }}">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <button class="dropdown-item" onclick="openViewModal('{{ draft.id }}')">
+                      <i class="bi bi-eye" style="color: var(--info);"></i> View Draft
+                    </button>
+                  </li>
+                  <li>
+                    <button class="dropdown-item" onclick="openEditModal('{{ draft.id }}')">
+                      <i class="bi bi-pencil-square" style="color: var(--primary-color);"></i> Edit Draft
+                    </button>
+                  </li>
+                  <li>
+                    <button class="dropdown-item" onclick="humanizeDraft('{{ draft.id }}')">
+                      <i class="bi bi-shield-check" style="color: var(--accent);"></i> Humanize
+                    </button>
+                  </li>
+                  <li>
+                    <button class="dropdown-item" onclick="submitForReview('{{ draft.id }}')">
+                      <i class="bi bi-check-circle" style="color: var(--success);"></i> Submit for Approval
+                    </button>
+                  </li>
+                  <li>
+                    <hr class="dropdown-divider">
+                  </li>
+                  <li>
+                    <button class="dropdown-item text-danger" onclick="deleteDraft('{{ draft.id }}')">
+                      <i class="bi bi-x-circle"></i> Delete
+                    </button>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
+          {% endfor %}
         </div>
+
+        <p class="list-noresults" data-noresults hidden>No drafts match that search.</p>
         {% else %}
-        <div class="text-center py-5">
-          <div class="mb-3 text-muted opacity-50"><i class="bi bi-file-earmark-text fs-1"></i></div>
-          <p class="text-secondary fw-bold">No drafts found.</p>
-          <a href="{{ url_for('blog.create_page') }}"
-            class="btn btn-sm btn-outline-primary mt-2 rounded-pill px-4">Create New</a>
+        <div class="list-empty">
+          <span class="list-empty-icon"><i class="bi bi-file-earmark-text"></i></span>
+          <p>No drafts yet. Anything you generate lands here until you send it for approval.</p>
+          <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-ghost">Create one</a>
         </div>
+        {% endif %}
+      </div>
+
+      {# Server-side pagination existed on this route from the start but had no
+         controls, so page 2 onwards was unreachable. #}
+      {% if total_pages and total_pages > 1 %}
+      <nav class="pager" aria-label="Drafts pages">
+        <a class="pager-btn {{ 'is-disabled' if not has_prev }}"
+          href="?page={{ current_page - 1 }}" aria-label="Previous page">
+          <i class="bi bi-chevron-left" aria-hidden="true"></i>
+        </a>
+        {% for p in range(1, total_pages + 1) %}
+        {% if p == 1 or p == total_pages or (p >= current_page - 1 and p <= current_page + 1) %}
+        <a class="pager-btn {{ 'is-active' if p == current_page }}" href="?page={{ p }}"
+          {{ 'aria-current=page' if p==current_page }}>{{ p }}</a>
+        {% elif p == current_page - 2 or p == current_page + 2 %}
+        <span class="pager-dots">…</span>
+        {% endif %}
         {% endfor %}
-      </div>
-    </div>
+        <a class="pager-btn {{ 'is-disabled' if not has_next }}"
+          href="?page={{ current_page + 1 }}" aria-label="Next page">
+          <i class="bi bi-chevron-right" aria-hidden="true"></i>
+        </a>
+      </nav>
+      {% endif %}
+    </section>
 
-<!-- Edit Modal -->
-<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered">
-    <div class="modal-content">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title">
-          <i class="bi bi-pencil-square"></i>
-          Edit Draft
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="custom-modal-body">
-        <input type="text" id="modal-title" class="edit-title-input" placeholder="Enter blog title...">
+    <!-- Edit Modal -->
+    <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+          <div class="custom-modal-header">
+            <h5 class="custom-modal-title">
+              <i class="bi bi-pencil-square"></i>
+              Edit Draft
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="custom-modal-body">
+            <input type="text" id="modal-title" class="edit-title-input" placeholder="Enter blog title...">
 
-        <!-- Slug Field -->
-        <div class="slug-field">
-          <label class="slug-label">URL Slug</label>
-          <div class="slug-input-group">
-            <span class="slug-prefix">/post/</span>
-            <input type="text" class="slug-input" id="modal-slug" placeholder="auto-generated-from-title">
-            <button type="button" class="slug-regenerate-btn" id="regenerate-slug" title="Regenerate from title">
-              <i class="bi bi-arrow-clockwise"></i>
+            <!-- Slug Field -->
+            <div class="slug-field">
+              <label class="slug-label">URL Slug</label>
+              <div class="slug-input-group">
+                <span class="slug-prefix">/post/</span>
+                <input type="text" class="slug-input" id="modal-slug" placeholder="auto-generated-from-title">
+                <button type="button" class="slug-regenerate-btn" id="regenerate-slug" title="Regenerate from title">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+              <small class="slug-hint">Leave blank to auto-generate from title. Changing slug will create a 301
+                redirect.</small>
+            </div>
+
+            <!-- Feature Image -->
+            <div class="cover-image-section">
+              <label class="slug-label">Feature Image</label>
+              <div class="cover-image-preview" id="coverImagePreview" style="display:none;">
+                <img id="coverImageImg" src="" alt="Cover">
+                <div class="cover-image-actions">
+                  <button type="button" class="cover-img-action-btn" onclick="openImagePicker()" title="Change image">
+                    <i class="bi bi-arrow-repeat"></i>
+                  </button>
+                  <button type="button" class="cover-img-action-btn danger" onclick="removeCoverImage()"
+                    title="Remove image">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="cover-image-placeholder" id="coverImagePlaceholder" onclick="openImagePicker()">
+                <div class="cover-placeholder-icon"><i class="bi bi-image"></i></div>
+                <div class="cover-placeholder-text">Click to select a feature image</div>
+                <div class="cover-placeholder-hint">Choose from your gallery</div>
+              </div>
+            </div>
+
+            <!-- SEO Settings -->
+            <div class="seo-settings-section">
+              <button type="button" class="seo-toggle-btn" id="seo-toggle-btn">
+                <i class="bi bi-search"></i> SEO Settings
+                <i class="bi bi-chevron-down seo-chevron"></i>
+              </button>
+              <div class="seo-fields" id="seo-fields" style="display: none;">
+                <div class="seo-field">
+                  <label class="seo-label">Meta Title</label>
+                  <input type="text" class="seo-input" id="modal-seo-title"
+                    placeholder="Custom title for search engines (default: blog title)" maxlength="60">
+                  <small class="seo-hint">Recommended: 50-60 characters. <span id="seo-title-count">0</span>/60</small>
+                </div>
+                <div class="seo-field">
+                  <label class="seo-label">Meta Description</label>
+                  <textarea class="seo-textarea" id="modal-seo-description"
+                    placeholder="Brief description for search results and social sharing" maxlength="160"
+                    rows="2"></textarea>
+                  <small class="seo-hint">Recommended: 150-160 characters. <span id="seo-desc-count">0</span>/160</small>
+                </div>
+              </div>
+            </div>
+
+            <textarea id="editor-canvas"></textarea>
+          </div>
+          <div class="custom-modal-footer">
+            <button type="button" class="btn-modal btn-secondary" onclick="copyDraftContent()">
+              <i class="bi bi-clipboard"></i> Copy
+            </button>
+            <button type="button" class="btn-modal btn-primary-custom" id="save-changes-btn"
+              onclick="saveModalChanges()">
+              <i class="bi bi-check-lg"></i> Save Changes
             </button>
           </div>
-          <small class="slug-hint">Leave blank to auto-generate from title. Changing slug will create a 301 redirect.</small>
         </div>
-
-        <!-- Feature Image -->
-        <div class="cover-image-section">
-          <label class="slug-label">Feature Image</label>
-          <div class="cover-image-preview" id="coverImagePreview" style="display:none;">
-            <img id="coverImageImg" src="" alt="Cover">
-            <div class="cover-image-actions">
-              <button type="button" class="cover-img-action-btn" onclick="openImagePicker()" title="Change image">
-                <i class="bi bi-arrow-repeat"></i>
-              </button>
-              <button type="button" class="cover-img-action-btn danger" onclick="removeCoverImage()" title="Remove image">
-                <i class="bi bi-trash"></i>
-              </button>
-            </div>
-          </div>
-          <div class="cover-image-placeholder" id="coverImagePlaceholder" onclick="openImagePicker()">
-            <div class="cover-placeholder-icon"><i class="bi bi-image"></i></div>
-            <div class="cover-placeholder-text">Click to select a feature image</div>
-            <div class="cover-placeholder-hint">Choose from your gallery</div>
-          </div>
-        </div>
-
-        <!-- SEO Settings -->
-        <div class="seo-settings-section">
-          <button type="button" class="seo-toggle-btn" id="seo-toggle-btn">
-            <i class="bi bi-search"></i> SEO Settings
-            <i class="bi bi-chevron-down seo-chevron"></i>
-          </button>
-          <div class="seo-fields" id="seo-fields" style="display: none;">
-            <div class="seo-field">
-              <label class="seo-label">Meta Title</label>
-              <input type="text" class="seo-input" id="modal-seo-title" placeholder="Custom title for search engines (default: blog title)" maxlength="60">
-              <small class="seo-hint">Recommended: 50-60 characters. <span id="seo-title-count">0</span>/60</small>
-            </div>
-            <div class="seo-field">
-              <label class="seo-label">Meta Description</label>
-              <textarea class="seo-textarea" id="modal-seo-description" placeholder="Brief description for search results and social sharing" maxlength="160" rows="2"></textarea>
-              <small class="seo-hint">Recommended: 150-160 characters. <span id="seo-desc-count">0</span>/160</small>
-            </div>
-          </div>
-        </div>
-
-        <textarea id="editor-canvas"></textarea>
-      </div>
-      <div class="custom-modal-footer">
-        <button type="button" class="btn-modal btn-secondary" onclick="copyDraftContent()">
-          <i class="bi bi-clipboard"></i> Copy
-        </button>
-        <button type="button" class="btn-modal btn-primary-custom" id="save-changes-btn" onclick="saveModalChanges()">
-          <i class="bi bi-check-lg"></i> Save Changes
-        </button>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- View Modal -->
-<div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered">
-    <div class="modal-content">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title">
-          <i class="bi bi-file-earmark-text"></i>
-          Draft Preview
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
+    <!-- View Modal -->
+    <div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+          <div class="custom-modal-header">
+            <h5 class="custom-modal-title">
+              <i class="bi bi-file-earmark-text"></i>
+              Draft Preview
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
 
-      <div class="custom-modal-body">
-        <!-- Title Section -->
-        <h2 class="blog-title-display" id="view-modal-title">Blog Title</h2>
-        <span class="status-badge status-draft mb-3" id="view-modal-status">
-          <i class="bi bi-circle-fill"></i> DRAFT
-        </span>
+          <div class="custom-modal-body">
+            <!-- Title Section -->
+            <h2 class="blog-title-display" id="view-modal-title">Blog Title</h2>
+            <span class="status-badge status-draft mb-3" id="view-modal-status">
+              <i class="bi bi-circle-fill"></i> DRAFT
+            </span>
 
-        <!-- Meta Info Bar -->
-        <div class="meta-info-bar">
-          <div class="meta-item">
-            <i class="bi bi-folder2"></i>
-            <span id="view-modal-category">General</span>
+            <!-- Meta Info Bar -->
+            <div class="meta-info-bar">
+              <div class="meta-item">
+                <i class="bi bi-folder2"></i>
+                <span id="view-modal-category">General</span>
+              </div>
+              <div class="meta-item">
+                <i class="bi bi-stopwatch"></i>
+                <span id="view-modal-reading-time">-- min read</span>
+              </div>
+              <div class="meta-item">
+                <i class="bi bi-body-text"></i>
+                <span id="view-modal-word-count">-- words</span>
+              </div>
+              <div class="meta-item">
+                <i class="bi bi-calendar3"></i>
+                <span id="view-modal-date">--</span>
+              </div>
+            </div>
+
+            <!-- Table of Contents -->
+            <div class="toc-container d-none" id="view-modal-toc">
+              <div class="toc-header">
+                <i class="bi bi-list-ul"></i>
+                <span>Table of Contents</span>
+              </div>
+              <div id="view-modal-toc-content"></div>
+            </div>
+
+            <!-- Content Preview -->
+            <div class="content-label">
+              <i class="bi bi-text-paragraph"></i>
+              <span>Content Preview</span>
+            </div>
+            <div class="blog-content-preview" id="view-modal-content">
+              Loading content...
+            </div>
           </div>
-          <div class="meta-item">
-            <i class="bi bi-stopwatch"></i>
-            <span id="view-modal-reading-time">-- min read</span>
-          </div>
-          <div class="meta-item">
-            <i class="bi bi-body-text"></i>
-            <span id="view-modal-word-count">-- words</span>
-          </div>
-          <div class="meta-item">
-            <i class="bi bi-calendar3"></i>
-            <span id="view-modal-date">--</span>
+
+          <div class="custom-modal-footer">
           </div>
         </div>
-
-        <!-- Table of Contents -->
-        <div class="toc-container d-none" id="view-modal-toc">
-          <div class="toc-header">
-            <i class="bi bi-list-ul"></i>
-            <span>Table of Contents</span>
-          </div>
-          <div id="view-modal-toc-content"></div>
-        </div>
-
-        <!-- Content Preview -->
-        <div class="content-label">
-          <i class="bi bi-text-paragraph"></i>
-          <span>Content Preview</span>
-        </div>
-        <div class="blog-content-preview" id="view-modal-content">
-          Loading content...
-        </div>
-      </div>
-
-      <div class="custom-modal-footer">
-        <!-- <button type="button" class="btn-modal btn-secondary" data-bs-dismiss="modal">
-          <i class="bi bi-x-lg"></i> Close
-        </button>
-        <button type="button" class="btn-modal btn-primary-custom" id="view-edit-btn">
-          <i class="bi bi-pencil"></i> Edit
-        </button>
-        <button type="button" class="btn-modal btn-success-custom" id="view-submit-btn">
-          <i class="bi bi-send"></i> Submit
-        </button> -->
       </div>
     </div>
-  </div>
-</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.2/tinymce.min.js" referrerpolicy="origin"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.2/tinymce.min.js" referrerpolicy="origin"></script>
 
-<!-- Schedule Modal -->
-<div class="modal fade" id="scheduleModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title">
-          <i class="bi bi-calendar-event"></i>
-          Schedule & Submit for Approval
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="custom-modal-body">
-        <p class="text-muted mb-3">Choose when you'd like this blog to be published. It will be sent to your admin for approval.</p>
-        <input type="datetime-local" class="form-control" id="scheduleDateTime"
-               style="padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-        <div id="bestTimeSuggestions" class="best-time-container mt-3">
-          <div class="best-time-header">
-            <i class="bi bi-robot"></i>
-            <span>AI Publish Time Agent — Recommended Times</span>
+    <!-- Schedule Modal -->
+    <div class="modal fade" id="scheduleModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="custom-modal-header">
+            <h5 class="custom-modal-title">
+              <i class="bi bi-calendar-event"></i>
+              Schedule & Submit for Approval
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div id="bestTimeSuggestionsList" class="best-time-list">
-            <div class="best-time-loading">
-              <div class="spinner-border spinner-border-sm text-primary"></div>
-              <span>Analyzing best publish times...</span>
+          <div class="custom-modal-body">
+            <p class="text-muted mb-3">Choose when you'd like this blog to be published. It will be sent to your admin
+              for approval.</p>
+            <input type="datetime-local" class="form-control" id="scheduleDateTime"
+              style="padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+            <div id="bestTimeSuggestions" class="best-time-container mt-3">
+              <div class="best-time-header">
+                <i class="bi bi-robot"></i>
+                <span>AI Publish Time Agent — Recommended Times</span>
+              </div>
+              <div id="bestTimeSuggestionsList" class="best-time-list">
+                <div class="best-time-loading">
+                  <div class="spinner-border spinner-border-sm text-primary"></div>
+                  <span>Analyzing best publish times...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="custom-modal-footer">
+            <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
+              <i class="bi bi-x-lg"></i> Cancel
+            </button>
+            <button type="button" class="btn-modal btn-modal-success" id="confirmScheduleBtn">
+              <i class="bi bi-calendar-check"></i> Schedule & Submit
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Picker Modal -->
+    <div class="image-picker-overlay" id="imagePickerOverlay" onclick="closeImagePicker(event)">
+      <div class="image-picker-modal" onclick="event.stopPropagation()">
+        <div class="image-picker-header">
+          <h4 class="image-picker-title"><i class="bi bi-images"></i> Choose from Gallery</h4>
+          <button class="image-picker-close" onclick="closeImagePicker()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="image-picker-body">
+          <div class="image-picker-grid" id="imagePickerGrid">
+            <div class="text-center py-4" style="grid-column:1/-1;">
+              <div class="spinner-border spinner-border-sm text-primary opacity-50"></div>
+              <p class="text-secondary mt-2 mb-0" style="font-size:0.82rem;">Loading gallery...</p>
             </div>
           </div>
         </div>
-      </div>
-      <div class="custom-modal-footer">
-        <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
-          <i class="bi bi-x-lg"></i> Cancel
-        </button>
-        <button type="button" class="btn-modal btn-modal-success" id="confirmScheduleBtn">
-          <i class="bi bi-calendar-check"></i> Schedule & Submit
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Image Picker Modal -->
-<div class="image-picker-overlay" id="imagePickerOverlay" onclick="closeImagePicker(event)">
-  <div class="image-picker-modal" onclick="event.stopPropagation()">
-    <div class="image-picker-header">
-      <h4 class="image-picker-title"><i class="bi bi-images"></i> Choose from Gallery</h4>
-      <button class="image-picker-close" onclick="closeImagePicker()"><i class="bi bi-x-lg"></i></button>
-    </div>
-    <div class="image-picker-body">
-      <div class="image-picker-grid" id="imagePickerGrid">
-        <div class="text-center py-4" style="grid-column:1/-1;">
-          <div class="spinner-border spinner-border-sm text-primary opacity-50"></div>
-          <p class="text-secondary mt-2 mb-0" style="font-size:0.82rem;">Loading gallery...</p>
+        <div class="image-picker-footer">
+          <a href="/gallery" class="image-picker-upload-link"><i class="bi bi-cloud-arrow-up"></i> Upload new images in
+            Gallery</a>
         </div>
       </div>
     </div>
-    <div class="image-picker-footer">
-      <a href="/gallery" class="image-picker-upload-link"><i class="bi bi-cloud-arrow-up"></i> Upload new images in Gallery</a>
-    </div>
-  </div>
-</div>
 
-<!-- Humanize Loading Overlay (mirrors the blog-generation loader) -->
-<div id="humanizeOverlay" class="humanize-overlay d-none">
-  <div class="humanize-overlay-card">
-    <div class="spinner-border text-primary" role="status"></div>
-    <div class="humanize-overlay-text" id="humanizeOverlayText">Humanizing content...</div>
-    <div class="humanize-progress">
-      <div id="humanizeProgressBar" class="humanize-progress-bar"></div>
+    <!-- Humanize Loading Overlay (mirrors the blog-generation loader) -->
+    <div id="humanizeOverlay" class="humanize-overlay d-none">
+      <div class="humanize-overlay-card">
+        <div class="spinner-border text-primary" role="status"></div>
+        <div class="humanize-overlay-text" id="humanizeOverlayText">Humanizing content...</div>
+        <div class="humanize-progress">
+          <div id="humanizeProgressBar" class="humanize-progress-bar"></div>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
-<script src="{{ url_for('static', filename='js/pages/drafts.js') }}?v=3"></script>
+    <script src="{{ url_for('static', filename='js/pages/drafts.js') }}?v=4"></script>
   </main>
 </div>
 {% endblock %}

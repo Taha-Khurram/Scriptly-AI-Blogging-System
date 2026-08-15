@@ -1,110 +1,416 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Gallery | ScriptlyAI{% endblock %}
+{% block title %}Gallery | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/gallery.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/gallery.css') }}?v=5">
 {% endblock %}
 
 {% block content %}
+{% set q = query or {'search': '', 'file_type': 'all', 'sort': 'newest', 'page': 1} %}
+{% set data = initial_data or {'images': [], 'total': 0, 'library_total': 0, 'matched_size': 0, 'type_counts': {},
+'page': 1, 'total_pages': 0} %}
+{% set counts = data.type_counts or {} %}
+{% set filtered = q.search or q.file_type != 'all' %}
+
+{% set type_tabs = [
+('all', 'All', (counts.values() | sum) if counts else 0),
+('jpg', 'JPG', counts.get('jpg', 0)),
+('png', 'PNG', counts.get('png', 0)),
+('gif', 'GIF', counts.get('gif', 0)),
+('webp', 'WebP', counts.get('webp', 0)),
+('other', 'Other', counts.get('other', 0))
+] %}
+
+{% set sort_labels = {
+'newest': 'Newest first', 'oldest': 'Oldest first', 'name': 'Name A–Z',
+'name_desc': 'Name Z–A', 'largest': 'Largest first', 'smallest': 'Smallest first'
+} %}
+
 <div class="dashboard-layout">
 
   {% include 'partials/sidebar.html' %}
 
+  {#
+    Everything below — the modals, the upload tray and the page script — lives
+    inside .dashboard-main. PJAX swaps only that element's innerHTML, so
+    anything outside it is dropped on the first in-app navigation and stays
+    broken until a hard reload.
+  #}
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <div class="header-welcome-text">Media</div>
-        <h1 class="header-title">Image Gallery</h1>
-      </div>
-    </header>
 
-    <div class="dashboard-content-wrapper animate-fade-up">
+    {# search_id is the id gallery.js binds its debounced query to, so the
+       header field *is* the library's search rather than a second one beside
+       it. It queries the whole collection through the API, not the 24 tiles
+       currently painted. #}
+    {% call page_header(
+    title='Gallery',
+    eyebrow='Media library',
+    search=true,
+    search_placeholder='Search images',
+    search_id='gallerySearch') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    <button type="button" class="page-header-action is-primary" data-upload-trigger>
+      <i class="bi bi-cloud-arrow-up" aria-hidden="true"></i>
+      <span class="page-header-label">Upload</span>
+    </button>
+    {% endcall %}
 
-      <!-- Upload Zone -->
-      <div class="gallery-upload-zone" id="uploadZone">
-        <div class="upload-zone-content">
-          <div class="upload-zone-icon"><i class="bi bi-cloud-arrow-up"></i></div>
-          <div class="upload-zone-text">Drag & drop images here or</div>
-          <button class="upload-zone-btn" onclick="document.getElementById('fileInput').click()">
-            <i class="bi bi-plus-lg"></i> Choose Files
+    {#
+      Toolbar. File type is the primary dimension here the way status is on the
+      listings, so it stays a permanently visible segmented control with live
+      facet counts; sort is a filter pill that states its own current value.
+
+      The selection bar occupies the same card and replaces the filters while
+      anything is selected — the pattern every file manager converged on,
+      because filtering and acting on a selection are never wanted at once.
+    #}
+    <section class="surface-card gallery-toolbar reveal" aria-label="Filter and sort images">
+
+      <div class="gallery-toolbar-filters" data-toolbar-filters>
+        <div class="seg-tabs gallery-type-tabs" role="group" aria-label="Filter by file type">
+          {% for value, label, count in type_tabs %}
+          {# A type with nothing in it is dropped rather than shown as a dead
+             "0" tab — except All, which anchors the group. #}
+          {% if value == 'all' or count %}
+          <button type="button" class="seg-tab{{ ' is-active' if q.file_type == value else '' }}"
+            data-type="{{ value }}">
+            {{ label }} <span class="seg-count">{{ count }}</span>
           </button>
-          <div class="upload-zone-hint">PNG, JPG, GIF, WebP — Max 5MB</div>
-        </div>
-        <input type="file" id="fileInput" multiple accept="image/png,image/jpeg,image/gif,image/webp" style="display:none">
-      </div>
-
-      <!-- Upload Progress -->
-      <div class="upload-progress-area" id="uploadProgress" style="display:none">
-        <div class="upload-progress-bar">
-          <div class="upload-progress-fill" id="uploadFill"></div>
-        </div>
-        <span class="upload-progress-text" id="uploadText">Uploading...</span>
-      </div>
-
-      <!-- Gallery Grid -->
-      <div class="gallery-container">
-        <div class="gallery-grid" id="galleryGrid">
-          {% if initial_data and initial_data.images %}
-            {% for img in initial_data.images %}
-            <div class="gallery-card" data-id="{{ img.id }}">
-              <img src="{{ img.url }}" alt="{{ img.filename }}" loading="lazy">
-              <div class="gallery-card-overlay">
-                <div class="gallery-card-actions">
-                  <button class="gallery-card-btn copy-btn" onclick="copyUrl(event, '{{ img.url }}')" title="Copy URL"><i class="bi bi-clipboard"></i></button>
-                  <button class="gallery-card-btn delete-btn" onclick="showDeleteConfirm(event, '{{ img.id }}')" title="Delete"><i class="bi bi-trash"></i></button>
-                </div>
-                <div class="gallery-card-name">{{ img.filename }}</div>
-              </div>
-            </div>
-            {% endfor %}
-          {% else %}
-            <div class="gallery-empty">
-              <div class="gallery-empty-icon"><i class="bi bi-images"></i></div>
-              <div class="gallery-empty-title">No images yet</div>
-              <div class="gallery-empty-text">Upload your first image above.</div>
-            </div>
           {% endif %}
+          {% endfor %}
+        </div>
+
+        <div class="gallery-toolbar-controls">
+          {# A listbox we own rather than a native select popup: the browser
+             draws that one itself, so it cannot take our surfaces or radius
+             and renders white-on-blue on a forced dark theme. The <select>
+             stays as the value holder, so `.value` reads and `change`
+             listeners work unchanged. #}
+          <div class="select-pill" data-select-pill>
+            <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
+              aria-expanded="false" aria-labelledby="gallerySortLabel">
+              <i class="bi bi-sort-down" aria-hidden="true"></i>
+              <span class="visually-hidden" id="gallerySortLabel">Sort images</span>
+              <span class="filter-pill-value" aria-hidden="true"
+                id="gallerySortValue">{{ sort_labels.get(q.sort, 'Newest first') }}</span>
+              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+            </button>
+
+            <div class="menu is-end" role="listbox" aria-labelledby="gallerySortLabel" hidden>
+              {% for value, label in sort_labels.items() %}
+              <button type="button" class="menu-item" role="option" data-value="{{ value }}">
+                <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                <span class="menu-label">{{ label }}</span>
+              </button>
+              {% endfor %}
+            </div>
+
+            <select id="gallerySort" tabindex="-1" aria-hidden="true">
+              {% for value, label in sort_labels.items() %}
+              <option value="{{ value }}" {{ 'selected' if q.sort==value else '' }}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {# Grid or list. A grid answers "which one looks right", a list
+             answers "which one is 4MB" — a media library needs both, and the
+             choice is remembered in localStorage. #}
+          <div class="view-toggle" role="group" aria-label="Layout">
+            <button type="button" class="view-toggle-btn is-active" data-view="grid" aria-pressed="true"
+              title="Grid view">
+              <i class="bi bi-grid-3x3-gap-fill" aria-hidden="true"></i>
+              <span class="visually-hidden">Grid view</span>
+            </button>
+            <button type="button" class="view-toggle-btn" data-view="list" aria-pressed="false" title="List view">
+              <i class="bi bi-list-ul" aria-hidden="true"></i>
+              <span class="visually-hidden">List view</span>
+            </button>
+          </div>
+
+          <button type="button" class="filter-clear" data-clear-filters {{ '' if filtered else 'hidden' }}>
+            <i class="bi bi-x-lg" aria-hidden="true"></i> Clear filters
+          </button>
         </div>
       </div>
 
-      <!-- Pagination -->
-      <div class="gallery-pagination" id="galleryPagination">
-        {% if initial_data and initial_data.total_pages > 1 %}
-          {% for p in range(1, initial_data.total_pages + 1) %}
-            {% if p <= 5 or p == initial_data.total_pages %}
-              <button class="page-btn{{ ' active' if p == 1 else '' }}" onclick="goToPage({{ p }})">{{ p }}</button>
-            {% elif p == 6 %}
-              <span class="page-ellipsis">...</span>
-            {% endif %}
+      {# Takes over the toolbar while a selection exists. aria-live so the
+         count is announced as tiles are picked. #}
+      <div class="gallery-selection-bar" data-selection-bar hidden>
+        <div class="gallery-selection-lead">
+          <button type="button" class="selection-close" data-selection-clear aria-label="Clear selection">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </button>
+          <span class="selection-count" data-selection-count role="status">1 selected</span>
+        </div>
+        <div class="gallery-selection-actions">
+          <button type="button" class="app-btn is-ghost" data-selection-all>Select page</button>
+          <button type="button" class="app-btn is-ghost" data-selection-copy>
+            <i class="bi bi-clipboard" aria-hidden="true"></i> Copy URLs
+          </button>
+          <button type="button" class="app-btn is-danger" data-selection-delete>
+            <i class="bi bi-trash3" aria-hidden="true"></i> Delete
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="surface-card gallery-card reveal" style="--reveal-delay: 60ms" aria-labelledby="galleryHeading">
+      <header class="card-head">
+        <h2 class="card-title" id="galleryHeading">
+          Images <span class="card-count" data-gallery-count>{{ data.total }}</span>
+        </h2>
+        <span class="card-note" data-gallery-note>
+          {%- if data.total -%}
+          {%- if data.total_pages > 1 %}Page {{ data.page }} of {{ data.total_pages }} · {% endif -%}
+          {{ (data.matched_size / 1048576) | round(1) }} MB
+          {%- endif -%}
+        </span>
+      </header>
+
+      {#
+        The tiles below are rendered twice in this codebase — here for the
+        first paint, and by `renderTile()` in gallery.js for every filter,
+        page and upload after it. The two must stay identical; gallery.js
+        hydrates its state by reading these data-* attributes rather than
+        re-rendering, so a mismatch shows up as wrong metadata, not as a
+        visible layout break.
+      #}
+      <div class="gallery-body" data-gallery-body>
+        {% if data.images %}
+        <div class="media-grid" id="galleryGrid" aria-label="Images">
+          {% for img in data.images %}
+          {% set name = img.filename or 'Untitled' %}
+          {% set bytes = img.size | default(0) | int %}
+          {% set ext = (name.rsplit('.', 1)[1] | upper) if '.' in name else 'IMG' %}
+          {# Mirrors formatBytes() in gallery.js exactly — KB under a megabyte,
+             one decimal of MB above it — so a re-render never restates the
+             same file's size differently.
+
+             `+ 0.5 | int`, not `| round`: Jinja's round is Python's, which
+             rounds half to *even*, while JS Math.round rounds half *up*. A
+             248,320-byte file is exactly 242.5 KB, and the two rules disagree
+             on it — the server painted "242 KB" and the first client
+             re-render silently changed it to "243 KB". #}
+          {% set readable = ('%.1f MB' % (bytes / 1048576)) if bytes >= 1048576 else ('%d KB' % ((bytes / 1024 + 0.5) |
+          int)) %}
+          {# data-media-item is what gallery.js selects on — the grid tile and
+             the list row are two presentations of one record, so the marker
+             cannot be the class that styles either one. #}
+          <figure class="media-tile" data-media-item data-id="{{ img.id }}" data-url="{{ img.url }}"
+            data-name="{{ name }}" data-size="{{ bytes }}" data-created="{{ img.created_at or '' }}">
+            {# Every overlay control lives inside the square frame, so each is
+               positioned against the thumbnail itself. The opener used to be
+               `inset: 0` with a hand-tuned `bottom: 44px` to clear the caption,
+               which silently broke the hit area whenever the caption's height
+               changed. #}
+            <div class="media-frame">
+              <div class="media-thumb">
+                <img src="{{ img.url }}" alt="{{ name }}" loading="lazy" decoding="async">
+              </div>
+
+              <button type="button" class="media-open" data-media-open aria-label="Preview {{ name }}"></button>
+
+              {# The input is the control and sits transparent on top; the span
+                 beside it is the visual. A styled `appearance: none` input
+                 cannot hold the tick as a child, and pseudo-elements on
+                 replaced elements are not guaranteed. #}
+              <span class="media-check">
+                <input type="checkbox" class="media-checkbox" data-media-select aria-label="Select {{ name }}">
+                <span class="media-check-box" aria-hidden="true"></span>
+              </span>
+
+              <button type="button" class="media-quick" data-media-copy title="Copy image URL"
+                aria-label="Copy URL for {{ name }}">
+                <i class="bi bi-link-45deg" aria-hidden="true"></i>
+              </button>
+            </div>
+
+            <figcaption class="media-caption">
+              <span class="media-name" title="{{ name }}">{{ name }}</span>
+              <span class="media-sub" data-media-sub>{{ readable }} · {{ ext }}</span>
+            </figcaption>
+          </figure>
           {% endfor %}
+        </div>
+        {% elif filtered %}
+        {# A filtered-to-nothing library is a different situation from an empty
+           one, and offering "upload your first image" to someone who has 200
+           of them and a typo in the search box is the wrong answer. #}
+        <div class="list-empty">
+          <span class="list-empty-icon"><i class="bi bi-search"></i></span>
+          <p>No images match those filters.</p>
+          <button type="button" class="app-btn is-ghost" data-clear-filters>Clear filters</button>
+        </div>
+        {% else %}
+        <div class="list-empty gallery-empty">
+          <span class="list-empty-icon"><i class="bi bi-images"></i></span>
+          <p>No images yet. Upload artwork here once and reuse it as a feature image on any post.</p>
+          <button type="button" class="app-btn is-primary" data-upload-trigger>
+            <i class="bi bi-cloud-arrow-up" aria-hidden="true"></i> Upload images
+          </button>
+          <span class="gallery-empty-hint">or drop files anywhere on this page — PNG, JPG, GIF, WebP up to 5MB</span>
+        </div>
         {% endif %}
       </div>
 
+      <nav class="pager" id="galleryPager" aria-label="Gallery pages">
+        {% if data.total_pages > 1 %}
+        {% for p in range(1, data.total_pages + 1) %}
+        {% if p <= 5 or p == data.total_pages %}
+        <button type="button" class="pager-btn{{ ' is-active' if p == data.page else '' }}"
+          data-page="{{ p }}">{{ p }}</button>
+        {% elif p == 6 %}
+        <span class="pager-dots">…</span>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+      </nav>
+    </section>
+
+    {# The file input every upload path routes through: the header button, the
+       empty state's button, and the "Add more" control in the tray. #}
+    <input type="file" id="galleryFileInput" multiple accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+
+    {#
+      Drag anywhere. A permanent dropzone at the top of the page is dead weight
+      once the library has anything in it — the whole canvas becomes the target
+      instead, and only while files are actually being dragged over it.
+    #}
+    <div class="drop-overlay" data-drop-overlay hidden aria-hidden="true">
+      <div class="drop-overlay-inner">
+        <i class="bi bi-cloud-arrow-up-fill" aria-hidden="true"></i>
+        <p class="drop-overlay-title">Drop to upload</p>
+        <p class="drop-overlay-hint">PNG, JPG, GIF or WebP · up to 5MB each</p>
+      </div>
     </div>
 
-<!-- Delete Confirmation Modal -->
-<div class="gallery-modal-overlay" id="deleteOverlay" onclick="closeDeleteModal(event)">
-  <div class="gallery-modal" onclick="event.stopPropagation()">
-    <div class="gallery-modal-header">
-      <div class="gallery-modal-icon danger-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
-      <h4 class="gallery-modal-title">Delete Image</h4>
-      <button class="gallery-modal-close" onclick="closeDeleteModal()"><i class="bi bi-x-lg"></i></button>
-    </div>
-    <div class="gallery-modal-body">
-      <p class="delete-confirm-text">Are you sure you want to delete this image? This cannot be undone.</p>
-    </div>
-    <div class="gallery-modal-footer">
-      <button class="gallery-btn gallery-btn-ghost" onclick="closeDeleteModal()">Cancel</button>
-      <button class="gallery-btn gallery-btn-danger" id="confirmDeleteBtn">
-        <i class="bi bi-trash"></i> Delete
-      </button>
-    </div>
-  </div>
-</div>
+    {#
+      Upload tray. Docked bottom-right so uploading never blocks the library
+      you are uploading into, with one row per file carrying its own progress,
+      its own outcome and its own retry — the single anonymous bar it replaces
+      could not say which of five files had failed.
+    #}
+    <section class="upload-tray" data-upload-tray hidden aria-label="Uploads">
+      <header class="upload-tray-head">
+        <span class="upload-tray-title" data-tray-title role="status">Uploading…</span>
+        <button type="button" class="upload-tray-btn" data-tray-toggle aria-expanded="true"
+          aria-label="Collapse uploads">
+          <i class="bi bi-chevron-down" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="upload-tray-btn" data-tray-close aria-label="Dismiss uploads">
+          <i class="bi bi-x-lg" aria-hidden="true"></i>
+        </button>
+      </header>
+      <ul class="upload-tray-list" data-tray-list></ul>
+    </section>
 
-<script src="{{ url_for('static', filename='js/pages/gallery.js') }}?v=3"></script>
+    <!-- Image preview -->
+    <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true" aria-labelledby="previewTitle">
+      <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content app-modal preview-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title preview-title" id="previewTitle" data-preview-name>Image</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="app-modal-body preview-body">
+            {# The stage carries a checkerboard so a transparent PNG reads as
+               transparent rather than as whatever the surface happens to be. #}
+            <div class="preview-stage">
+              <img data-preview-image src="" alt="">
+              <button type="button" class="preview-nav is-prev" data-preview-prev aria-label="Previous image">
+                <i class="bi bi-chevron-left" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="preview-nav is-next" data-preview-next aria-label="Next image">
+                <i class="bi bi-chevron-right" aria-hidden="true"></i>
+              </button>
+            </div>
+
+            <aside class="preview-rail">
+              <dl class="preview-facts">
+                <div class="preview-fact">
+                  <dt>Dimensions</dt>
+                  <dd data-preview-dimensions>—</dd>
+                </div>
+                <div class="preview-fact">
+                  <dt>Size</dt>
+                  <dd data-preview-size>—</dd>
+                </div>
+                <div class="preview-fact">
+                  <dt>Type</dt>
+                  <dd data-preview-type>—</dd>
+                </div>
+                <div class="preview-fact">
+                  <dt>Uploaded</dt>
+                  <dd data-preview-created>—</dd>
+                </div>
+              </dl>
+
+              {# Three formats because this library exists to feed posts:
+                 the raw URL for the feature-image picker, Markdown for the
+                 editor, HTML for anywhere else. Each copies the *absolute*
+                 URL — a bare /static/… path pasted anywhere off-site is a
+                 broken image. #}
+              <div class="preview-copy-group">
+                <span class="preview-copy-label">Copy as</span>
+                <div class="preview-copy-buttons">
+                  <button type="button" class="app-btn is-ghost" data-preview-copy="url">URL</button>
+                  <button type="button" class="app-btn is-ghost" data-preview-copy="markdown">Markdown</button>
+                  <button type="button" class="app-btn is-ghost" data-preview-copy="html">HTML</button>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          <footer class="app-modal-foot">
+            <span class="app-modal-note" data-preview-position></span>
+            <a class="app-btn is-ghost" data-preview-open target="_blank" rel="noopener" href="#">
+              <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Open original
+            </a>
+            <button type="button" class="app-btn is-danger" data-preview-delete>
+              <i class="bi bi-trash3" aria-hidden="true"></i> Delete
+            </button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete confirmation -->
+    <div class="modal fade" id="deleteImageModal" tabindex="-1" aria-hidden="true" aria-labelledby="deleteImageTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="deleteImageTitle">Delete image</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <p class="delete-copy" data-delete-copy>
+              This image will be removed from your library and deleted from the server. Posts already using it will
+              lose the image.
+            </p>
+            <div class="delete-preview" data-delete-preview hidden>
+              <img data-delete-thumb src="" alt="">
+              <span data-delete-name></span>
+            </div>
+          </div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-danger" data-delete-confirm>Delete</button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/pages/gallery.js') }}?v=5"></script>
   </main>
 </div>
-
 {% endblock %}

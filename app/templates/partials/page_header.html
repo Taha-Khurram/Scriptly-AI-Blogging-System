@@ -22,6 +22,15 @@
   `document` ({ detail: { value, submit } }) and the page decides what that
   means — the dashboard filters its recent-work list live and hands Enter off
   to All Blogs.
+
+  A page that wants the results dropdown answers `page-search` by dispatching
+  `page-search-results` on `document`:
+
+    { query, items: [{ title, meta, href, mark, status, statusLabel }],
+      empty, footer: { label, href } }
+
+  The header owns the panel from there — open/close, arrow keys, Enter on the
+  highlighted row. A page that stays silent simply never opens it.
 #}
 
 {% macro page_header(title, eyebrow='', search=false, search_placeholder='Search', search_id='pageSearch') %}
@@ -46,13 +55,20 @@
                     </svg>
                 </span>
                 <label class="visually-hidden" for="{{ search_id }}">{{ search_placeholder }}</label>
+                {# The browser's own clear cross is suppressed in CSS — this field
+                   ships its own, and two of them read as a bug. #}
                 <input type="search" id="{{ search_id }}" class="page-search-input" autocomplete="off"
-                    placeholder="{{ search_placeholder }}">
+                    placeholder="{{ search_placeholder }}" role="combobox" aria-autocomplete="list"
+                    aria-expanded="false" aria-controls="{{ search_id }}Results">
                 {# Filled in as ⌘K on Apple platforms by app.js. #}
                 <kbd class="page-search-kbd" data-search-hint aria-hidden="true">Ctrl K</kbd>
                 <button type="button" class="page-search-clear" data-page-search-clear aria-label="Clear search">
                     <span class="material-symbols-outlined" style="font-size:18px">close</span>
                 </button>
+
+                {# Filled by app.js from whatever the page answers with. #}
+                <div class="page-search-panel" id="{{ search_id }}Results" data-page-search-panel role="listbox"
+                    aria-label="Search results" hidden></div>
             </div>
             {% endif %}
 

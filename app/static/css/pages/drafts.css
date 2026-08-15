@@ -51,54 +51,67 @@
   transition: width 0.5s ease;
 }
 
-/* Drafts List */
-.drafts-container {
-  background: var(--surface-1);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+/* ==========================================================================
+   DRAFTS LIST
+
+   The card, rows, empty state and pager are the shared primitives from
+   dashboard.css §12. Only what is specific to this screen lives here — which
+   is barely anything, and that is the point: a draft row and a dashboard row
+   are the same object.
+   ========================================================================== */
+
+.drafts-card {
+  padding-bottom: var(--sp-6);
+  /* the ⋮ menu escapes the card */
   overflow: visible;
 }
 
-.drafts-header {
-  display: flex;
-  padding: 1.25rem 2rem;
-  background: transparent;
-  border-bottom: 1px solid var(--border-subtle);
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--secondary-color);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.drafts-container {
+  padding: var(--sp-4) var(--sp-4) 0;
 }
 
-.draft-row {
-  display: flex;
-  align-items: center;
-  padding: 1.25rem 2rem;
-  border-bottom: 1px solid var(--border-subtle);
-  transition: var(--transition-base);
+/* mark | title+category | when | actions */
+.drafts-container .data-row {
+  grid-template-columns: 36px minmax(0, 1fr) 116px auto;
 }
 
-.draft-row:hover {
-  background: var(--bg-body);
+.drafts-container .row-time {
+  text-align: right;
 }
 
-.draft-row:last-child {
-  border-bottom: none;
+.card-note {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.col-title { flex: 3; font-weight: 500; color: var(--info-color); }
-.col-tags { flex: 1.5; }
-.col-status { flex: 1.5; color: var(--secondary-color); font-size: 0.9rem; }
-.col-actions { flex: 0 0 80px; text-align: right; }
+.drafts-card .list-empty .page-header-action {
+  margin-top: var(--sp-2);
+}
 
-.badge-tag {
-  background: var(--accent-tint);
-  color: var(--primary-color);
-  padding: 0.35rem 1rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.8rem;
-  font-weight: 500;
+@media (max-width: 700px) {
+  .drafts-container .data-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: var(--sp-3);
+  }
+
+  .drafts-card .row-mark {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* The date drops rather than squeezing the title to nothing; the row still
+     carries it in the title attribute the JS leaves behind. */
+  .drafts-container .row-time {
+    display: none;
+  }
+
+  /* Two hover shortcuts plus a menu is more than a phone row can carry —
+     the menu keeps every one of those actions. */
+  .drafts-card .row-action {
+    display: none;
+  }
 }
 
 /* Custom Dropdown Styles */

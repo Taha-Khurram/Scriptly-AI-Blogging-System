@@ -1,507 +1,463 @@
 /* ==========================================================================
-   All Blogs Listing Page Styles
+   All Blogs
+
+   Filters, then the listing. Both are the shared primitives from
+   dashboard.css §12 — this file only sets the column template for a row that
+   carries more than the dashboard's three parts, and the two filter controls
+   that are specific to this screen.
    ========================================================================== */
 
-/* ==================== FILTER SECTION ==================== */
-.blogs-filters {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-}
+/* The filter bar itself — .filter-bar, .filter-pill, .filter-clear — moved to
+   dashboard.css §12 when the gallery became the second screen to use it. This
+   file styles only what is specific to All Blogs. */
 
-.blogs-filter-tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
-}
-
-.blogs-filter-tabs .filter-tab {
-    padding: 0.5rem 1.25rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface-1);
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.blogs-filter-tabs .filter-tab:hover {
-    background: var(--surface-2);
-    color: var(--text-2);
-    border-color: var(--border-strong);
-}
-
-.blogs-filter-tabs .filter-tab.active {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    border-color: var(--primary-color);
-    box-shadow: var(--elev-2);
-}
-
-.blogs-filter-controls {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.blogs-filters .filter-select {
-    padding: 0.55rem 2rem 0.55rem 0.85rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-body);
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-2);
-    cursor: pointer;
-    min-width: 160px;
-    appearance: auto;
-    transition: all 0.2s ease;
-}
-
-.blogs-filters .filter-select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
-.blogs-filters .filter-search-wrap {
-    position: relative;
-    flex: 1;
-    min-width: 200px;
-    max-width: 320px;
-}
-
-.blogs-filters .filter-search-wrap i {
-    position: absolute;
-    left: 0.85rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-faint);
-    font-size: 0.85rem;
-}
-
-.blogs-filters .filter-search {
-    width: 100%;
-    padding: 0.55rem 0.85rem 0.55rem 2.25rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-body);
-    font-size: 0.82rem;
-    color: var(--text-2);
-    transition: all 0.2s ease;
-}
-
-.blogs-filters .filter-search:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--focus-ring);
-    background: var(--surface-1);
-}
-
-.blogs-filters .filter-date-btn {
-    padding: 0.55rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-body);
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-2);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    white-space: nowrap;
-}
-
-.blogs-filters .filter-date-btn:hover {
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-}
-
-.blogs-filters .filter-date-btn.active {
-    background: var(--accent-tint);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-}
-
-/* ==================== BLOGS TABLE ==================== */
+/* ==================== LISTING ==================== */
 .blogs-container {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
+    padding-bottom: var(--sp-6);
+    /* the row menus escape the card */
     overflow: visible;
 }
 
-/* Keep an open action dropdown above sibling rows */
-.blog-row:has(.dropdown-menu.show) {
-    position: relative;
-    z-index: 20;
+.blogs-list {
+    padding: var(--sp-4) var(--sp-4) 0;
 }
 
-.blogs-list-header {
-    display: flex;
-    padding: 1rem 2rem;
-    background: var(--bg-body);
-    border-bottom: 1px solid var(--border-subtle);
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--secondary-color);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+/* mark | title+meta | status | when | menu — the same rhythm as the drafts
+   list, with the two columns drafts has no use for slotted in between. */
+.blogs-list .data-row {
+    grid-template-columns: 36px minmax(0, 1fr) auto 116px 40px;
 }
 
-.col-blog-title { flex: 3; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-blog-author { flex: 1.5; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-blog-category { flex: 1.5; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-blog-status { flex: 1.2; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-blog-date { flex: 1.3; min-width: 0; text-align: right; padding-right: 1rem; }
-.col-blog-actions { flex: 0 0 48px; min-width: 48px; display: flex; justify-content: flex-end; overflow: visible; }
-.blogs-list-header .col-blog-actions { text-align: right; }
-
-/* ==================== BLOG ROW ==================== */
-.blog-row {
-    display: flex;
-    align-items: center;
-    padding: 0.9rem 2rem;
-    border-bottom: 1px solid var(--border-subtle);
-    transition: all 0.15s ease;
-}
-
-.blog-row:hover {
-    background: var(--bg-body);
-}
-
-.blog-row:last-child {
-    border-bottom: none;
-}
-
-.blog-title-cell {
-    font-weight: 500;
-    font-size: 0.85rem;
-    color: var(--text-strong);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.blog-author-cell {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.blog-author-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--text-on-accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 500;
-    font-size: 0.85rem;
-    flex-shrink: 0;
-}
-
-.blog-author-name {
-    font-size: 0.82rem;
-    color: var(--text-2);
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.blog-category-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.7rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.72rem;
-    font-weight: 500;
-    background: var(--accent-tint);
-    color: var(--primary-color);
-}
-
-.blog-date-cell {
-    font-size: 0.8rem;
-    color: var(--text-faint);
+.blogs-list .row-time {
     text-align: right;
-    white-space: nowrap;
 }
 
-/* ==================== STATUS BADGES ==================== */
-.blog-status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.25rem 0.65rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.68rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+.blogs-list .list-empty {
+    grid-column: 1 / -1;
 }
 
-.blog-status-badge .bi-circle-fill { font-size: 0.35rem; }
-
-.status-badge-draft { background: var(--surface-3); color: var(--text-muted); }
-.status-badge-under_review { background: var(--warning-soft); color: var(--warning); }
-.status-badge-published { background: var(--success-soft); color: var(--success); }
-.status-badge-rejected { background: var(--danger-soft); color: var(--danger); }
-
-/* ==================== PAGINATION ==================== */
-.blogs-pagination {
+/* The loading and error states all_blogs.js swaps in */
+.blogs-state {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
-    gap: 0.35rem;
-    padding: 1.5rem 0 0.5rem;
-}
-
-.blogs-pagination .page-btn {
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface-1);
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s ease;
-}
-
-.blogs-pagination .page-btn:hover:not(.disabled):not(.active) {
-    background: var(--surface-2);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-}
-
-.blogs-pagination .page-btn.active {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    border-color: var(--primary-color);
-    box-shadow: var(--elev-2);
-}
-
-.blogs-pagination .page-btn.disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.blogs-pagination .page-dots {
-    padding: 0 0.25rem;
+    gap: var(--sp-3);
+    padding: var(--sp-12) var(--sp-4);
+    font-size: var(--fs-sm);
     color: var(--text-faint);
 }
 
-/* ==================== DATE MODAL ==================== */
-#dateRangeModal .custom-modal {
+.blogs-state.is-error {
+    color: var(--danger);
+}
+
+@media (max-width: 1000px) {
+
+    /* The timestamp goes first — it is the one column whose value the row's
+       title attribute still carries, so nothing becomes unreachable. */
+    .blogs-list .data-row {
+        grid-template-columns: 36px minmax(0, 1fr) auto 40px;
+    }
+
+    .blogs-list .row-time {
+        display: none;
+    }
+}
+
+@media (max-width: 700px) {
+    .filter-bar {
+        align-items: stretch;
+    }
+
+    .filter-bar-controls .filter-pill {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .blogs-list .data-row {
+        grid-template-columns: 32px minmax(0, 1fr) 40px;
+        row-gap: var(--sp-2);
+    }
+
+    .blogs-list .row-mark {
+        width: 32px;
+        height: 32px;
+    }
+
+    .blogs-list .status-pill {
+        grid-column: 2;
+        justify-self: start;
+    }
+}
+
+/* ==========================================================================
+   DATE RANGE MODAL
+
+   A presets rail on the left, our own range calendar on the right, and a
+   footer that states what Apply will do. Native <input type="date"> is gone:
+   its popup is drawn by the browser (so it cannot take our surfaces) and it
+   picks a single date, which made a *range* two disconnected pickers.
+   ========================================================================== */
+
+#dateRangeModal .modal-dialog {
+    max-width: 640px;
+}
+
+.date-modal {
     border: none;
     border-radius: var(--radius-lg);
+    background: var(--surface-1);
     box-shadow: var(--elev-3);
     overflow: hidden;
 }
 
-#dateRangeModal .custom-modal-header {
+.date-modal-head {
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 1.75rem;
+    gap: var(--sp-4);
+    padding: var(--sp-5) var(--sp-6);
     border-bottom: 1px solid var(--border-subtle);
-    background: var(--surface-1);
 }
 
-#dateRangeModal .custom-modal-title {
-    font-size: 1.05rem;
-    font-weight: 500;
+.date-modal-title {
+    margin: 0;
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
     color: var(--text-strong);
+    letter-spacing: -0.01em;
+}
+
+.date-modal-close {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.date-modal-close:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+/* Rail + calendar. The rail is fixed so "Last 90 days" never wraps and the
+   grid keeps a stable width as the month changes. */
+.date-modal-body {
+    display: grid;
+    grid-template-columns: 176px minmax(0, 1fr);
+    align-items: stretch;
+}
+
+/* --- Presets rail ------------------------------------------------------ */
+.date-presets {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--sp-4) var(--sp-3);
+    border-right: 1px solid var(--border-subtle);
+    background: var(--surface-2);
+}
+
+.date-preset {
+    padding: var(--sp-3);
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.date-preset:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.date-preset:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+/* Set when the grid already matches this preset, so reopening shows which
+   range is in force rather than a rail of identical rows. */
+.date-preset.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-on-soft);
+}
+
+.date-custom {
+    padding: var(--sp-5) var(--sp-6);
+}
+
+/* --- Calendar ----------------------------------------------------------
+   A range picker, so the two endpoints are chosen in one grid rather than in
+   two separate single-date popups. The selected band is drawn on the *cell*
+   and the endpoints on the button inside it — that is what lets the highlight
+   run continuously across a week while the ends stay circular.
+   ----------------------------------------------------------------------- */
+
+.cal {
+    user-select: none;
+}
+
+.cal-head {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    margin: 0;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
 }
 
-#dateRangeModal .custom-modal-title i { color: var(--primary-color); }
-
-#dateRangeModal .custom-modal-body {
-    padding: 1.5rem 1.75rem;
-    background: var(--surface-1);
+.cal-title {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
 }
 
-#dateRangeModal .custom-modal-footer {
+.cal-nav {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-2);
+    font-size: 12px;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.cal-nav:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.cal-nav:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.cal-dow,
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+}
+
+.cal-dow {
+    margin-bottom: var(--sp-1);
+}
+
+.cal-dow span {
+    text-align: center;
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-faint);
+}
+
+/* No column gap: the range band has to be able to run edge to edge. */
+.cal-cell {
+    display: grid;
+    place-items: center;
+    padding: 1px 0;
+}
+
+.cal-day {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-xs);
+    color: var(--text-1);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-standard),
+        color var(--dur-fast) var(--ease-standard);
+}
+
+.cal-day:hover {
+    background: var(--surface-3);
+}
+
+.cal-day:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+/* Days spilling in from the neighbouring months stay pickable but recede. */
+.cal-cell.is-outside .cal-day {
+    color: var(--text-faint);
+}
+
+.cal-cell.is-today .cal-day {
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+/* An endpoint is already filled — the today ring on top of it just reads as a
+   double border. */
+.cal-cell.is-start .cal-day,
+.cal-cell.is-end .cal-day {
+    box-shadow: none;
+}
+
+/* The band. Painted on the cell so adjacent days join up; the half-rounded
+   ends stop it bleeding past the selection. */
+.cal-cell.is-in-range,
+.cal-cell.is-preview {
+    background: var(--accent-tint);
+}
+
+.cal-cell.is-start {
+    border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+}
+
+.cal-cell.is-end {
+    border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+}
+
+.cal-cell.is-start.is-end {
+    border-radius: var(--radius-pill);
+}
+
+.cal-cell.is-start .cal-day,
+.cal-cell.is-end .cal-day {
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-weight: var(--fw-medium);
+}
+
+.cal-cell.is-start .cal-day:hover,
+.cal-cell.is-end .cal-day:hover {
+    background: var(--accent-hover);
+}
+
+/* Mid-selection: the row reads as "click again to close the range". */
+.cal.is-picking .cal-day {
+    cursor: crosshair;
+}
+
+/* --- Footer ------------------------------------------------------------ */
+.date-modal-foot {
     display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding: 1rem 1.75rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-6);
     border-top: 1px solid var(--border-subtle);
     background: var(--surface-2);
 }
 
-.date-range-field {
-    margin-bottom: 1rem;
-}
-
-.date-range-field .form-label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--text-2);
-    margin-bottom: 0.4rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.date-range-field .form-control {
-    width: 100%;
-    padding: 0.6rem 0.85rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    color: var(--text-1);
-    background: var(--surface-1);
-    transition: all 0.2s ease;
-}
-
-.date-range-field .form-control:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
-.date-range-presets {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-subtle);
-}
-
-.preset-btn {
-    padding: 0.45rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface-1);
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    text-align: center;
-}
-
-.preset-btn:hover {
-    background: var(--accent-tint);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-}
-
-#dateRangeModal .btn-modal {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.55rem 1.15rem;
-    border-radius: var(--radius-sm);
-    font-weight: 500;
-    font-size: 0.82rem;
-    transition: all 0.2s ease;
-    border: none;
-    cursor: pointer;
-}
-
-#dateRangeModal .btn-modal-secondary {
-    background: var(--surface-1);
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-}
-
-#dateRangeModal .btn-modal-secondary:hover { background: var(--surface-2); color: var(--text-2); }
-
-#dateRangeModal .btn-modal-primary {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    box-shadow: var(--elev-2);
-}
-
-#dateRangeModal .btn-modal-primary:hover { opacity: 0.9; }
-
-/* ==================== EMPTY STATE ==================== */
-.blogs-empty {
-    padding: 3.5rem 1rem;
-    text-align: center;
-}
-
-.blogs-empty i {
-    font-size: 2.5rem;
-    color: var(--text-faint);
-    margin-bottom: 0.75rem;
-    display: block;
-}
-
-.blogs-empty p {
-    color: var(--text-faint);
-    font-weight: 500;
-    font-size: 0.9rem;
+/* The summary sits beside the buttons rather than above them: it is the label
+   for what Apply is about to do. */
+.date-summary {
     margin: 0;
+    min-width: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* ==================== RESPONSIVE ==================== */
-@media (max-width: 1024px) {
-    .blogs-list-header {
-        padding: 1rem 1.25rem;
-    }
-
-    .blog-row {
-        padding: 0.9rem 1.25rem;
-    }
+/* A backwards range is no longer reachable — the picker swaps the endpoints —
+   so the only special state left is "half a range, still waiting". */
+.date-summary.is-hint {
+    color: var(--accent);
 }
 
-@media (max-width: 768px) {
-    .blogs-filters {
-        padding: 1rem;
+.date-actions {
+    display: flex;
+    gap: var(--sp-2);
+    flex-shrink: 0;
+}
+
+.date-btn {
+    height: 40px;
+    padding: 0 var(--sp-5);
+    border: 0;
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.date-btn.is-ghost {
+    background: none;
+    color: var(--text-muted);
+}
+
+.date-btn.is-ghost:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.date-btn.is-primary {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.date-btn.is-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.date-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.date-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Below this the rail has no room beside the grid, so it becomes a row of
+   chips above it — the same options, laid out the way they were before. */
+@media (max-width: 560px) {
+    .date-modal-body {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .blogs-list-header {
-        display: none;
-    }
-
-    .blog-row {
+    .date-presets {
+        flex-direction: row;
         flex-wrap: wrap;
-        gap: 0.5rem;
-        padding: 1rem 1.25rem;
+        border-right: 0;
+        border-bottom: 1px solid var(--border-subtle);
+        padding: var(--sp-4);
     }
 
-    .col-blog-title { flex: 1 1 100%; }
-    .col-blog-author { flex: 1 1 50%; }
-    .col-blog-category { flex: 1 1 50%; }
-    .col-blog-status { flex: 0 0 auto; }
-    .col-blog-date { flex: 1; text-align: left; }
-    .col-blog-actions { flex: 0 0 auto; }
-
-    .blogs-filter-tabs {
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        padding-bottom: 0.5rem;
+    .date-preset {
+        flex: 1 1 auto;
+        border-radius: var(--radius-pill);
+        text-align: center;
+        background: var(--surface-1);
     }
 
-    .blogs-filter-controls {
+    .date-modal-foot {
         flex-direction: column;
         align-items: stretch;
     }
 
-    .blogs-filters .filter-search-wrap {
-        max-width: none;
+    .date-actions {
+        justify-content: flex-end;
     }
 }
+
+

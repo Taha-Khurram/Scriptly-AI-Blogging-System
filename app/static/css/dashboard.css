@@ -44,6 +44,11 @@
     /* --- Type ------------------------------------------------------------ */
     /* Google Sans where the platform has it (Chrome/Android/ChromeOS),
        Inter as the substitute everywhere else. */
+    /* Tells the browser which way to paint the controls it renders itself —
+       the date picker's calendar, scrollbars, the native select popup. Without
+       it, forcing data-theme="dark" on a light OS leaves those widgets white. */
+    color-scheme: light;
+
     --font-sans: 'Google Sans', 'Google Sans Text', 'Product Sans', 'Inter',
         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-display: var(--font-sans);
@@ -106,6 +111,28 @@
     /* Inverse surface — floating toasts, tooltips, snackbars */
     --inverse-surface: #303030;
     --on-inverse: #F2F2F2;
+
+    /* --- On media --------------------------------------------------------
+       Controls that sit on top of an arbitrary image — the gallery tile's
+       checkbox and copy button, and the scrim that gives them contrast.
+
+       These are the one group that must NOT be redefined per theme. What is
+       behind them is a photograph, not a surface, so a light-theme value would
+       put dark chrome on a dark photo half the time. They are fixed against
+       the image and stay legible in both themes for the same reason the auth
+       brand pane is fixed ink. Anything overlaying media uses these; anything
+       overlaying a surface uses the surface tokens instead. */
+    --media-scrim-strong: rgb(0 0 0 / 0.45);
+    --media-scrim-soft: rgb(0 0 0 / 0.12);
+    --media-chip: rgb(0 0 0 / 0.42);
+    --media-chip-hover: rgb(0 0 0 / 0.62);
+    --media-control-fill: rgb(0 0 0 / 0.35);
+    --media-control-fill-hover: rgb(0 0 0 / 0.5);
+    --media-control-edge: rgb(255 255 255 / 0.9);
+    --media-chip-edge: rgb(255 255 255 / 0.25);
+    --media-chip-edge-hover: rgb(255 255 255 / 0.45);
+    --on-media: #FFFFFF;
+    --media-control-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
 
     /* --- Text ----------------------------------------------------------- */
     --text-strong: #1F1F1F;
@@ -224,6 +251,7 @@
 
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
+        color-scheme: dark;
         --bg-canvas: #131314;
         --surface-1: #1E1F20;
         --surface-2: #282A2C;
@@ -283,6 +311,7 @@
 }
 
 :root[data-theme="dark"] {
+    color-scheme: dark;
     --bg-canvas: #131314;
     --surface-1: #1E1F20;
     --surface-2: #282A2C;
@@ -2351,6 +2380,15 @@ pre {
     color: var(--text-faint);
 }
 
+/* Chromium and Safari draw their own clear cross inside type="search". The
+   field already has one (.page-search-clear), and the pair sat side by side. */
+.page-search-input::-webkit-search-cancel-button,
+.page-search-input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
+}
+
 .page-search-kbd {
     flex-shrink: 0;
     display: inline-flex;
@@ -2401,6 +2439,132 @@ pre {
 .page-search.has-value .page-search-kbd {
     opacity: 0;
     pointer-events: none;
+}
+
+/* --- Search results dropdown ------------------------------------------- */
+/* Anchored to the field rather than the header so it tracks the search box at
+   every breakpoint, and clipped to its own scroll so a long result set never
+   runs off the bottom of the viewport. */
+.page-search-panel {
+    position: absolute;
+    top: calc(100% + var(--sp-2));
+    left: 0;
+    right: 0;
+    z-index: 5;
+    max-height: min(60vh, 26rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--sp-2);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elev-3);
+    animation: pageSearchIn var(--dur-fast) var(--ease-standard);
+}
+
+@keyframes pageSearchIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+}
+
+.page-search-result {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-sm);
+    color: var(--text-1);
+    text-decoration: none;
+    transition: background-color var(--dur-fast) var(--ease-standard);
+}
+
+/* Hover and keyboard cursor are the same affordance — the arrow keys move
+   .is-active, so a moused-over row and an arrowed-to row look identical. */
+.page-search-result:hover,
+.page-search-result.is-active {
+    background: var(--surface-3);
+}
+
+.page-search-result-mark {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-strong);
+}
+
+.page-search-result-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.page-search-result-title,
+.page-search-result-meta {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.page-search-result-title {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.page-search-result-meta {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.page-search-hit {
+    padding: 0;
+    background: none;
+    color: var(--accent);
+    font-weight: var(--fw-strong);
+}
+
+.page-search-empty {
+    margin: 0;
+    padding: var(--sp-5) var(--sp-3);
+    text-align: center;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+}
+
+/* The escape hatch: whatever the page could not answer for lives behind this
+   row, so a query with no local hit is still a dead end the reader can leave. */
+.page-search-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-1);
+    padding: var(--sp-3);
+    border-top: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+    text-decoration: none;
+    transition: background-color var(--dur-fast) var(--ease-standard);
+}
+
+.page-search-foot:hover,
+.page-search-foot.is-active {
+    background: var(--surface-3);
+    color: var(--accent);
+}
+
+.page-search-panel :is(.page-search-result, .page-search-foot):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
 }
 
 /* --- Actions ----------------------------------------------------------- */
@@ -2513,6 +2677,864 @@ pre {
     .page-header-action .page-header-label {
         display: none;
     }
+}
+
+/* ==========================================================================
+   12. LISTING PRIMITIVES — card, rows, segmented tabs, pills, pager
+
+   The pieces every "screen full of records" is built from: dashboard, drafts
+   and all-blogs all compose from these, so a row looks and behaves the same
+   wherever it appears. Page stylesheets set the column template and nothing
+   else.
+
+   Modifier classes are scoped under their block (`.status-pill.status-draft`,
+   never a bare `.status-draft`) because page CSS already owns some of those
+   names — drafts.css styles a `.status-draft` badge inside the preview modal,
+   and an unscoped rule loading after this file would silently repaint every
+   pill on the page.
+   ========================================================================== */
+
+.surface-card {
+    background: var(--surface-1);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elev-1);
+}
+
+/* --- Card head --------------------------------------------------------- */
+.card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    padding: var(--sp-6) var(--sp-6) 0;
+}
+
+.card-head.is-stacked {
+    flex-wrap: wrap;
+    row-gap: var(--sp-4);
+}
+
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0;
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+}
+
+.card-count {
+    padding: 2px 9px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: var(--transition-base);
+}
+
+.card-link:hover {
+    background: var(--accent-tint);
+    color: var(--accent);
+}
+
+.card-link i {
+    font-size: 0.9em;
+    transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.card-link:hover i {
+    transform: translateX(2px);
+}
+
+/* --- Segmented tabs ---------------------------------------------------- */
+/* Active takes --accent-soft, the same treatment the nav rail gives its
+   current item, so "selected" reads identically everywhere. */
+.seg-tabs {
+    display: flex;
+    gap: var(--sp-1);
+    padding: var(--sp-1);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.seg-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.seg-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-4);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.seg-tab:hover {
+    color: var(--text-strong);
+}
+
+.seg-tab.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-on-soft);
+}
+
+.seg-tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.seg-count {
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    font-size: var(--fs-2xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+.seg-tab.is-active .seg-count {
+    background: var(--surface-1);
+    color: var(--accent-on-soft);
+}
+
+/* --- Filter bar -------------------------------------------------------- */
+/* The primary dimension of a listing stays a segmented control above;
+   everything else is a "filter pill": a control that renders its own current
+   value, so the applied query is readable at a glance instead of hidden
+   inside a closed dropdown. An applied pill takes --accent-soft, the same
+   treatment "selected" gets everywhere else in the system.
+
+   Lived in all_blogs.css until the gallery became the second screen to use
+   it. Page stylesheets set only what is specific to their own bar. */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+    margin-bottom: var(--sp-6);
+}
+
+.filter-bar-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+}
+
+.filter-pill {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 38px;
+    padding: 0 var(--sp-4);
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.filter-pill:hover {
+    background: var(--surface-4);
+    color: var(--text-strong);
+}
+
+.filter-pill:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.filter-pill>i {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.filter-pill-caret {
+    font-size: 0.7em !important;
+    opacity: 0.6;
+    transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+/* The caret points at the panel while it is open */
+.filter-pill[aria-expanded="true"] .filter-pill-caret {
+    transform: rotate(180deg);
+}
+
+/* Applied state: the label gives way to the value, and the whole pill tints. */
+.filter-pill.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-on-soft);
+}
+
+.filter-pill.is-active:hover {
+    background: var(--accent-soft);
+    filter: brightness(1.03);
+    color: var(--accent-on-soft);
+}
+
+.filter-pill.is-active>i {
+    opacity: 1;
+}
+
+.filter-pill.is-active .filter-pill-label {
+    display: none;
+}
+
+.filter-pill-value {
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.filter-pill-value[hidden] {
+    display: none;
+}
+
+.filter-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 38px;
+    padding: 0 var(--sp-3);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.filter-clear:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.filter-clear[hidden] {
+    display: none;
+}
+
+.filter-clear i {
+    font-size: 0.7em;
+}
+
+/* --- Rows -------------------------------------------------------------- */
+/* The default is the dashboard's three-part row. Pages that need more columns
+   (all-blogs adds author / category / status / date) restate only
+   grid-template-columns. */
+.data-rows {
+    display: grid;
+    gap: 2px;
+}
+
+.data-row {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-4);
+    padding: var(--sp-3);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    transition: background var(--dur-fast) var(--ease-standard);
+}
+
+.data-row:hover {
+    background: var(--surface-2);
+}
+
+.data-row[hidden] {
+    display: none;
+}
+
+.row-mark {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-xs);
+    background: var(--surface-3);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+}
+
+.row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.row-title {
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.row-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-width: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.row-meta>span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row-sep {
+    color: var(--text-faint);
+}
+
+.row-time {
+    white-space: nowrap;
+    color: var(--text-faint);
+}
+
+/* The row's main column as a button, for lists whose rows open a modal rather
+   than navigate. Resets the control chrome and keeps the column layout. */
+.row-open {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.row-open:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-xs);
+}
+
+/* Shown when a search filters every row out of a list */
+.list-noresults {
+    margin: 0;
+    padding: var(--sp-10) var(--sp-3);
+    text-align: center;
+    font-size: var(--fs-sm);
+    color: var(--text-faint);
+}
+
+.list-noresults[hidden] {
+    display: none;
+}
+
+/* Trailing controls. The quick action is revealed by hover or keyboard focus
+   anywhere in the row — it is a shortcut to something the ⋮ menu also offers,
+   never the only way to reach it. */
+.row-trail {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-1);
+}
+
+.row-action {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: var(--transition-base);
+}
+
+.data-row:hover .row-action,
+.data-row:focus-within .row-action {
+    opacity: 1;
+}
+
+.row-action:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.row-action:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Touch has no hover, so a permanently invisible control would be unreachable */
+@media (hover: none) {
+    .row-action {
+        opacity: 1;
+    }
+}
+
+/* --- Status pills ------------------------------------------------------ */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+}
+
+.status-pill.status-draft {
+    background: var(--surface-3);
+    color: var(--text-muted);
+}
+
+.status-pill.status-under_review {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+.status-pill.status-published {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.status-pill.status-rejected {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+/* --- Empty state ------------------------------------------------------- */
+.list-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-12) var(--sp-4);
+    text-align: center;
+}
+
+.list-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--text-faint);
+    font-size: 22px;
+}
+
+.list-empty p {
+    margin: 0;
+    max-width: 24rem;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-faint);
+}
+
+/* --- Pager ------------------------------------------------------------- */
+.pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-1);
+    padding: var(--sp-5) var(--sp-4) 0;
+}
+
+.pager:empty {
+    display: none;
+}
+
+.pager-btn {
+    display: grid;
+    place-items: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 var(--sp-2);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+    text-decoration: none;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.pager-btn:hover:not(.is-active):not(.is-disabled) {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.pager-btn.is-active {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.pager-btn.is-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.pager-dots {
+    padding: 0 var(--sp-1);
+    color: var(--text-faint);
+}
+
+/* --- Entrance ---------------------------------------------------------- */
+/* `backwards`, not `both`. Both would keep the final keyframe applied forever,
+   and that keyframe sets `transform` — which gives every revealed card a
+   permanent stacking context. A dropdown opened inside one is then trapped
+   there and paints *under* the next card, whatever its z-index. The last
+   keyframe is already the element's natural state, so dropping `forwards`
+   changes nothing visually and leaves no transform behind. */
+.reveal {
+    animation: fadeInUp var(--dur-slow) var(--ease-standard) backwards;
+    animation-delay: var(--reveal-delay, 0ms);
+}
+
+/* ==========================================================================
+   14. MODAL SHELL — head / body / footer for a dialog we own
+
+   Bootstrap's modal machinery (backdrop, focus trap, Esc) is kept; only its
+   chrome is replaced, because `.modal-header`, `.bg-light`, `.text-dark` and
+   `rounded-pill` utilities carry Bootstrap's own palette rather than ours.
+   ========================================================================== */
+
+.app-modal {
+    border: none;
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    box-shadow: var(--elev-3);
+    overflow: hidden;
+}
+
+.app-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    padding: var(--sp-5) var(--sp-6);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.app-modal-title {
+    margin: 0;
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+}
+
+.app-modal-close {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.app-modal-close:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.app-modal-body {
+    padding: var(--sp-6);
+    max-height: min(60vh, 520px);
+    overflow-y: auto;
+}
+
+.app-modal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-2);
+    padding: var(--sp-4) var(--sp-6);
+    border-top: 1px solid var(--border-subtle);
+    background: var(--surface-2);
+}
+
+/* Pushes the buttons right while a count or hint sits on the left */
+.app-modal-note {
+    margin: 0 auto 0 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+/* --- Fields ------------------------------------------------------------ */
+/* The .prompt-box idiom the auth screens use: filled, no resting stroke,
+   lifting to --surface-1 on focus. */
+.app-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.app-field label {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+}
+
+.app-field input,
+.app-field textarea {
+    width: 100%;
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+    transition: var(--transition-base);
+}
+
+.app-field input::placeholder,
+.app-field textarea::placeholder {
+    color: var(--text-faint);
+}
+
+.app-field input:hover,
+.app-field textarea:hover {
+    background: var(--surface-3);
+}
+
+.app-field input:focus,
+.app-field textarea:focus {
+    outline: none;
+    background: var(--surface-1);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.app-field-hint {
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+/* --- Buttons ----------------------------------------------------------- */
+.app-btn {
+    height: 40px;
+    padding: 0 var(--sp-5);
+    border: 0;
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.app-btn.is-ghost {
+    background: none;
+    color: var(--text-muted);
+}
+
+.app-btn.is-ghost:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.app-btn.is-primary {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.app-btn.is-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.app-btn.is-danger {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.app-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.app-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ==========================================================================
+   13. MENU — the popover a select-pill opens
+
+   A native <select> popup is drawn by the browser, so it cannot take the
+   product's surfaces, radius or type — on a forced dark theme over a light OS
+   it renders white-on-blue against the dark canvas. This is the replacement:
+   a real listbox we own. The native <select> stays in the DOM as the value
+   holder (see .select-pill), so nothing that reads `.value` or listens for
+   `change` has to know.
+
+   Behaviour is the SelectPill module in app.js.
+   ========================================================================== */
+
+.select-pill {
+    position: relative;
+}
+
+/* The select is still the source of truth — kept reachable to assistive tech
+   through the trigger's aria wiring, but never painted. */
+.select-pill>select {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.menu {
+    position: absolute;
+    top: calc(100% + var(--sp-2));
+    left: 0;
+    z-index: 70;
+    min-width: 220px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: var(--sp-2);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    box-shadow: var(--elev-3);
+    animation: menuIn var(--dur-fast) var(--ease-emphasized);
+}
+
+/* Right-aligned when the trigger sits at the end of a toolbar, so the panel
+   opens inward instead of off the edge. */
+.menu.is-end {
+    left: auto;
+    right: 0;
+}
+
+.menu[hidden] {
+    display: none;
+}
+
+@keyframes menuIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    width: 100%;
+    padding: var(--sp-2) var(--sp-3);
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-standard);
+}
+
+.menu-item:hover,
+.menu-item.is-focused {
+    background: var(--surface-2);
+}
+
+.menu-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.menu-item.is-selected {
+    color: var(--accent);
+    font-weight: var(--fw-medium);
+}
+
+/* The tick holds its space at all times, so selecting an item never reflows
+   the label beside it. */
+.menu-check {
+    flex-shrink: 0;
+    width: 16px;
+    font-size: 14px;
+    visibility: hidden;
+}
+
+.menu-item.is-selected .menu-check {
+    visibility: visible;
+}
+
+.menu-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Respect reduced-motion preferences */
