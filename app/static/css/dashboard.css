@@ -134,6 +134,13 @@
     --on-media: #FFFFFF;
     --media-control-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
 
+    /* Paper behind a rendered email preview. Fixed in both themes for the same
+       reason as the --media-* group: the newsletter preview shows the email as
+       the *recipient's* client will draw it, and mail clients paint white.
+       Tinting it with the app's dark surface would make the composer lie about
+       what is about to be sent. */
+    --email-paper: #FFFFFF;
+
     /* --- Text ----------------------------------------------------------- */
     --text-strong: #1F1F1F;
     --text-1: #202124;
@@ -2825,6 +2832,170 @@ pre {
     color: var(--accent-on-soft);
 }
 
+/* --- Stat tile --------------------------------------------------------- */
+/* The full stat-tile contract: label · value · delta · trend. Medallion in the
+   first column, the reading order in the second, and an optional
+   micro-visualisation in the third.
+
+   That third column is the point. A tile of nothing but a medallion and a
+   figure leaves most of its width empty and says only "how many" — the reader
+   still has to guess whether that number is good. The trend and the delta are
+   what turn a count into a fact.
+
+   Six screens use these (activity, analytics, comments, leads, newsletter,
+   schedule) but the only definition lived in comments.css. A tile with just
+   the two original children still lays out exactly as before: the third
+   column collapses to zero. The medallion's *colour* stays with the page,
+   since what a tile means is a page-level decision. */
+.stat-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-4);
+    padding: var(--sp-5) var(--sp-6);
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    box-shadow: var(--elev-1);
+    transition: box-shadow var(--dur-base) var(--ease-standard);
+}
+
+.stat-card:hover {
+    box-shadow: var(--elev-2);
+}
+
+.stat-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border-radius: var(--radius-md);
+    font-size: 1.25rem;
+}
+
+.stat-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+/* Label above the figure, not below it: the tile is read top-down, and the
+   label is what tells you how to read the number that follows. */
+.stat-label {
+    order: -1;
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* Proportional figures, deliberately NOT tabular-nums: equal-width digits give
+   every glyph the width of a `0`, which reads loose at display size. Tabular
+   is for columns of numbers that must align vertically. */
+.stat-count {
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-medium);
+    line-height: 1.15;
+    color: var(--text-strong);
+    letter-spacing: -0.02em;
+}
+
+/* Direction is carried by an arrow glyph and words as well as by colour —
+   status hue never means anything on its own. */
+.stat-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    margin-top: 2px;
+    font-size: var(--fs-2xs);
+    color: var(--text-muted);
+}
+
+.stat-delta.is-up {
+    color: var(--success);
+}
+
+.stat-delta.is-down {
+    color: var(--danger);
+}
+
+.stat-delta i {
+    font-size: 0.9em;
+}
+
+/* --- The trend slot ---------------------------------------------------- */
+/* One series, one hue. The current period is marked by *form* — a dot with a
+   surface-coloured ring — rather than by a second colour, so nothing here
+   depends on telling two blues apart. */
+.stat-trend {
+    display: block;
+    width: 116px;
+    height: 40px;
+    overflow: visible;
+}
+
+.stat-trend-area {
+    fill: var(--accent-tint);
+}
+
+.stat-trend-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.stat-trend-dot {
+    fill: var(--accent);
+    stroke: var(--surface-1);
+    stroke-width: 2;
+}
+
+/* A meter, for a tile whose third column is a ratio rather than a series. The
+   unfilled track is a lighter step of the same hue, so the state reads across
+   the whole bar. */
+.stat-meter {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--sp-2);
+    width: 116px;
+}
+
+.stat-meter-track {
+    width: 100%;
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-tint);
+    overflow: hidden;
+}
+
+.stat-meter-fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    transition: width var(--dur-slow) var(--ease-standard);
+}
+
+.stat-meter-note {
+    font-size: var(--fs-2xs);
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
+/* Below ~440px the trend is the first thing to go — the figure and its delta
+   are the tile's job, the picture is the enhancement. */
+@media (max-width: 440px) {
+
+    .stat-trend,
+    .stat-meter {
+        display: none;
+    }
+}
+
 /* --- Filter bar -------------------------------------------------------- */
 /* The primary dimension of a listing stays a segmented control above;
    everything else is a "filter pill": a control that renders its own current
@@ -3334,7 +3505,8 @@ pre {
 }
 
 .app-field input,
-.app-field textarea {
+.app-field textarea,
+.app-field select {
     width: 100%;
     padding: var(--sp-3) var(--sp-4);
     border: 1px solid transparent;
@@ -3352,12 +3524,14 @@ pre {
 }
 
 .app-field input:hover,
-.app-field textarea:hover {
+.app-field textarea:hover,
+.app-field select:hover {
     background: var(--surface-3);
 }
 
 .app-field input:focus,
-.app-field textarea:focus {
+.app-field textarea:focus,
+.app-field select:focus {
     outline: none;
     background: var(--surface-1);
     border-color: var(--accent);
@@ -3367,6 +3541,14 @@ pre {
 .app-field-hint {
     font-size: var(--fs-xs);
     color: var(--text-faint);
+}
+
+/* Body copy for a confirmation dialog. */
+.delete-copy {
+    margin: 0;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-2);
 }
 
 /* --- Buttons ----------------------------------------------------------- */

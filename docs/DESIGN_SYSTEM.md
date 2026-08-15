@@ -152,6 +152,38 @@ Separation between segments is a **2px gap in the surface colour**, never a
 stroke, and every segment is direct-labelled in the legend below the bar, so
 identity never rests on hue alone.
 
+### The stat tile
+
+A tile is `label · value · delta · trend`, in that reading order. A medallion
+and a bare figure is only half a tile: it says *how many* and leaves the reader
+to guess whether that number is good, and on a wide card it leaves two thirds of
+the width empty. The delta answers "compared to what", the trend answers "going
+which way".
+
+- **The value takes proportional figures, never `tabular-nums`.** Equal-width
+  digits give every glyph the width of a `0`, so `121` reads loose at display
+  size. Tabular is for columns that align vertically — table rows, axis ticks.
+- **Large values compact**: `1,284` → `1.3K` → `4.2M`, with the exact figure kept
+  on the element's `title` (which is also where JS reads it back from, since the
+  compact form is unparseable).
+- **The sparkline is one series in one hue.** The current period is marked by
+  *form* — a dot with a 2px surface ring — not by a second colour, so nothing
+  depends on telling two blues apart. `--accent` carries it in both themes
+  (6.4:1 on the light surface, 9.6:1 on the dark); `--viz-stage-1` was rejected
+  for this because it lands at 2.3:1 on white.
+- **A flat all-zero series sits on the baseline**, not halfway up the box — "nothing
+  happened" must not read as "steady at some level".
+- **Padding clears the marker, not the line.** The endpoint dot reaches 4.5px past
+  its centre, so the plot insets by 6px; at 4px the last dot was clipped by the
+  viewBox.
+- **The trend has a text equivalent.** `role="img"` plus an `aria-label` naming
+  the total, the range and the latest value — a micro-chart has no room for axes,
+  and a tooltip may never be the only way to reach a value.
+- Where the third column is a **ratio rather than a series** it takes a `.stat-meter`
+  instead, whose unfilled track is a lighter step of the same hue.
+- Direction is carried by an **arrow glyph and words** as well as by colour, so the
+  reserved status hues never mean anything on their own.
+
 ### Motion
 
 `--ease-standard` `cubic-bezier(.2,0,0,1)` · `--ease-emphasized` `cubic-bezier(.3,0,0,1)` ·
@@ -534,6 +566,89 @@ rounds half *up*, so a 248,320-byte file painted as "242 KB" and silently became
 "243 KB" on the first client render. The template uses `(x + 0.5) | int`, which
 is exactly `Math.round` for positive values.
 
+### Newsletter — `newsletter.html`
+
+Three jobs behind one set of segmented tabs — **Compose · Subscribers ·
+Archive** — under the standard shell. The screen used to stack all three down
+one scrolling page, so the archive sat below a composer you were not using and
+the send button sat below that.
+
+```
+╔ page header ═══════════════════════════════════════════════════╗
+║ Email marketing                                                ║
+║ H1 Newsletter                                       ( ☾ )      ║
+╚════════════════════════════════════════════════════════════════╝
+┌ 👥 128 Subscribers ┬ 📤 12 Issues sent ┬ 📄 34 Published posts ┐
+└────────────────────┴───────────────────┴───────────────────────┘
+┌ (Compose) (Subscribers 128) (Archive 12) ──────────────────────┐
+└────────────────────────────────────────────────────────────────┘
+┌ compose ───────────────────────────────────────────────────────┐
+│ Subject line          │ ▣ Live preview      [🖥|📱]            │
+│ ▢                     │ ┌────────────────────────────┐         │
+│ Introduction          │ │  rendered email, on paper  │         │
+│ ▢▢▢                   │ │  white in both themes      │         │
+│ Post summaries        │ │                            │         │
+│ ① Title  ▢▢           │ └────────────────────────────┘         │
+│ ② Title  ▢▢           │                                        │
+├────────────────────────────────────────────────────────────────┤
+│ 👥 Goes to 128 subscribers   [Discard] [Send test] [Send ✈]    │  ← sticky
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Edit and preview are side by side.** The preview was a separate card *further
+down the page*, reached by "Continue to Preview" and left by "Back to Edit", so
+checking a wording change cost two clicks and two scrolls. It is now always
+there, re-rendered 400ms after you stop typing. Each render carries a sequence
+number and a stale response is dropped — a slow earlier render must never
+overwrite a newer one. A desktop/phone toggle sits above it, because most
+newsletters are opened on a phone.
+
+The preview iframes are `sandbox=""` — no scripts, no same-origin. `html_content`
+is replayed from storage in the archive viewer, and an email body is not a
+thing to execute.
+
+**Sending is the dangerous act, so it is the guarded one.** Previously one click
+on a button labelled "Send" delivered to every subscriber, with no confirmation
+and no undo. Now:
+
+- **Send test** was already supported by the API (`test_mode` / `test_email`) but
+  its markup was *commented out in the template*, so the safest step in the flow
+  was unreachable. It is back, prefilled with the signed-in address.
+- **Send** opens a confirmation that states the audience as a figure and repeats
+  it in the button's own label — `Send to 128 subscribers`, not `Send`.
+- Both send controls are **disabled while the mail transport is unconfigured**.
+  The old screen left them live and let the request fail.
+
+**Compose opens on a prompt, not a form.** The starting state borrows
+`create_blog.html`'s idiom — one question, one field, one action — because the
+first act here is also "ask the agent for something". With nothing published it
+says so up front instead of letting Generate fail.
+
+Four things were broken rather than merely dated, and are fixed:
+
+- **The modals sat outside `.dashboard-main`.** PJAX swaps only that element's
+  innerHTML, so View and Delete in the archive were dropped on every in-app
+  navigation and worked only after a hard reload — the same fault Categories
+  had. (The *script* survived only by accident: PJAX scrapes `<script>` tags
+  from the whole document, not just the swapped region.)
+- **Nothing was escaped.** `${sub.email}`, `${item.subject}` and `${post.title}`
+  went into markup raw, and a summary containing `</textarea>` closed the field
+  it was being written into. Subscriber addresses and blog titles are
+  user-supplied. Values are now escaped for attribute context, and the summary
+  is assigned as `.value` rather than interpolated.
+- **650 lines of `<style>` and 415 of `<script>` lived in the template** — the
+  only screen in the app with no page CSS/JS files. Uncacheable, re-parsed on
+  every visit, and PJAX had to re-inject the whole style block into `<head>`
+  each time. Both are files now.
+- **The page declared ~20 globals**, including `closeDeleteModal` and
+  `showDeleteConfirm`, which `leads.js` also declares. The two only avoided
+  colliding by never being on screen together. It is one scoped IIFE now.
+
+Subscribers gained search and CSV export (built in the browser from data already
+fetched — no new endpoint). Cells beginning `=`, `+`, `-` or `@` are quoted so a
+subscriber cannot make a spreadsheet execute their address as a formula, and the
+file carries a BOM so Excel reads UTF-8 addresses correctly.
+
 ### Scheduling / publishing — `schedule.html`, `approval_queue.html`
 
 Stat tiles, then a week navigator (`‹ May 18 – May 24 ›` + `Today` pill) above the
@@ -629,7 +744,11 @@ Reusable pieces, all token-driven:
 | Header search | `.page-search` | soft-filled pill, ⌘K/Ctrl K hint, clear button |
 | Header action | `.page-header-action` / `.page-header-icon-btn` | primary / ghost pill, 44px round icon button |
 | Page header (legacy) | `.dashboard-header` / `.header-title` | plain eyebrow + H1, still used by the other screens |
-| Stat tile | `.stat-card` / `.stat-icon` | tonal circular medallion |
+| Stat tile | `.stat-card` / `.stat-icon` / `.stat-label` / `.stat-count` / `.stat-delta` / `.stat-trend` / `.stat-meter` | the full label · value · delta · trend contract; in dashboard.css §12 since six screens use it — only the medallion's *colour* stays with the page |
+| Setup banner | `.setup-banner` | `--warning-soft` on `--warning-border`; a blocked screen explaining itself |
+| Device toggle | `.device-toggle` / `.device-btn` | desktop ↔ phone preview width |
+| Email preview | `.preview-stage` / `.preview-device` | sandboxed iframe on `--email-paper`, which does not invert |
+| Send bar | `.send-bar` | sticky footer stating the audience beside the irreversible action |
 | Card head | `.card-head` / `.card-title` / `.card-link` | title row + pill "view all" link |
 | Stacked bar | `.viz-stack` / `.viz-seg` | ordinal ramp, 2px surface gaps, 4px outer ends |
 | Chart legend | `.viz-legend` | swatch · label · count · share — doubles as the table view |
@@ -819,8 +938,23 @@ so a typo would otherwise ship silently. `--check` is the CI form.
 - **On-media controls do not take a theme.** `--media-*` / `--on-media` are the
   one token group that must not be redefined per theme: what sits behind them is
   a photograph, not a surface, so a light-mode value would put dark chrome on a
-  dark photo half the time. Anything overlaying an image uses those; anything
-  overlaying a surface uses the surface tokens.
+  dark photo half the time. `--email-paper` is the same idea for a different
+  reason — a newsletter preview shows the email as the *recipient's* client will
+  draw it, and mail clients paint white, so tinting it with the app's dark
+  surface would make the composer lie about what is about to be sent. Anything
+  overlaying an image or standing in for foreign paper uses those; anything
+  overlaying our own surface uses the surface tokens.
+- **An irreversible action names its own blast radius.** A button that says
+  "Send" is a button whose consequence you have to already know. The newsletter's
+  confirmation states the audience as a figure *and* repeats it in the button
+  label — `Send to 128 subscribers` — and the rehearsal (send yourself a test)
+  sits beside it rather than being the thing you remember afterwards.
+- **A page's script and its modals belong inside `.dashboard-main`.** PJAX swaps
+  only that element's innerHTML. Categories and Newsletter both shipped with
+  modals outside it and both were dead on in-app navigation until a hard reload.
+  Scripts are the confusing case: PJAX scrapes `<script>` tags from the *whole*
+  document, so a misplaced script still runs and the screen looks half-working
+  rather than obviously broken.
 - **The same value rendered twice must round the same way.** Jinja's `round`
   filter is Python's — half to *even* — while JS `Math.round` is half *up*. A
   file of exactly 242.5 KB therefore painted one way from the server and

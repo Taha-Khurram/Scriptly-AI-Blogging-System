@@ -10,48 +10,13 @@
     margin-bottom: 2rem;
 }
 
-.stat-card {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    padding: 1.25rem 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    flex-shrink: 0;
-}
-
+/* .stat-card / .stat-icon / .stat-info / .stat-count / .stat-label moved to
+   dashboard.css §12 — six templates use them and this file was the only
+   definition, so any page that loaded a different stylesheet got unstyled
+   tiles. Only this screen's own medallion colours stay here. */
 .stat-total { background: var(--accent-tint); color: var(--primary-color); }
 .stat-published { background: var(--success-soft); color: var(--success); }
 .stat-removed { background: var(--danger-soft); color: var(--danger); }
-
-.stat-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.stat-count {
-    font-size: 1.5rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    line-height: 1.2;
-}
-
-.stat-label {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    font-weight: 500;
-}
 
 /* ==================== FILTER TABS ==================== */
 .comment-filters {

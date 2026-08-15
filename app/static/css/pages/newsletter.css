@@ -1,0 +1,629 @@
+/* ==========================================================================
+   Newsletter — compose, audience, archive
+
+   Three jobs behind one set of segmented tabs, composing from the shared
+   primitives in dashboard.css: .surface-card, .stat-card, .seg-tabs,
+   .data-row, .list-empty, .app-modal, .app-field, .app-btn, .status-pill.
+
+   What lives here is only what an email composer needs and a listing does
+   not — the setup prompt, the split editor/preview, the device frame and
+   the send bar.
+
+   This screen previously carried 650 lines of inline <style> and 415 of
+   inline <script> in the template. Both are files now: the browser can cache
+   them, and PJAX loads the stylesheet as a <link> rather than re-injecting
+   the whole block into <head> on every visit.
+   ========================================================================== */
+
+/* ==================== SETUP BANNER ====================
+   The "email isn't configured" state. --warning-soft on --warning-border, the
+   same treatment analytics uses for its reconnect prompt, so a blocked screen
+   looks the same wherever it happens.
+   ==================================================================== */
+.setup-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-5);
+    margin-bottom: var(--sp-6);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-md);
+    background: var(--warning-soft);
+}
+
+.setup-banner[hidden] {
+    display: none;
+}
+
+.setup-banner-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--surface-1);
+    color: var(--warning);
+    font-size: 0.95rem;
+}
+
+.setup-banner-body {
+    min-width: 0;
+}
+
+.setup-banner-title {
+    margin: 0 0 2px;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.setup-banner-text {
+    margin: 0;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.setup-banner-text code {
+    padding: 1px 5px;
+    border-radius: var(--radius-xs);
+    background: var(--surface-1);
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+    color: var(--text-strong);
+}
+
+.setup-banner-text a {
+    color: var(--accent);
+}
+
+/* ==================== STATS + TABS ==================== */
+.newsletter-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-6);
+}
+
+.stat-audience { background: var(--accent-tint); color: var(--accent); }
+.stat-sent { background: var(--success-soft); color: var(--success); }
+.stat-posts { background: var(--warning-soft); color: var(--warning); }
+
+.newsletter-tabs-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+    margin-bottom: var(--sp-6);
+}
+
+/* Only the active tab's panel is in the document flow. */
+.tab-panel[hidden] {
+    display: none;
+}
+
+/* ==================== COMPOSE — SETUP PROMPT ====================
+
+   The starting state borrows create_blog's prompt idiom rather than opening
+   on a form of empty boxes: this screen's first act is also "ask the agent
+   for something", and the two should feel like the same gesture.
+   ==================================================================== */
+.compose-setup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-5);
+    padding: var(--sp-12) var(--sp-6);
+    text-align: center;
+}
+
+.compose-setup-lead {
+    max-width: 30rem;
+}
+
+.compose-setup-title {
+    margin: 0 0 var(--sp-2);
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-regular);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+}
+
+.compose-setup-lede {
+    margin: 0;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+}
+
+.compose-setup-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    width: min(560px, 100%);
+    text-align: left;
+}
+
+.compose-setup-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 150px;
+    gap: var(--sp-3);
+}
+
+/* .app-field select carries the field's surfaces from dashboard.css; the
+   caret is drawn here because Bootstrap's .form-select ships its own as a
+   background-image in a fixed colour that stays dark on a dark theme. */
+.compose-setup-form select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: var(--sp-8);
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+        linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-size: 5px 5px, 5px 5px;
+    background-position: calc(100% - 18px) calc(50% + 1px), calc(100% - 13px) calc(50% + 1px);
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+
+/* The blocked state: no published posts means there is nothing to summarise,
+   and saying so up front beats letting Generate fail. */
+.compose-blocked {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+/* ==================== COMPOSE — SPLIT EDITOR ====================
+
+   Editor left, live preview right. The old screen put the preview in a card
+   *further down the page*, reached by a "Continue to Preview" button and left
+   behind by a "Back to Edit" one — so seeing the effect of a wording change
+   cost two clicks and two scrolls. The preview is simply always there.
+   ==================================================================== */
+.compose-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--sp-6);
+    padding: var(--sp-6);
+}
+
+.compose-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    min-width: 0;
+}
+
+.compose-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    margin: 0;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* One generated post: its title is fixed (it is the blog's) and only the
+   summary is editable, so the title is a label rather than a field. */
+.compose-post {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-3);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.compose-post+.compose-post {
+    margin-top: var(--sp-3);
+}
+
+.compose-post-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    min-width: 0;
+}
+
+.compose-post-index {
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.compose-post-title {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.compose-post textarea {
+    width: 100%;
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid transparent;
+    border-radius: var(--radius-xs);
+    background: var(--surface-1);
+    font-family: inherit;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-1);
+    resize: vertical;
+    transition: var(--transition-base);
+}
+
+.compose-post textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* --- Live preview ------------------------------------------------------- */
+.compose-preview {
+    position: sticky;
+    top: var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    align-self: start;
+    min-width: 0;
+}
+
+.preview-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+}
+
+.preview-bar-label {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* Desktop / phone. Most newsletters are opened on a phone, so being able to
+   check the narrow width without leaving the composer is the point. */
+.device-toggle {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+}
+
+.device-btn {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.device-btn:hover {
+    color: var(--text-strong);
+}
+
+.device-btn.is-active {
+    background: var(--surface-1);
+    color: var(--accent);
+    box-shadow: var(--elev-1);
+}
+
+.device-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.preview-stage {
+    display: grid;
+    place-items: start center;
+    padding: var(--sp-4);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    /* Tall enough to judge an email by, capped so the send bar stays reachable
+       without scrolling the whole canvas. */
+    height: min(70vh, 720px);
+    overflow-y: auto;
+}
+
+.preview-device {
+    width: 100%;
+    max-width: 640px;
+    border-radius: var(--radius-sm);
+    background: var(--email-paper);
+    box-shadow: var(--elev-2);
+    overflow: hidden;
+    transition: max-width var(--dur-base) var(--ease-standard);
+}
+
+.preview-device.is-mobile {
+    max-width: 380px;
+}
+
+.preview-device iframe {
+    display: block;
+    width: 100%;
+    height: 2000px;
+    border: 0;
+    background: var(--email-paper);
+}
+
+/* The iframe is a fixed tall canvas that the stage scrolls, rather than an
+   iframe with its own scrollbar inside a scrolling panel — nested scroll areas
+   are the single most reliable way to make a preview feel broken. */
+.preview-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-12) var(--sp-4);
+    text-align: center;
+    font-size: var(--fs-sm);
+    color: var(--text-faint);
+}
+
+.preview-placeholder i {
+    font-size: 1.75rem;
+    opacity: 0.55;
+}
+
+/* --- Send bar ----------------------------------------------------------- */
+/* Sticky at the bottom of the composer: the decision to send should be
+   reachable from wherever you are in a long edit, not only from the end. */
+.send-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    padding: var(--sp-4) var(--sp-6);
+    border-top: 1px solid var(--border-subtle);
+    background: var(--surface-1);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.send-bar-info {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-width: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.send-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+}
+
+.send-bar-actions .app-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+/* ==================== SUBSCRIBERS ==================== */
+.audience-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    flex-wrap: wrap;
+    padding: var(--sp-4) var(--sp-6) 0;
+}
+
+.audience-search {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 320px;
+}
+
+.audience-search input {
+    width: 100%;
+    height: 38px;
+    padding: 0 var(--sp-4) 0 36px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+    transition: var(--transition-base);
+}
+
+.audience-search input::placeholder {
+    color: var(--text-faint);
+}
+
+.audience-search input:focus {
+    outline: none;
+    background: var(--surface-1);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.audience-search i {
+    position: absolute;
+    top: 50%;
+    left: var(--sp-4);
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.subscriber-rows,
+.history-rows {
+    padding: var(--sp-4) var(--sp-4) 0;
+}
+
+.subscriber-rows .data-row {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+}
+
+.history-rows .data-row {
+    grid-template-columns: 36px minmax(0, 1fr) auto auto auto;
+}
+
+.row-recipients {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+    .history-rows .data-row {
+        grid-template-columns: 36px minmax(0, 1fr) auto;
+    }
+
+    .history-rows .row-time,
+    .subscriber-rows .row-time {
+        display: none;
+    }
+}
+
+/* ==================== MODALS ==================== */
+/* The send confirmation states the count in the button label itself, so the
+   irreversible action names its own blast radius rather than saying "Send". */
+.send-confirm-figure {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-4);
+}
+
+.send-confirm-count {
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-regular);
+    line-height: 1;
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.send-confirm-unit {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+}
+
+.send-summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.send-summary-label {
+    font-size: var(--fs-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+}
+
+.send-summary-value {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    overflow-wrap: anywhere;
+}
+
+.send-warning {
+    margin: var(--sp-4) 0 0;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+}
+
+/* Archive viewer — a rendered email, so it gets the full modal body. */
+.archive-modal .app-modal-body {
+    padding: 0;
+    max-height: none;
+}
+
+.archive-stage {
+    height: min(70vh, 760px);
+    padding: var(--sp-5);
+    background: var(--surface-2);
+    overflow-y: auto;
+    display: grid;
+    place-items: start center;
+}
+
+.archive-stage .preview-device {
+    max-width: 620px;
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 1100px) {
+    .compose-split {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Stacked, the preview is below a long form — pinning it would strand it
+       off-screen, so it scrolls with the page instead. */
+    .compose-preview {
+        position: static;
+    }
+
+    .preview-stage {
+        height: min(56vh, 560px);
+    }
+}
+
+@media (max-width: 640px) {
+    .compose-setup-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .compose-setup {
+        padding: var(--sp-8) var(--sp-4);
+    }
+
+    .send-bar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .send-bar-actions .app-btn {
+        flex: 1;
+        justify-content: center;
+    }
+}

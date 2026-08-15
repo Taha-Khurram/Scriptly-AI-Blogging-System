@@ -985,13 +985,8 @@
 }
 
 /* --- Delete confirmation ------------------------------------------------ */
-.delete-copy {
-    margin: 0;
-    font-size: var(--fs-sm);
-    line-height: var(--lh-body);
-    color: var(--text-2);
-}
-
+/* .delete-copy moved to dashboard.css §14 when the newsletter's confirm
+   dialogs became the second user of it. */
 .delete-preview {
     display: flex;
     align-items: center;

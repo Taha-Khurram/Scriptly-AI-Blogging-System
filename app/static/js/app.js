@@ -996,6 +996,9 @@ const Pjax = (() => {
             </div>`,
 
         // Newsletter: header + 3 stat cards + newsletter creation card + subscribers
+        // Newsletter: header + 3 stat tiles + the section tabs + the composer's
+        // split editor/preview. The old skeleton drew a tall stacked form
+        // because that is what the page used to be.
         newsletter: `
             <header class="dashboard-header skeleton-header">
                 <div><div class="skeleton skeleton-text" style="height:14px;width:90px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:140px;"></div></div>
@@ -1005,19 +1008,22 @@ const Pjax = (() => {
                 <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:50px;"></div></div></div>
                 <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:50px;"></div></div></div>
             </div>
-            <div class="skeleton-card" style="margin-bottom:1.5rem;">
-                <div class="skeleton skeleton-text" style="height:18px;width:180px;margin-bottom:1.25rem;"></div>
-                <div class="skeleton skeleton-text sm" style="margin-bottom:0.5rem;"></div>
-                <div class="skeleton" style="width:100%;height:40px;border-radius:8px;margin-bottom:1rem;"></div>
-                <div class="skeleton skeleton-text sm" style="margin-bottom:0.5rem;"></div>
-                <div class="skeleton" style="width:100%;height:80px;border-radius:8px;margin-bottom:1rem;"></div>
-                <div class="skeleton" style="width:140px;height:38px;border-radius:8px;"></div>
+            <div class="skeleton-filter-bar" style="margin-bottom:1.5rem;">
+                <div class="skeleton" style="width:96px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:124px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:98px;height:34px;border-radius:999px;"></div>
             </div>
             <div class="skeleton-card">
-                <div class="skeleton skeleton-text" style="height:18px;width:130px;margin-bottom:1rem;"></div>
-                <div class="skeleton-list-item"><div class="skeleton skeleton-text md"></div><div class="skeleton skeleton-text sm"></div></div>
-                <div class="skeleton-list-item"><div class="skeleton skeleton-text lg"></div><div class="skeleton skeleton-text sm"></div></div>
-                <div class="skeleton-list-item"><div class="skeleton skeleton-text md"></div><div class="skeleton skeleton-text sm"></div></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+                    <div>
+                        <div class="skeleton skeleton-text sm" style="margin-bottom:0.5rem;"></div>
+                        <div class="skeleton" style="width:100%;height:40px;border-radius:12px;margin-bottom:1.25rem;"></div>
+                        <div class="skeleton skeleton-text sm" style="margin-bottom:0.5rem;"></div>
+                        <div class="skeleton" style="width:100%;height:88px;border-radius:12px;margin-bottom:1.25rem;"></div>
+                        <div class="skeleton" style="width:100%;height:72px;border-radius:12px;"></div>
+                    </div>
+                    <div class="skeleton" style="width:100%;height:320px;border-radius:16px;"></div>
+                </div>
             </div>`,
 
         // Leads: header + 3 stats + filter tabs + table (status, name, email, subject, date, actions)

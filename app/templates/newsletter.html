@@ -1,1321 +1,413 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Newsletter | ScriptlyAI{% endblock %}
+{% block title %}Newsletter | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<style>
-    /* Stats Cards */
-    .stats-row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    .stat-card {
-        background: var(--surface-1);
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        box-shadow: var(--shadow-sm);
-        border: 1px solid var(--border-subtle);
-    }
-
-    .stat-card .stat-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: var(--radius-md);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-        margin-bottom: 1rem;
-    }
-
-    .stat-card .stat-value {
-        font-size: 2rem;
-        font-weight: 500;
-        color: var(--text-primary);
-        line-height: 1;
-    }
-
-    .stat-card .stat-label {
-        font-size: 0.85rem;
-        color: var(--text-muted);
-        margin-top: 0.25rem;
-    }
-
-    /* Newsletter Card */
-    .newsletter-card {
-        background: var(--surface-1);
-        border-radius: var(--radius-lg);
-        padding: 2rem;
-        box-shadow: var(--shadow-sm);
-        margin-bottom: 1.5rem;
-        border: 1px solid var(--border-subtle);
-    }
-
-    .newsletter-card h3 {
-        color: var(--text-primary);
-        margin-bottom: 0.5rem;
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        font-size: 1.25rem;
-        font-weight: 500;
-    }
-
-    .newsletter-card h3 i {
-        color: var(--primary-color);
-        font-size: 1.1rem;
-        padding: 0.5rem;
-        background: var(--accent-tint);
-        border-radius: var(--radius-sm);
-    }
-
-    .newsletter-card > p.text-muted {
-        margin-bottom: 1.5rem;
-        color: var(--text-muted);
-        font-size: 0.9rem;
-    }
-
-    /* Form Styles */
-    .form-label {
-        font-size: 0.8rem;
-        font-weight: 500;
-        color: var(--primary-color);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 0.5rem;
-    }
-
-    .form-control, .form-select {
-        border: 2px solid var(--border);
-        border-radius: var(--radius-sm);
-        padding: 0.75rem 1rem;
-        font-size: 0.95rem;
-        color: var(--text-1);
-        background-color: var(--surface-2);
-        transition: all 0.2s ease;
-    }
-
-    .form-control:focus, .form-select:focus {
-        border-color: var(--primary-color);
-        background-color: var(--surface-1);
-        box-shadow: 0 0 0 4px var(--focus-ring);
-        outline: none;
-    }
-
-    /* Preview Section */
-    .preview-frame {
-        background: var(--surface-2);
-        border: 2px solid var(--border);
-        border-radius: var(--radius-md);
-        padding: 1rem;
-        max-height: 500px;
-        overflow-y: auto;
-    }
-
-    .preview-frame iframe {
-        width: 100%;
-        min-height: 400px;
-        border: none;
-        background: var(--surface-1);
-        border-radius: var(--radius-sm);
-    }
-
-    /* Post Selection */
-    .post-select-item {
-        display: flex;
-        align-items: center;
-        padding: 1rem;
-        border: 2px solid var(--border);
-        border-radius: var(--radius-sm);
-        margin-bottom: 0.75rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-    .post-select-item:hover {
-        border-color: var(--primary-color);
-        background: var(--accent-tint);
-    }
-
-    .post-select-item.selected {
-        border-color: var(--primary-color);
-        background: var(--accent-tint);
-    }
-
-    .post-select-item input {
-        margin-right: 1rem;
-    }
-
-    .post-select-info {
-        flex: 1;
-    }
-
-    .post-select-title {
-        font-weight: 500;
-        color: var(--text-primary);
-    }
-
-    .post-select-meta {
-        font-size: 0.8rem;
-        color: var(--text-faint);
-    }
-
-    /* Subscriber List */
-    .subscriber-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .subscriber-item:last-child {
-        border-bottom: none;
-    }
-
-    .subscriber-email {
-        font-weight: 500;
-        color: var(--text-primary);
-    }
-
-    .subscriber-date {
-        font-size: 0.8rem;
-        color: var(--text-faint);
-    }
-
-    /* Buttons */
-    .btn-primary {
-        background: var(--accent);
-        border: none;
-        padding: 0.75rem 2rem;
-        border-radius: var(--radius-sm);
-        font-weight: 500;
-        font-size: 0.9rem;
-        transition: all 0.2s ease;
-        box-shadow: var(--elev-2);
-    }
-
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--elev-2);
-    }
-
-    .btn-outline-primary {
-        border: 2px solid var(--primary-color);
-        color: var(--primary-color);
-        padding: 0.7rem 1.5rem;
-        border-radius: var(--radius-sm);
-        font-weight: 500;
-        background: transparent;
-    }
-
-    .btn-outline-primary:hover {
-        background: var(--primary-color);
-        color: var(--text-on-accent);
-    }
-
-    /* Steps Indicator */
-    .steps-indicator {
-        display: flex;
-        justify-content: center;
-        gap: 2rem;
-        margin-bottom: 2rem;
-    }
-
-    .step {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        color: var(--text-faint);
-        font-weight: 500;
-    }
-
-    .step.active {
-        color: var(--primary-color);
-    }
-
-    .step.completed {
-        color: var(--success-color);
-    }
-
-    .step-number {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--surface-3);
-        font-weight: 500;
-        font-size: 0.9rem;
-    }
-
-    .step.active .step-number {
-        background: var(--primary-color);
-        color: var(--text-on-accent);
-    }
-
-    .step.completed .step-number {
-        background: var(--success-color);
-        color: white;
-    }
-
-    /* History Table */
-    .history-table {
-        width: 100%;
-    }
-
-    .history-table th {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        color: var(--text-muted);
-        font-weight: 500;
-        padding: 0.75rem 1rem;
-        border-bottom: 2px solid var(--border);
-    }
-
-    .history-table td {
-        padding: 1rem;
-        border-bottom: 1px solid var(--border-subtle);
-        color: var(--text-primary);
-    }
-
-    .history-table tr:hover {
-        background: var(--surface-2);
-    }
-
-    /* Loading States */
-    .loading-spinner {
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        border: 3px solid var(--border);
-        border-top-color: var(--primary-color);
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-
-    .btn.loading {
-        position: relative;
-        color: transparent;
-        pointer-events: none;
-    }
-
-    .btn.loading::after {
-        content: '';
-        position: absolute;
-        width: 20px;
-        height: 20px;
-        top: 50%;
-        left: 50%;
-        margin: -10px 0 0 -10px;
-        border: 3px solid transparent;
-        border-top-color: var(--surface-1);
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-
-    /* Empty State */
-    .empty-state {
-        text-align: center;
-        padding: 3rem 2rem;
-        color: var(--text-faint);
-    }
-
-    .empty-state i {
-        font-size: 3rem;
-        opacity: 0.3;
-        margin-bottom: 1rem;
-    }
-
-    /* Generated Content */
-    .generated-content {
-        background: var(--surface-2);
-        border-radius: var(--radius-md);
-        padding: 1.5rem;
-        margin-top: 1rem;
-    }
-
-    .generated-subject {
-        font-size: 1.1rem;
-        font-weight: 500;
-        color: var(--text-primary);
-        margin-bottom: 1rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid var(--border);
-    }
-
-    .generated-intro {
-        color: var(--text-2);
-        line-height: 1.6;
-        margin-bottom: 1rem;
-    }
-
-    .generated-post {
-        background: var(--surface-1);
-        border-radius: var(--radius-sm);
-        padding: 1rem;
-        margin-bottom: 0.75rem;
-        border: 1px solid var(--border);
-    }
-
-    .generated-post h5 {
-        font-weight: 500;
-        color: var(--text-primary);
-        margin-bottom: 0.5rem;
-    }
-
-    .generated-post p {
-        color: var(--text-muted);
-        font-size: 0.9rem;
-        margin: 0;
-    }
-
-    /* Setup Alert */
-    .setup-alert {
-        background: var(--warning-soft);
-        border: 1px solid var(--warning-border);
-        border-radius: var(--radius-md);
-        padding: 1.25rem;
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: flex-start;
-        gap: 1rem;
-    }
-
-    .setup-alert i {
-        color: var(--warning);
-        font-size: 1.25rem;
-        margin-top: 2px;
-    }
-
-    .setup-alert h5 {
-        color: var(--warning);
-        margin-bottom: 0.25rem;
-        font-weight: 500;
-    }
-
-    .setup-alert p {
-        color: var(--text-2);
-        font-size: 0.9rem;
-        margin: 0;
-    }
-
-    .setup-alert code {
-        background: var(--surface-2);
-        padding: 0.15rem 0.4rem;
-        border-radius: var(--radius-xs);
-        font-size: 0.85rem;
-    }
-
-    /* Send Panel */
-    .send-panel {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .send-panel h5 {
-        color: var(--text-primary);
-        font-weight: 500;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid var(--border);
-    }
-
-    .send-panel .btn-lg {
-        padding: 1rem 2rem;
-        font-size: 1.1rem;
-    }
-
-    @media (max-width: 991px) {
-        .send-panel {
-            margin-top: 1.5rem;
-        }
-    }
-
-    /* Dropdown Actions */
-    .dropdown-actions {
-        position: relative;
-        display: inline-block;
-    }
-
-    .btn-dots {
-        background: none;
-        border: none;
-        padding: 0.5rem;
-        cursor: pointer;
-        color: var(--text-muted);
-        border-radius: var(--radius-xs);
-        transition: all 0.2s ease;
-    }
-
-    .btn-dots:hover {
-        background: var(--surface-3);
-        color: var(--primary-color);
-    }
-
-    .dropdown-menu-actions {
-        position: absolute;
-        right: 0;
-        top: 100%;
-        background: var(--surface-1);
-        border-radius: var(--radius-sm);
-        box-shadow: var(--elev-2);
-        min-width: 100px;
-        z-index: 100;
-        display: none;
-        overflow: hidden;
-    }
-
-    .dropdown-menu-actions.show {
-        display: block;
-    }
-
-    .dropdown-menu-actions button {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        padding: 0.75rem 1rem;
-        border: none;
-        background: none;
-        text-align: left;
-        cursor: pointer;
-        font-size: 0.9rem;
-        color: var(--text-1);
-        transition: background 0.2s ease;
-    }
-
-    .dropdown-menu-actions button:hover {
-        background: var(--surface-2);
-        color: var(--primary-color);
-    }
-
-    /* View Newsletter Modal - Right Side Panel */
-    .view-modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: var(--scrim);
-        z-index: 1000;
-        opacity: 0;
-        visibility: hidden;
-        transition: all 0.3s ease;
-    }
-
-    .view-modal-overlay.active {
-        opacity: 1;
-        visibility: visible;
-    }
-
-    .view-modal-content {
-        position: absolute;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        background: var(--surface-1);
-        width: 600px;
-        max-width: 100%;
-        display: flex;
-        flex-direction: column;
-        transform: translateX(100%);
-        transition: transform 0.3s ease;
-    }
-
-    .view-modal-overlay.active .view-modal-content {
-        transform: translateX(0);
-    }
-
-    .view-modal-header {
-        padding: 1.25rem 1.5rem;
-        border-bottom: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    .view-modal-header h4 {
-        margin: 0;
-        font-weight: 500;
-        color: var(--text-primary);
-    }
-
-    .view-modal-close {
-        background: none;
-        border: none;
-        font-size: 1.5rem;
-        cursor: pointer;
-        color: var(--text-muted);
-        padding: 0.25rem;
-    }
-
-    .view-modal-close:hover {
-        color: var(--primary-color);
-    }
-
-    .view-modal-body {
-        padding: 1rem;
-        overflow-y: auto;
-        flex: 1;
-    }
-
-    .view-modal-body iframe {
-        width: 100%;
-        height: 100%;
-        min-height: 100%;
-        border: 1px solid var(--border);
-        border-radius: var(--radius-sm);
-    }
-
-    /* Delete Confirmation Modal */
-    .confirm-modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: var(--scrim);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1100;
-        opacity: 0;
-        visibility: hidden;
-        transition: all 0.3s ease;
-    }
-
-    .confirm-modal-overlay.active {
-        opacity: 1;
-        visibility: visible;
-    }
-
-    .confirm-modal-content {
-        background: var(--surface-1);
-        border-radius: var(--radius-lg);
-        padding: 2rem;
-        width: 90%;
-        max-width: 400px;
-        text-align: center;
-        transform: scale(0.9);
-        transition: transform 0.3s ease;
-    }
-
-    .confirm-modal-overlay.active .confirm-modal-content {
-        transform: scale(1);
-    }
-
-    .confirm-modal-icon {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background: var(--danger-soft);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 1rem;
-        font-size: 1.5rem;
-    }
-
-    .confirm-modal-content h4 {
-        margin: 0 0 0.5rem;
-        font-weight: 500;
-        color: var(--text-primary);
-    }
-
-    .confirm-modal-content p {
-        margin: 0;
-        font-size: 0.9rem;
-    }
-
-    .btn-danger {
-        background: var(--danger);
-        border: none;
-        color: var(--text-on-accent);
-        padding: 0.75rem 1.5rem;
-        border-radius: var(--radius-sm);
-        font-weight: 500;
-    }
-
-    .btn-danger:hover {
-        background: var(--danger);
-        filter: brightness(0.92);
-    }
-
-    .btn-danger:disabled {
-        background: var(--surface-3);
-        color: var(--text-faint);
-        cursor: not-allowed;
-    }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/newsletter.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
+{% set subs = subscriber_count | default(0) | int %}
+{% set sent = sent_count | default(0) | int %}
+{% set posts = published_count | default(0) | int %}
+
 <div class="dashboard-layout">
 
-    {% include 'partials/sidebar.html' %}
+  {% include 'partials/sidebar.html' %}
 
-    <main class="dashboard-main">
-        <header class="dashboard-header">
-            <div>
-                <div class="header-welcome-text">Email Marketing</div>
-                <h1 class="header-title">Newsletter</h1>
-            </div>
-        </header>
+  {#
+    Everything below — the stats, the tabs, all four modals and the page script
+    — lives inside .dashboard-main. PJAX swaps only that element's innerHTML,
+    and this screen used to keep its modals and its script *outside* it: the
+    script survived only because PJAX happens to scrape <script> tags from the
+    whole document, while the View and Delete modals were dropped on every
+    in-app navigation and stayed broken until a hard reload.
+  #}
+  <main class="dashboard-main">
 
-        <!-- Setup Alert (shown if email not configured) -->
-        <div class="setup-alert" id="setup-alert" style="display: none;">
-            <i class="bi bi-exclamation-triangle-fill"></i>
-            <div>
-                <h5>Email Service Not Configured</h5>
-                <p>Add your Gmail credentials to <code>.env</code> file: <code>GMAIL_USER</code> and <code>GMAIL_APP_PASSWORD</code><br>
-                Generate an App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank">myaccount.google.com/apppasswords</a></p>
-            </div>
-        </div>
+    {% call page_header(title='Newsletter', eyebrow='Email marketing') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    {% endcall %}
 
-        <!-- Stats Row -->
-        <div class="stats-row">
-            <div class="stat-card">
-                <div class="stat-icon" style="background: var(--accent-tint); color: var(--accent);">
-                    <i class="bi bi-people-fill"></i>
-                </div>
-                <div class="stat-value" id="subscriber-count">{{ subscriber_count }}</div>
-                <div class="stat-label">Subscribers</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon" style="background: var(--success-soft); color: var(--success);">
-                    <i class="bi bi-send-fill"></i>
-                </div>
-                <div class="stat-value" id="sent-count">{{ sent_count }}</div>
-                <div class="stat-label">Newsletters Sent</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon" style="background: var(--warning-soft); color: var(--warning);">
-                    <i class="bi bi-journal-text"></i>
-                </div>
-                <div class="stat-value" id="published-count">{{ published_count }}</div>
-                <div class="stat-label">Published Blogs</div>
-            </div>
-        </div>
-
-        <!-- Create Newsletter Section -->
-        <div class="newsletter-card">
-            <h3><i class="bi bi-pencil-square"></i> Create Newsletter</h3>
-            <p class="text-muted">Generate an AI-powered newsletter from your recent published blogs.</p>
-
-            <!-- Step 1: Configure -->
-            <div id="step-configure">
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Topic / Theme (Optional)</label>
-                            <input type="text" class="form-control" id="newsletter-topic"
-                                   placeholder="e.g., Weekly roundup, Tech updates">
-                            <small class="text-muted">Leave empty for a general digest</small>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Number of Posts</label>
-                            <select class="form-select" id="newsletter-limit">
-                                <option value="3">3 posts</option>
-                                <option value="5" selected>5 posts</option>
-                                <option value="10">10 posts</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Custom Introduction (Optional)</label>
-                    <textarea class="form-control" id="newsletter-intro" rows="2"
-                              placeholder="Write a custom intro or leave empty for AI-generated..."></textarea>
-                </div>
-
-                <button class="btn btn-primary" id="btn-generate" onclick="generateNewsletter()">
-                    <i class="bi bi-stars me-2"></i>Generate Newsletter
-                </button>
-            </div>
-
-            <!-- Generated Content -->
-            <div id="generated-result" style="display: none;">
-                <hr class="my-4">
-                <h5 class="mb-3">Generated Content</h5>
-
-                <div class="mb-3">
-                    <label class="form-label">Subject Line</label>
-                    <input type="text" class="form-control" id="final-subject">
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Introduction</label>
-                    <textarea class="form-control" id="final-intro" rows="3"></textarea>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Post Summaries</label>
-                    <div id="posts-list"></div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Call to Action</label>
-                    <input type="text" class="form-control" id="final-cta" value="Visit Our Blog">
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Closing Message</label>
-                    <input type="text" class="form-control" id="final-closing" value="Thanks for reading!">
-                </div>
-
-                <div class="d-flex gap-3 mt-4">
-                    <button class="btn btn-primary" id="btn-preview" onclick="showPreviewCard()">
-                        <span class="btn-text"><i class="bi bi-arrow-right me-2"></i>Continue to Preview</span>
-                        <span class="btn-loading" style="display: none;">
-                            <span class="spinner-border spinner-border-sm me-2"></span>Loading Preview...
-                        </span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Preview & Send Card -->
-        <div class="newsletter-card" id="preview-send-card" style="display: none;">
-            <h3><i class="bi bi-send"></i> Preview & Send</h3>
-            <p class="text-muted">Review your newsletter and send it to subscribers.</p>
-
-            <div class="row">
-                <div class="col-lg-8">
-                    <div class="preview-frame" style="max-height: 600px;">
-                        <iframe id="preview-iframe" srcdoc="" style="min-height: 500px;"></iframe>
-                    </div>
-                </div>
-                <div class="col-lg-4">
-                    <div class="send-panel" style="background: var(--surface-2); border-radius: var(--radius-md); padding: 1.5rem; height: 100%;">
-                        <h5 class="mb-3"><i class="bi bi-envelope-paper me-2"></i>Ready to Send</h5>
-
-                        <div class="mb-3 p-3 bg-white rounded border">
-                            <div class="text-muted small mb-1">Subject</div>
-                            <div class="fw-bold" id="preview-subject-display">-</div>
-                        </div>
-
-                        <div class="mb-3 p-3 bg-white rounded border">
-                            <div class="text-muted small mb-1">Recipients</div>
-                            <div class="fw-bold"><span id="preview-recipient-count">-</span> subscribers</div>
-                        </div>
-
-                        <div class="d-grid gap-2 mt-4">
-                            <button class="btn btn-primary btn-lg" id="btn-send" onclick="sendNewsletter()">
-                                <i class="bi bi-send-fill me-2"></i>Send
-                            </button>
-                        </div>
-
-                        <div class="mt-3">
-                            <button class="btn btn-link text-muted p-0" onclick="hidePreviewCard()">
-                                <i class="bi bi-arrow-left me-1"></i>Back to Edit
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Subscribers Section -->
-        <div class="newsletter-card">
-            <h3><i class="bi bi-people"></i> Subscribers</h3>
-            <p class="text-muted">People who subscribed to your newsletter.</p>
-
-            <div id="subscribers-list">
-                <div class="empty-state">
-                    <i class="bi bi-people d-block"></i>
-                    <p class="mb-0">Loading subscribers...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- History Section -->
-        <div class="newsletter-card">
-            <h3><i class="bi bi-clock-history"></i> Send History</h3>
-            <p class="text-muted">Track your newsletter performance.</p>
-
-            <div id="history-list">
-                <div class="empty-state">
-                    <i class="bi bi-clock-history d-block"></i>
-                    <p class="mb-0">Loading history...</p>
-                </div>
-            </div>
-        </div>
-
-    </main>
-</div>
-
-<!-- Test Email Modal
-<div class="confirm-modal-overlay" id="testEmailModal">
-    <div class="confirm-modal-content">
-        <h4 class="mb-3">Send Test Email</h4>
-        <div class="mb-3">
-            <label class="form-label">Email Address</label>
-            <input type="email" class="form-control" id="test-email" placeholder="your@email.com">
-        </div>
-        <div class="d-flex gap-2 justify-content-end">
-            <button class="btn btn-outline-secondary" onclick="closeTestModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="confirmSendTest()">Send Test</button>
-        </div>
+    {# Hidden until /api/newsletter/status says the transport is unconfigured,
+       rather than flashing a warning on every load while the check is in
+       flight. Every send control stays disabled while it is showing. #}
+    <div class="setup-banner" data-setup-banner hidden>
+      <span class="setup-banner-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+      <div class="setup-banner-body">
+        <p class="setup-banner-title">Email service not configured</p>
+        <p class="setup-banner-text">
+          Add <code>GMAIL_USER</code> and <code>GMAIL_APP_PASSWORD</code> to your <code>.env</code> file.
+          Generate an app password at
+          <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">
+            myaccount.google.com/apppasswords</a>. You can still draft an issue — sending is disabled until then.
+        </p>
+      </div>
     </div>
-</div> -->
 
-<!-- View Newsletter Modal -->
-<div class="view-modal-overlay" id="viewNewsletterModal" onclick="closeViewModal()">
-    <div class="view-modal-content" onclick="event.stopPropagation()">
-        <div class="view-modal-header">
-            <h4 id="view-modal-title">Newsletter Preview</h4>
-            <button class="view-modal-close" onclick="closeViewModal()">&times;</button>
-        </div>
-        <div class="view-modal-body">
-            <iframe id="view-newsletter-iframe" srcdoc=""></iframe>
-        </div>
+    {#
+      Stat tiles carrying the full contract — label, value, delta, trend —
+      rather than a medallion and a bare count with two thirds of the card
+      empty. The delta and the sparkline are computed in the browser from the
+      subscriber and archive payloads the page already fetches, so none of this
+      costs an extra request; the server-rendered figure is the truth until
+      they arrive and is never animated over.
+    #}
+    <div class="newsletter-stats reveal">
+      <div class="stat-card">
+        <span class="stat-icon stat-audience"><i class="bi bi-people-fill" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">{{ 'Subscriber' if subs == 1 else 'Subscribers' }}</span>
+          <span class="stat-count" data-stat-subscribers title="{{ subs }}">{{ subs }}</span>
+          <span class="stat-delta" data-delta-subscribers></span>
+        </span>
+        <span data-trend-subscribers></span>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-icon stat-sent"><i class="bi bi-send-fill" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">{{ 'Issue sent' if sent == 1 else 'Issues sent' }}</span>
+          <span class="stat-count" data-stat-sent title="{{ sent }}">{{ sent }}</span>
+          <span class="stat-delta" data-delta-sent></span>
+        </span>
+        <span data-trend-sent></span>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-icon stat-posts"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">{{ 'Published post' if posts == 1 else 'Published posts' }}</span>
+          <span class="stat-count" data-stat-posts title="{{ posts }}">{{ posts }}</span>
+          <span class="stat-delta" data-delta-posts></span>
+        </span>
+        {# A ratio, not a series — so this slot is a meter. It tracks the Posts
+           select in the composer, which is what ties the number to the action. #}
+        <span class="stat-meter" data-meter-posts{{ ' hidden' if posts == 0 else '' }}>
+          <span class="stat-meter-track">
+            <span class="stat-meter-fill" data-meter-fill style="width:0%"></span>
+          </span>
+          <span class="stat-meter-note" data-meter-note></span>
+        </span>
+      </div>
     </div>
-</div>
 
-<!-- Delete Confirmation Modal -->
-<div class="confirm-modal-overlay" id="deleteConfirmModal">
-    <div class="confirm-modal-content">
-        <div class="confirm-modal-icon">
-            <i class="bi bi-trash text-danger"></i>
+    {# Three jobs, three tabs. The old screen stacked all of them down one
+       scrolling page — compose, then preview, then subscribers, then history —
+       so the archive sat below a composer you were not using. #}
+    <section class="surface-card newsletter-tabs-bar reveal" style="--reveal-delay: 60ms" aria-label="Newsletter sections">
+      <div class="seg-tabs newsletter-tabs" role="tablist" aria-label="Newsletter sections">
+        <button type="button" class="seg-tab is-active" role="tab" aria-selected="true" data-tab="compose">
+          Compose
+        </button>
+        <button type="button" class="seg-tab" role="tab" aria-selected="false" data-tab="audience">
+          Subscribers <span class="seg-count" data-subscriber-shown>{{ subs }}</span>
+        </button>
+        <button type="button" class="seg-tab" role="tab" aria-selected="false" data-tab="history">
+          Archive <span class="seg-count" data-history-count>{{ sent }}</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ===================== COMPOSE ===================== -->
+    <section class="surface-card reveal" style="--reveal-delay: 120ms" data-tab-panel="compose">
+
+      {# Starting state. Borrows the create-blog prompt idiom rather than
+         opening on a wall of empty fields, because the first act here is also
+         "ask the agent for something". #}
+      <div class="compose-setup" data-compose-setup>
+        <div class="compose-setup-lead">
+          <h2 class="compose-setup-title">What should this issue cover?</h2>
+          <p class="compose-setup-lede">
+            Scriptly reads your published posts and drafts a newsletter around them — subject line,
+            intro, a summary per post and a closing. You edit everything before it goes out.
+          </p>
         </div>
-        <h4>Delete Newsletter?</h4>
-        <p class="text-muted">This action cannot be undone. The newsletter will be permanently removed from your history.</p>
-        <div class="d-flex gap-2 justify-content-center mt-4">
-            <button class="btn btn-outline-secondary" onclick="closeDeleteModal()">Cancel</button>
-            <button class="btn btn-danger" id="btn-confirm-delete" onclick="confirmDeleteNewsletter()">
-                <span class="btn-text">Delete</span>
-                <span class="btn-loading" style="display: none;">
-                    <span class="spinner-border spinner-border-sm me-2"></span>Deleting...
-                </span>
+
+        <div class="compose-setup-form">
+          <div class="compose-setup-row">
+            <div class="app-field">
+              <label for="composeTopic">Theme <span class="app-field-hint">optional</span></label>
+              <input type="text" id="composeTopic" autocomplete="off"
+                placeholder="e.g. Weekly roundup, product updates">
+            </div>
+            <div class="app-field">
+              <label for="composeLimit">Posts</label>
+              <select id="composeLimit" class="form-select">
+                <option value="3">3 posts</option>
+                <option value="5" selected>5 posts</option>
+                <option value="10">10 posts</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="app-field">
+            <label for="composeIntro">Opening line <span class="app-field-hint">optional</span></label>
+            <textarea id="composeIntro" rows="2"
+              placeholder="Leave empty and Scriptly will write one from your posts."></textarea>
+          </div>
+
+          {% if posts == 0 %}
+          <p class="compose-blocked">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            Publish at least one post first — a newsletter is built from them.
+          </p>
+          {% endif %}
+
+          <div>
+            <button type="button" class="app-btn is-primary" data-generate {{ 'disabled' if posts == 0 else '' }}>
+              <i class="bi bi-stars" aria-hidden="true"></i> Draft newsletter
             </button>
+          </div>
         </div>
-    </div>
-</div>
+      </div>
 
-<script>
-var generatedData = null;
-var renderedHtml = null;
-var deleteNewsletterIdPending = null;
+      {# Editor and preview side by side. The preview used to be a separate
+         card further down the page behind a "Continue to Preview" button, so
+         checking a wording change cost two clicks and two scrolls. #}
+      <div data-compose-editor hidden>
+        <div class="compose-split">
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadStats();
-    loadSubscribers();
-    loadHistory();
-});
-
-async function loadStats() {
-    // Counts already rendered server-side; just check email service config
-    try {
-        const response = await fetch('/api/newsletter/status');
-        const data = await response.json();
-
-        if (!data.email_service?.configured) {
-            document.getElementById('setup-alert').style.display = 'flex';
-        }
-    } catch (err) {
-        console.error('Stats error:', err);
-    }
-}
-
-async function loadSubscribers() {
-    try {
-        const response = await fetch('/api/newsletter/subscribers');
-        const data = await response.json();
-
-        const container = document.getElementById('subscribers-list');
-
-        if (!data.subscribers || data.subscribers.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="bi bi-people d-block"></i>
-                    <p class="mb-0 fw-bold">No subscribers yet</p>
-                    <p class="small">Subscribers from your site will appear here</p>
-                </div>
-            `;
-            return;
-        }
-
-        let html = '';
-        data.subscribers.forEach(sub => {
-            const date = sub.subscribed_at ? new Date(sub.subscribed_at).toLocaleDateString() : 'Recently';
-            html += `
-                <div class="subscriber-item">
-                    <div>
-                        <div class="subscriber-email">${sub.email}</div>
-                        <div class="subscriber-date">Subscribed: ${date}</div>
-                    </div>
-                </div>
-            `;
-        });
-        container.innerHTML = html;
-
-    } catch (err) {
-        console.error('Subscribers error:', err);
-        document.getElementById('subscribers-list').innerHTML = `
-            <div class="empty-state">
-                <i class="bi bi-exclamation-circle d-block"></i>
-                <p class="mb-0">Failed to load subscribers</p>
+          <div class="compose-editor">
+            <div class="app-field">
+              <label for="finalSubject">Subject line</label>
+              <input type="text" id="finalSubject" autocomplete="off" placeholder="What lands in the inbox">
             </div>
-        `;
-    }
-}
 
-async function loadHistory() {
-    try {
-        const response = await fetch('/api/newsletter/history');
-        const data = await response.json();
+            <div class="app-field">
+              <label for="finalIntro">Introduction</label>
+              <textarea id="finalIntro" rows="4"></textarea>
+            </div>
 
-        const container = document.getElementById('history-list');
+            <div>
+              <h3 class="compose-section-title">
+                Post summaries
+                <span class="app-field-hint">titles come from the posts</span>
+              </h3>
+              <div data-post-list></div>
+            </div>
 
-        if (!data.history || data.history.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="bi bi-clock-history d-block"></i>
-                    <p class="mb-0 fw-bold">No newsletters sent yet</p>
-                    <p class="small">Your send history will appear here</p>
-                </div>
-            `;
-            return;
-        }
+            <div class="app-field">
+              <label for="finalCta">Button text</label>
+              <input type="text" id="finalCta" autocomplete="off" value="Visit our blog">
+            </div>
 
-        let html = '<table class="history-table"><thead><tr><th>Subject</th><th>Recipients</th><th>Date</th><th></th></tr></thead><tbody>';
-        data.history.forEach((item, index) => {
-            const date = item.sent_at ? new Date(item.sent_at).toLocaleString() : 'Unknown';
-            html += `
-                <tr id="history-row-${item.id}">
-                    <td>${item.subject || 'No subject'}</td>
-                    <td>${item.recipient_count || 0}</td>
-                    <td>${date}</td>
-                    <td>
-                        <div class="dropdown-actions">
-                            <button class="btn-dots" onclick="toggleDropdown(event, ${index})">
-                                <i class="bi bi-three-dots-vertical"></i>
-                            </button>
-                            <div class="dropdown-menu-actions" id="dropdown-${index}">
-                                <button onclick="viewNewsletter('${item.id}')">
-                                    <i class="bi bi-eye me-2"></i>View
-                                </button>
-                                <button onclick="deleteNewsletter('${item.id}')" class="text-danger">
-                                    <i class="bi bi-trash me-2"></i>Delete
-                                </button>
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
-        html += '</tbody></table>';
-        container.innerHTML = html;
+            <div class="app-field">
+              <label for="finalClosing">Closing</label>
+              <input type="text" id="finalClosing" autocomplete="off" value="Thanks for reading!">
+            </div>
+          </div>
 
-    } catch (err) {
-        console.error('History error:', err);
-    }
-}
+          <aside class="compose-preview">
+            <div class="preview-bar">
+              <span class="preview-bar-label">
+                <i class="bi bi-eye" aria-hidden="true"></i> Live preview
+              </span>
+              {# Most newsletters are read on a phone, so the narrow width is
+                 checkable without leaving the composer. #}
+              <div class="device-toggle" role="group" aria-label="Preview width">
+                <button type="button" class="device-btn is-active" data-device="desktop" aria-pressed="true"
+                  title="Desktop width">
+                  <i class="bi bi-display" aria-hidden="true"></i>
+                  <span class="visually-hidden">Desktop width</span>
+                </button>
+                <button type="button" class="device-btn" data-device="mobile" aria-pressed="false"
+                  title="Phone width">
+                  <i class="bi bi-phone" aria-hidden="true"></i>
+                  <span class="visually-hidden">Phone width</span>
+                </button>
+              </div>
+            </div>
 
-async function generateNewsletter() {
-    const btn = document.getElementById('btn-generate');
-    btn.classList.add('loading');
-    btn.disabled = true;
+            <div class="preview-stage" data-preview-stage>
+              <div class="preview-placeholder">
+                <i class="bi bi-envelope" aria-hidden="true"></i>
+                <span>The rendered email will appear here.</span>
+              </div>
+              {# sandbox: the preview renders template output as a document, so
+                 it is kept from reaching back into the page. #}
+              <div class="preview-device" hidden>
+                <iframe data-preview-frame title="Newsletter preview" sandbox=""></iframe>
+              </div>
+            </div>
+          </aside>
+        </div>
 
-    try {
-        const response = await fetch('/api/newsletter/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                topic: document.getElementById('newsletter-topic').value,
-                custom_intro: document.getElementById('newsletter-intro').value,
-                blog_limit: parseInt(document.getElementById('newsletter-limit').value)
-            })
-        });
+        <div class="send-bar">
+          <p class="send-bar-info">
+            <i class="bi bi-people" aria-hidden="true"></i>
+            Goes to <strong>{{ subs }}</strong> {{ 'subscriber' if subs == 1 else 'subscribers' }}
+          </p>
+          <div class="send-bar-actions">
+            <button type="button" class="app-btn is-ghost" data-discard>Discard</button>
+            <button type="button" class="app-btn is-ghost" data-open-test data-requires-email>
+              <i class="bi bi-envelope-check" aria-hidden="true"></i> Send test
+            </button>
+            <button type="button" class="app-btn is-primary" data-open-send data-requires-email>
+              <i class="bi bi-send" aria-hidden="true"></i> Send newsletter
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
 
-        const data = await response.json();
+    <!-- ===================== SUBSCRIBERS ===================== -->
+    <section class="surface-card reveal" data-tab-panel="audience" hidden aria-labelledby="audienceHeading">
+      <header class="card-head">
+        <h2 class="card-title" id="audienceHeading">Subscribers</h2>
+        <button type="button" class="app-btn is-ghost" data-export-subscribers>
+          <i class="bi bi-download" aria-hidden="true"></i> Export CSV
+        </button>
+      </header>
 
-        if (!data.success) {
-            showToast({ type: 'error', title: 'Generation Failed', message: data.error || 'Could not generate newsletter' });
-            return;
-        }
+      <div class="audience-toolbar">
+        <div class="audience-search">
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <label class="visually-hidden" for="subscriberSearch">Search subscribers</label>
+          <input type="search" id="subscriberSearch" data-subscriber-search placeholder="Search by email"
+            autocomplete="off">
+        </div>
+      </div>
 
-        generatedData = data;
+      <div class="subscriber-rows" data-subscriber-rows>
+        <div class="list-empty">
+          <span class="list-empty-icon"><i class="bi bi-people"></i></span>
+          <p>Loading subscribers…</p>
+        </div>
+      </div>
+    </section>
 
-        // Populate form
-        document.getElementById('final-subject').value = data.subject || '';
-        document.getElementById('final-intro').value = data.intro || '';
-        document.getElementById('final-cta').value = data.cta_text || 'Visit Our Blog';
-        document.getElementById('final-closing').value = data.closing || 'Thanks for reading!';
+    <!-- ===================== ARCHIVE ===================== -->
+    <section class="surface-card reveal" data-tab-panel="history" hidden aria-labelledby="historyHeading">
+      <header class="card-head">
+        <h2 class="card-title" id="historyHeading">Archive</h2>
+        <span class="card-note">Every issue you have sent</span>
+      </header>
 
-        // Populate posts
-        let postsHtml = '';
-        if (data.posts && data.posts.length > 0) {
-            data.posts.forEach((post, i) => {
-                postsHtml += `
-                    <div class="generated-post">
-                        <h5>${post.title}</h5>
-                        <textarea class="form-control post-summary" data-index="${i}" rows="2">${post.summary}</textarea>
-                    </div>
-                `;
-            });
-        }
-        document.getElementById('posts-list').innerHTML = postsHtml;
+      <div class="history-rows" data-history-rows>
+        <div class="list-empty">
+          <span class="list-empty-icon"><i class="bi bi-clock-history"></i></span>
+          <p>Loading archive…</p>
+        </div>
+      </div>
+    </section>
 
-        // Show result section
-        document.getElementById('generated-result').style.display = 'block';
-        document.getElementById('generated-result').scrollIntoView({ behavior: 'smooth' });
+    <!-- ===================== MODALS ===================== -->
 
-        showToast({ type: 'success', title: 'Newsletter Generated', message: 'Review and edit the content below' });
+    {# Test send. The API has supported test_mode all along; the markup for it
+       was commented out in the template, so the safest step in the whole flow
+       was unreachable. #}
+    <div class="modal fade" id="testSendModal" tabindex="-1" aria-hidden="true" aria-labelledby="testSendTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="testSendTitle">Send a test</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <div class="app-field">
+              <label for="testEmail">Send to</label>
+              <input type="email" id="testEmail" autocomplete="email" placeholder="you@example.com"
+                value="{{ user_email or '' }}">
+              <span class="app-field-hint">
+                Goes to this address only. Nothing reaches your subscribers.
+              </span>
+            </div>
+          </div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-primary" data-send-test>Send test</button>
+          </footer>
+        </div>
+      </div>
+    </div>
 
-    } catch (err) {
-        console.error('Generate error:', err);
-        showToast({ type: 'error', title: 'Error', message: 'Failed to generate newsletter' });
-    } finally {
-        btn.classList.remove('loading');
-        btn.disabled = false;
-    }
-}
+    {# Send confirmation. Sending is irreversible and reaches every subscriber,
+       so the count is stated as a figure and repeated in the button's own
+       label. The old screen sent on one click of a button labelled "Send". #}
+    <div class="modal fade" id="sendConfirmModal" tabindex="-1" aria-hidden="true" aria-labelledby="sendConfirmTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="sendConfirmTitle">Send this newsletter?</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <p class="send-confirm-figure">
+              <span class="send-confirm-count" data-confirm-count>0</span>
+              <span class="send-confirm-unit" data-confirm-unit>subscribers</span>
+            </p>
+            <div class="send-summary">
+              <span class="send-summary-label">Subject</span>
+              <span class="send-summary-value" data-confirm-subject></span>
+            </div>
+            <p class="send-warning">
+              This goes out immediately and cannot be recalled. Send yourself a test first if you have not.
+            </p>
+          </div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-primary" data-confirm-send>Send</button>
+          </footer>
+        </div>
+      </div>
+    </div>
 
-async function showPreviewCard() {
-    const btn = document.getElementById('btn-preview');
-    btn.disabled = true;
-    btn.querySelector('.btn-text').style.display = 'none';
-    btn.querySelector('.btn-loading').style.display = 'inline';
+    <!-- Archive viewer -->
+    <div class="modal fade" id="archiveModal" tabindex="-1" aria-hidden="true" aria-labelledby="archiveTitle">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content app-modal archive-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="archiveTitle" data-archive-title>Newsletter</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <div class="archive-stage">
+              <div class="preview-device">
+                <iframe data-archive-frame title="Sent newsletter" sandbox=""></iframe>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    try {
-        await renderHtml();
+    <!-- Delete from archive -->
+    <div class="modal fade" id="deleteNewsletterModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="deleteNewsletterTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="deleteNewsletterTitle">Remove from archive</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <p class="delete-copy">
+              “<span data-delete-subject></span>” will be removed from your archive. The emails already
+              delivered are unaffected — this only deletes the record.
+            </p>
+          </div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-danger" data-delete-confirm>Delete</button>
+          </footer>
+        </div>
+      </div>
+    </div>
 
-        if (renderedHtml) {
-            // Update preview iframe
-            document.getElementById('preview-iframe').srcdoc = renderedHtml;
-
-            // Update subject display
-            document.getElementById('preview-subject-display').textContent =
-                document.getElementById('final-subject').value || 'No subject';
-
-            // Update recipient count
-            const count = document.getElementById('subscriber-count').textContent;
-            document.getElementById('preview-recipient-count').textContent = count;
-
-            // Show preview card
-            document.getElementById('preview-send-card').style.display = 'block';
-            document.getElementById('preview-send-card').scrollIntoView({ behavior: 'smooth' });
-        }
-    } finally {
-        btn.disabled = false;
-        btn.querySelector('.btn-text').style.display = 'inline';
-        btn.querySelector('.btn-loading').style.display = 'none';
-    }
-}
-
-function hidePreviewCard() {
-    document.getElementById('preview-send-card').style.display = 'none';
-    document.getElementById('generated-result').scrollIntoView({ behavior: 'smooth' });
-}
-
-async function renderHtml() {
-    const posts = [];
-    document.querySelectorAll('.post-summary').forEach((textarea, i) => {
-        posts.push({
-            title: generatedData.posts[i]?.title || '',
-            summary: textarea.value,
-            id: generatedData.posts[i]?.id || '',
-            category: generatedData.posts[i]?.category || ''
-        });
-    });
-
-    try {
-        const response = await fetch('/api/newsletter/render', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                subject: document.getElementById('final-subject').value,
-                intro: document.getElementById('final-intro').value,
-                posts: posts,
-                cta_text: document.getElementById('final-cta').value,
-                closing: document.getElementById('final-closing').value
-            })
-        });
-
-        const data = await response.json();
-        if (data.success) {
-            renderedHtml = data.html;
-        }
-    } catch (err) {
-        console.error('Render error:', err);
-    }
-}
-
-async function sendNewsletter() {
-    const btn = document.getElementById('btn-send');
-    btn.classList.add('loading');
-    btn.disabled = true;
-
-    await renderHtml();
-
-    try {
-        const response = await fetch('/api/newsletter/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                subject: document.getElementById('final-subject').value,
-                html_content: renderedHtml
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showToast({
-                type: 'success',
-                title: 'Newsletter Sent!',
-                message: `Sent to ${data.sent} subscribers`
-            });
-            loadHistory();
-            loadStats();
-        } else {
-            showToast({ type: 'error', title: 'Send Failed', message: data.error || 'Could not send newsletter' });
-        }
-    } catch (err) {
-        showToast({ type: 'error', title: 'Error', message: 'Failed to send newsletter' });
-    } finally {
-        btn.classList.remove('loading');
-        btn.disabled = false;
-    }
-}
-
-// Dropdown functions
-function toggleDropdown(event, index) {
-    event.stopPropagation();
-
-    // Close all other dropdowns
-    document.querySelectorAll('.dropdown-menu-actions').forEach(menu => {
-        menu.classList.remove('show');
-    });
-
-    const dropdown = document.getElementById(`dropdown-${index}`);
-    dropdown.classList.toggle('show');
-}
-
-// Close dropdowns when clicking outside
-document.addEventListener('click', function() {
-    document.querySelectorAll('.dropdown-menu-actions').forEach(menu => {
-        menu.classList.remove('show');
-    });
-});
-
-async function viewNewsletter(id) {
-    // Close dropdown
-    document.querySelectorAll('.dropdown-menu-actions').forEach(menu => {
-        menu.classList.remove('show');
-    });
-
-    try {
-        const response = await fetch(`/api/newsletter/history/${id}`);
-        const data = await response.json();
-
-        console.log('Newsletter data:', data);
-
-        if (data.success && data.newsletter) {
-            document.getElementById('view-modal-title').textContent = data.newsletter.subject || 'Newsletter';
-
-            // Use html_content if available, otherwise create basic HTML from content_preview
-            let content = data.newsletter.html_content;
-            if (!content) {
-                const preview = data.newsletter.content_preview || 'No content available';
-                content = `
-                    <html>
-                    <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                        <h2 style="color: #4318FF;">${data.newsletter.subject || 'Newsletter'}</h2>
-                        <p>${preview}</p>
-                        <p style="color: #999; font-size: 12px; margin-top: 20px;">
-                            <em>Full content not available for newsletters sent before the update.</em>
-                        </p>
-                    </body>
-                    </html>
-                `;
-            }
-
-            document.getElementById('view-newsletter-iframe').srcdoc = content;
-            document.getElementById('viewNewsletterModal').classList.add('active');
-        } else {
-            console.error('Newsletter load failed:', data);
-            showToast({ type: 'error', title: 'Error', message: data.error || 'Could not load newsletter' });
-        }
-    } catch (err) {
-        console.error('View error:', err);
-        showToast({ type: 'error', title: 'Error', message: 'Failed to load newsletter' });
-    }
-}
-
-function closeViewModal() {
-    document.getElementById('viewNewsletterModal').classList.remove('active');
-}
-
-function deleteNewsletter(id) {
-    // Close dropdown
-    document.querySelectorAll('.dropdown-menu-actions').forEach(menu => {
-        menu.classList.remove('show');
-    });
-
-    // Store the ID and show confirmation modal
-    deleteNewsletterIdPending = id;
-    document.getElementById('deleteConfirmModal').classList.add('active');
-}
-
-function closeDeleteModal() {
-    document.getElementById('deleteConfirmModal').classList.remove('active');
-    deleteNewsletterIdPending = null;
-
-    // Reset button state
-    const btn = document.getElementById('btn-confirm-delete');
-    btn.disabled = false;
-    btn.querySelector('.btn-text').style.display = 'inline';
-    btn.querySelector('.btn-loading').style.display = 'none';
-}
-
-async function confirmDeleteNewsletter() {
-    if (!deleteNewsletterIdPending) return;
-
-    const btn = document.getElementById('btn-confirm-delete');
-    btn.disabled = true;
-    btn.querySelector('.btn-text').style.display = 'none';
-    btn.querySelector('.btn-loading').style.display = 'inline';
-
-    try {
-        const response = await fetch(`/api/newsletter/history/${deleteNewsletterIdPending}`, {
-            method: 'DELETE'
-        });
-        const data = await response.json();
-
-        if (data.success) {
-            // Remove row from table
-            const row = document.getElementById(`history-row-${deleteNewsletterIdPending}`);
-            if (row) row.remove();
-
-            // Update sent count
-            const countEl = document.getElementById('sent-count');
-            const currentCount = parseInt(countEl.textContent) || 0;
-            countEl.textContent = Math.max(0, currentCount - 1);
-
-            closeDeleteModal();
-            showToast({ type: 'success', title: 'Deleted', message: 'Newsletter deleted successfully' });
-        } else {
-            closeDeleteModal();
-            showToast({ type: 'error', title: 'Error', message: data.error || 'Could not delete newsletter' });
-        }
-    } catch (err) {
-        console.error('Delete error:', err);
-        closeDeleteModal();
-        showToast({ type: 'error', title: 'Error', message: 'Failed to delete newsletter' });
-    }
-}
-</script>
+    <script src="{{ url_for('static', filename='js/pages/newsletter.js') }}?v=2"></script>
+  </main>
+</div>
 {% endblock %}

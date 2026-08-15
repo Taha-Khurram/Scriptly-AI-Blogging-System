@@ -1568,7 +1568,10 @@ def newsletter_page():
         published_count=published_count,
         subscriber_count=subscriber_count,
         sent_count=sent_count,
-        username=session.get('user_name', 'User')
+        username=session.get('user_name', 'User'),
+        # Pre-fills the test-send field, so trying the issue on yourself before
+        # blasting it is one click rather than one click and typing your address.
+        user_email=session.get('user_email', '')
     )
 
 
