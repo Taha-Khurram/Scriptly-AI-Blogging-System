@@ -4,7 +4,7 @@
 {% block title %}Newsletter | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/newsletter.css') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/newsletter.css') }}?v=3">
 {% endblock %}
 
 {% block content %}
@@ -135,13 +135,37 @@
               <input type="text" id="composeTopic" autocomplete="off"
                 placeholder="e.g. Weekly roundup, product updates">
             </div>
+            {# A listbox we own, not a native select popup. The browser draws
+               that one itself, so it takes none of our surfaces, radius or
+               type — square corners and a hard OS-blue highlight dropped into
+               the middle of a rounded, tokenised form. The <select> stays in
+               the DOM as the value holder, so `val('composeLimit')` and the
+               `change` listener that repaints the posts meter both work
+               unchanged. Behaviour is initSelectPill in app.js. #}
             <div class="app-field">
-              <label for="composeLimit">Posts</label>
-              <select id="composeLimit" class="form-select">
-                <option value="3">3 posts</option>
-                <option value="5" selected>5 posts</option>
-                <option value="10">10 posts</option>
-              </select>
+              <span class="field-label" id="composeLimitLabel">Posts</span>
+              <div class="select-pill" data-select-pill>
+                <button type="button" class="select-field" data-select-trigger aria-haspopup="listbox"
+                  aria-expanded="false" aria-labelledby="composeLimitLabel composeLimitValue">
+                  <span class="select-field-value" id="composeLimitValue">5 posts</span>
+                  <i class="bi bi-chevron-down select-field-caret" aria-hidden="true"></i>
+                </button>
+
+                <div class="menu is-block" role="listbox" aria-labelledby="composeLimitLabel" hidden>
+                  {% for n in [3, 5, 10] %}
+                  <button type="button" class="menu-item" role="option" data-value="{{ n }}">
+                    <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                    <span class="menu-label">{{ n }} posts</span>
+                  </button>
+                  {% endfor %}
+                </div>
+
+                <select id="composeLimit" tabindex="-1" aria-hidden="true">
+                  {% for n in [3, 5, 10] %}
+                  <option value="{{ n }}" {{ 'selected' if n == 5 else '' }}>{{ n }} posts</option>
+                  {% endfor %}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -407,7 +431,7 @@
       </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/pages/newsletter.js') }}?v=2"></script>
+    <script src="{{ url_for('static', filename='js/pages/newsletter.js') }}?v=3"></script>
   </main>
 </div>
 {% endblock %}

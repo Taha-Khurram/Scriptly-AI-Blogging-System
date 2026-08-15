@@ -46,10 +46,45 @@ def _validate_url(url):
     return url
 
 
+def _num(value, default=0):
+    """Coerce a stored report field to a number. Reports are written by the
+    agent, so a field can be absent, null, or a string."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _summarise_reports(reports):
+    """The three figures the page header states: how many runs, the average
+    points gained, and the best score reached. Derived here rather than in the
+    browser so the tiles are correct on first paint instead of counting up from
+    zero after a fetch."""
+    gains = []
+    best = 0
+    for r in reports:
+        after = _num(r.get('seo_score'))
+        before = _num(r.get('original_score'))
+        gain = r.get('score_improvement')
+        gains.append(_num(gain, after - before))
+        best = max(best, after)
+
+    return {
+        'count': len(reports),
+        'avg_gain': round(sum(gains) / len(gains)) if gains else 0,
+        'best_score': round(best),
+    }
+
+
 @optimization_bp.route('/optimization')
 @admin_required
 def optimization_page():
-    return render_template('optimization.html')
+    user_id = session.get('user_id')
+    reports = _db.get_user_seo_reports(user_id) if user_id else []
+    return render_template(
+        'optimization.html',
+        report_summary=_summarise_reports(reports),
+    )
 
 
 @optimization_bp.route('/api/optimization/url-metrics')

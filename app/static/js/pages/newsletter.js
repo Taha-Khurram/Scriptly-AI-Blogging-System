@@ -882,8 +882,24 @@
         }
     }, { signal });
 
+    // The select-pill module writes the chosen value through to the real
+    // <select> and fires a genuine `change`, so this stays a plain change
+    // listener. It owns only the trigger's visible caption — the module
+    // deliberately does not touch it, because what a trigger should read once
+    // a value is applied differs per screen.
+    function syncLimitLabel() {
+        const select = document.getElementById('composeLimit');
+        const label = document.getElementById('composeLimitValue');
+        if (!select || !label) return;
+        const opt = select.options[select.selectedIndex];
+        if (opt) label.textContent = opt.textContent.trim();
+    }
+
     root.addEventListener('change', (e) => {
-        if (e.target.id === 'composeLimit') paintPostsTile();
+        if (e.target.id === 'composeLimit') {
+            syncLimitLabel();
+            paintPostsTile();
+        }
     }, { signal });
 
     // Enter in the setup fields generates, rather than doing nothing.
@@ -906,6 +922,7 @@
     // ----------------------------------------------------------------------
 
     showTab('compose');
+    syncLimitLabel();
     paintPostsTile();
     loadStatus();
     loadSubscribers();

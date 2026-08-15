@@ -3543,6 +3543,82 @@ pre {
     color: var(--text-faint);
 }
 
+/* A label that is not a <label>. Where the control is a .select-field, the
+   real <select> is visually hidden, so pointing a `for=` at it would send the
+   click somewhere invisible; the trigger takes aria-labelledby instead and the
+   caption is a plain span wearing the same type. */
+.app-field .field-label {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+}
+
+/* --- Select field ------------------------------------------------------ */
+/* The select-pill machinery (see §13) wearing field chrome instead of toolbar
+   chrome, for a select that sits in a form beside text inputs rather than in a
+   filter bar.
+
+   The behaviour is bound to [data-select-trigger], never to a class, so the
+   same module drives both looks. Use this anywhere a native <select> would
+   otherwise be visible: the browser draws that popup itself, so it takes none
+   of our surfaces, radius or type — square corners and a hard OS-blue
+   highlight in the middle of a rounded, tokenised form. */
+.select-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    width: 100%;
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.select-field:hover {
+    background: var(--surface-3);
+}
+
+/* Open and focused read the same as a focused input, so the row of fields
+   behaves as one control set. */
+.select-field:focus-visible,
+.select-field[aria-expanded="true"] {
+    outline: none;
+    background: var(--surface-1);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.select-field-caret {
+    flex-shrink: 0;
+    font-size: 0.7em;
+    opacity: 0.6;
+    transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+/* The caret points at the panel while it is open. */
+.select-field[aria-expanded="true"] .select-field-caret {
+    transform: rotate(180deg);
+}
+
+.select-field-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A menu that belongs to a field matches the field's width rather than the
+   toolbar default, so it cannot be wider than the control it drops from. */
+.menu.is-block {
+    min-width: 100%;
+}
+
 /* Body copy for a confirmation dialog. */
 .delete-copy {
     margin: 0;

@@ -153,21 +153,6 @@
     gap: var(--sp-3);
 }
 
-/* .app-field select carries the field's surfaces from dashboard.css; the
-   caret is drawn here because Bootstrap's .form-select ships its own as a
-   background-image in a fixed colour that stays dark on a dark theme. */
-.compose-setup-form select {
-    appearance: none;
-    -webkit-appearance: none;
-    padding-right: var(--sp-8);
-    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
-        linear-gradient(135deg, currentColor 50%, transparent 50%);
-    background-size: 5px 5px, 5px 5px;
-    background-position: calc(100% - 18px) calc(50% + 1px), calc(100% - 13px) calc(50% + 1px);
-    background-repeat: no-repeat;
-    cursor: pointer;
-}
-
 /* The blocked state: no published posts means there is nothing to summarise,
    and saying so up front beats letting Generate fail. */
 .compose-blocked {

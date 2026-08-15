@@ -354,6 +354,26 @@ anything: resting it says `Category`, applied it says `Growth` and takes
 `--accent-soft`, the same "selected" treatment the nav rail and the status tabs
 use. `Clear all` exists only while something is applied.
 
+**No native `<select>` is ever visible.** The browser draws that popup itself,
+so it takes none of the product's surfaces, radius or type — square corners and
+a hard OS-blue highlight dropped into the middle of a rounded, tokenised screen,
+and on a forced dark theme over a light OS it renders white-on-blue. Declaring
+`color-scheme` fixes the *mode* but not the chrome. Every select in the app is
+therefore an owned listbox with the real `<select>` kept in the DOM as the value
+holder, in one of two shapes:
+
+- **`.filter-pill`** — toolbar chrome, for a filter bar (All Blogs' category,
+  Gallery's sort).
+- **`.select-field`** — `.app-field` chrome, for a select standing in a form
+  beside text inputs (the newsletter composer's post count).
+
+Behaviour is the same `initSelectPill` module either way: it binds on
+`[data-select-trigger]`, never on a class, so one module drives both looks. It
+writes the chosen value through to the `<select>` and fires a real bubbling
+`change`, so existing `.value` reads and `change` listeners need no changes. It
+deliberately does **not** set the trigger's caption — what a trigger should read
+once a value is applied differs per screen, so each page owns that one line.
+
 The category pill opens a **listbox we own** (`.select-pill` + `.menu`), not a
 native select popup — the browser draws that one itself, so it cannot take the
 product's surfaces, radius or type, and on a forced dark theme over a light OS
@@ -649,6 +669,128 @@ fetched — no new endpoint). Cells beginning `=`, `+`, `-` or `@` are quoted so
 subscriber cannot make a spreadsheet execute their address as a formula, and the
 file carries a BOM so Excel reads UTF-8 addresses correctly.
 
+### Optimization — `optimization.html`
+
+Five jobs behind one segmented control, under the standard shell. The screen
+was already tokenised but had adopted none of the components: a bespoke
+underlined tab bar, a bespoke custom select, a bespoke dropdown, a bespoke
+empty state and a bespoke dashed empty card — ~600 lines of page CSS
+re-implementing things that already existed.
+
+```
+╔ page header ═══════════════════════════════════════════════════╗
+║ Search performance                                             ║
+║ H1 Optimization                                     ( ☾ )      ║
+╚════════════════════════════════════════════════════════════════╝
+┌ ✦ 12 Optimizations run ┬ ↗ +11 Average gain ┬ 🏆 82 Best score ┐
+└────────────────────────┴────────────────────┴──────────────────┘
+┌ (Optimize) (Reports 12) (Draft keywords) (URL metrics) (Domain…)┐
+└────────────────────────────────────────────────────────────────┘
+┌ optimize ──────────────────────────────────────────────────────┐
+│ Optimize a draft                                               │
+│ …rewrites the title, meta, headings — and saves over the draft. │
+│ Draft [⛁ Growth loops ▾]  Region [🌐 United States ▾]  (✦ Opt.) │
+├────────────────────────────────────────────────────────────────┤
+│ SEO score after            ┌ A ┐              [⬇ Export report] │
+│  88   was 64  ↑+24         │grade│                              │
+│ Score breakdown                                                │
+│  Content   ▓▓▓▓▓▓▓▌░░░░  50 → 85  ↑+35   ← bar = now, ▌ = before│
+│  Links     ▓▓▓▓▓▓░▌░░░░  70 → 62  ↓-8                          │
+│ ┌ New title ─────────┐ ┌ Primary keyword ──┐                   │
+│ ┌ ✓ Changes made ────┐ ┌ ⚡ Go further ─────┐                   │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Optimize leads.** The old bar opened on URL Metrics — a third-party lookup —
+and buried the product's own capability fourth. Optimize is also the only tab
+that *changes* anything; the other four report on the world.
+
+**The irreversible action names its own blast radius.** A run rewrites the
+draft's title, meta description, headings and body and saves over it, with no
+undo. It fired from a single unguarded click on a button labelled "Optimize".
+It now opens a confirmation that names the draft and the region and repeats the
+consequence in the button's own label — `Optimize and save` — the same rule the
+newsletter's send follows.
+
+**The score breakdown is finally on screen.** The API has always returned a
+per-category before/after (`comparison.breakdown_comparison`); it went straight
+into the exported HTML report and nowhere else. Each category is a **bullet
+chart**: the bar is the score now, a 2px tick is where it started. Two stacked
+fills would hide the smaller of the pair whichever way the run went — a tick
+reads the same in both directions and does not depend on telling two tones
+apart. Direction is carried by an arrow glyph, a sign and a title word as well
+as by colour.
+
+**One attribute owns panel state.** `.opt-body[data-state]` switches between
+`empty · loading · error · results`. The old screen ran two mechanisms side by
+side — `display:block` on the empty state and a `.show` class on the results —
+which is two sources of truth for one question, and it had **no error state at
+all**: a failed lookup only raised a toast and returned the panel to "empty", so
+a rate-limited API looked exactly like a run you had never started. Failures now
+land in the panel, quoting the message the API actually sent, with a retry.
+
+**Tables where the data is tabular.** Keyword research is a comparison down a
+column, so it stays a table rather than becoming the row idiom; it sheds CPC,
+clicks and traffic potential below 760px instead of scrolling the page
+sideways. Domain keywords is the provider's shape, so its columns are the
+**union of every row's keys** — built from the first row alone, a field omitted
+on row 1 dropped that column for every row — and the first column is `sticky`
+so the keyword stays readable while the rest scrolls under it.
+
+Reports moved to the `.data-row` listing: the grade is the monogram, the row
+opens a detail modal, and export and delete sit permanently in the trailing
+area rather than behind hover, because the row's own click is taken and there
+is no ⋮ menu holding a duplicate.
+
+Six things were broken rather than merely dated, and are fixed:
+
+- **The custom select had no keyboard support.** `cs-*` hid the native control
+  with `display: none !important` and rebuilt it as `<div role="option">` with
+  click handlers and a trigger that listened for no keys — so the draft and
+  country pickers could not be operated by keyboard at all, and a screen reader
+  got a listbox with no focusable options. They are `.select-pill` now, which
+  keeps the real `<select>` as the value holder; ~115 lines of JS and ~150 of
+  CSS went with it.
+- **`document` listeners accumulated on every visit.** The page bound its
+  dismiss handlers at module scope, and PJAX re-injects the file on each
+  navigation to `/optimization`, so the fifth visit had five copies bound and
+  nothing ever removed them. One IIFE, one `AbortController` the next run
+  aborts.
+- **Eight globals and inline `onclick`.** `report.id` was interpolated straight
+  into an `onclick` attribute with no escaping, and `escapeHtml` was the
+  `textContent → innerHTML` two-liner, which leaves both quote characters
+  alone. Everything is delegation off `.dashboard-main` and the five-character
+  escaper now.
+- **Auto Optimize had no empty state.** `optimizeEmptyState` was referenced four
+  times and `id="optimizeEmptyState"` existed nowhere in the template, so every
+  reference was `null` behind a guard and the tab opened on a form above a void.
+- **Delete used `window.confirm()`** — the last browser-native confirm in the
+  product, and the only destructive action that did not say what it destroyed.
+- **"Site Audit" was not an audit.** The endpoint is `topsearchkeywords.php`
+  and returns the terms a domain ranks for. A tab that promises an audit and
+  delivers a keyword list is a label that lies; it is **Domain keywords**.
+
+The URL Metrics tiles are deliberately **not** `.stat-card`: a stat tile
+promises label · value · delta · trend and that API returns none of the
+comparison half. `.opt-metric` says what it can — the figure, its unit, and a
+meter only where the figure is genuinely a ratio (domain and URL rating, out of
+100). Counts compact to `1.2M` with the exact figure on `title`. Everything the
+tiles do not claim used to be printed underneath as a flat label/value grid —
+a debug view shipped as product UI — and now sits behind a closed disclosure
+labelled as what it is.
+
+The header tiles are server-rendered from the saved reports (`_summarise_reports`
+in `optimization_routes.py`) so they are true on first paint, and re-derived in
+the browser only once the report list has actually been fetched — an empty
+cache before the first fetch would otherwise zero out figures that were already
+correct. The tab is written to the hash, so a reload returns to the panel you
+were on.
+
+The exported report is a standalone document opened from the filesystem, where
+no stylesheet of ours is loaded, so it is the one place that carries literal
+hex — the light-theme token values, not the old `#4318FF` palette it shipped
+with.
+
 ### Scheduling / publishing — `schedule.html`, `approval_queue.html`
 
 Stat tiles, then a week navigator (`‹ May 18 – May 24 ›` + `Today` pill) above the
@@ -749,7 +891,15 @@ Reusable pieces, all token-driven:
 | Device toggle | `.device-toggle` / `.device-btn` | desktop ↔ phone preview width |
 | Email preview | `.preview-stage` / `.preview-device` | sandboxed iframe on `--email-paper`, which does not invert |
 | Send bar | `.send-bar` | sticky footer stating the audience beside the irreversible action |
-| Card head | `.card-head` / `.card-title` / `.card-link` | title row + pill "view all" link |
+| Panel state | `.opt-body[data-state]` / `.opt-state[data-for]` | one attribute switches empty · loading · error · results |
+| Agent working | `.opt-working` / `.opt-working-badge` / `.opt-working-bar` | spinner pill over the indeterminate `brandShimmer` bar |
+| Bullet meter | `.opt-meter` / `-track` / `-fill` / `-tick` | bar = value now, tick = the reference it started from |
+| Bare metric | `.opt-metric` | label · value · unit, for data with no delta or trend to state |
+| Data table | `.opt-table` / `.opt-table-scroll` | tokenised table; `.is-pinned` sticks the first column, `.opt-col-wide` drops below 760px |
+| Difficulty | `.kw-difficulty` | word first, then the track and the number — never hue alone |
+| Raw dump | `.opt-raw` / `.opt-raw-row` | closed disclosure over fields the UI does not claim |
+| Row button | `.opt-row-btn` | trailing row action that is always visible, where no ⋮ menu duplicates it |
+| Card head | `.card-head` / `.card-title` / `.card-link` / `.card-note` | title row + pill "view all" link + wrapping sub-line |
 | Stacked bar | `.viz-stack` / `.viz-seg` | ordinal ramp, 2px surface gaps, 4px outer ends |
 | Chart legend | `.viz-legend` | swatch · label · count · share — doubles as the table view |
 | Segmented tabs | `.seg-tabs` / `.seg-tab` / `.seg-count` | active = `--accent-soft`, same as the nav rail's current item |
@@ -775,6 +925,7 @@ Reusable pieces, all token-driven:
 | Preview | `.preview-stage` / `.preview-rail` / `.preview-facts` | image beside its metadata and copy formats |
 | Filter pill | `.filter-pill` / `.filter-pill-value` / `.filter-pill-caret` | states its own value; `.is-active` = `--accent-soft` |
 | Select pill | `.select-pill` / `.menu` / `.menu-item` / `.menu-check` | our own listbox wrapped around a real `<select>`; see below |
+| Select field | `.select-field` / `.select-field-value` / `.select-field-caret` / `.menu.is-block` | the same listbox wearing `.app-field` chrome, for a select inside a form rather than a filter bar |
 | Clear filters | `.filter-clear` | ghost text button, present only while something is applied |
 | Date range | `.date-modal` / `.date-preset` / `.date-summary` | presets, then calendar, then what Apply will do |
 | Range calendar | `.cal` / `.cal-cell` / `.cal-day` | band on the cell, endpoints on the button; `.is-start` / `.is-end` / `.is-in-range` / `.is-preview` |
@@ -955,6 +1106,21 @@ so a typo would otherwise ship silently. `--check` is the CI form.
   Scripts are the confusing case: PJAX scrapes `<script>` tags from the *whole*
   document, so a misplaced script still runs and the screen looks half-working
   rather than obviously broken.
+- **A page script runs again on every visit, so it must be re-entrant.** PJAX
+  re-injects the file each time, and a listener bound to `document` or `window`
+  at module scope is never removed — Optimization's dismiss handlers were bound
+  five times over by the fifth visit. Take the newsletter/optimization pattern:
+  one IIFE, one `AbortController` parked on `window` that the next run aborts,
+  and `{ signal }` on every listener. Passing the same signal to `fetch` also
+  cancels in-flight requests, so a response cannot land in a screen that is no
+  longer there — which is why those handlers distinguish `AbortError` from a
+  real failure instead of reporting "check your connection" on every navigation.
+- **A screen with no error state reports failure as absence.** Optimization
+  raised a toast and returned the panel to its empty state, so a rate-limited
+  API looked identical to a lookup you never ran — and the toast was gone four
+  seconds later. Empty, loading, error and results are four states of one
+  region, switched by one attribute (`.opt-body[data-state]`), and the error
+  state quotes what the server actually said and offers the retry.
 - **The same value rendered twice must round the same way.** Jinja's `round`
   filter is Python's — half to *even* — while JS `Math.round` is half *up*. A
   file of exactly 242.5 KB therefore painted one way from the server and
