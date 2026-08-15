@@ -1134,6 +1134,15 @@ so a typo would otherwise ship silently. `--check` is the CI form.
   came to the tile to read. Where a control genuinely is hover-revealed (the
   tile checkbox, the row's quick actions), it needs a `@media (hover: none)`
   block that pins it visible, exactly as `.row-action` has.
+- **A bar drawn on a `<span>` needs `display`.** `width` and `height` do nothing
+  on an inline box, so `.stat-meter-fill` — a span carrying `height: 100%` and a
+  server-rendered `style="width: 67%"` — computed to zero and the meter sat
+  empty at every value, on both Newsletter and Optimization. The *track* looked
+  fine throughout, which is what hid it: the track is a flex item of
+  `.stat-meter` and gets blockified for free, while its child does not. Do not
+  let a fill inherit its box type from an ancestor's `display` — a later change
+  to that ancestor silently empties the bar. Note that `position: relative`
+  does **not** blockify either; only `absolute`/`fixed` do.
 - **Weight ≤ 600.** Reach for size, colour or spacing before bold.
 - **Elevation over borders.** A 1px `--border-subtle` divider is fine; a heavy
   stroke is not.

@@ -1261,22 +1261,34 @@ const Pjax = (() => {
                 <div class="skeleton-table-row"><div style="display:flex;align-items:center;gap:10px;width:25%;"><div class="skeleton skeleton-circle" style="width:36px;height:36px;flex-shrink:0;"></div><div class="skeleton skeleton-text" style="width:75%;"></div></div><div class="skeleton skeleton-text" style="width:26%;"></div><div class="skeleton skeleton-text" style="width:11%;"></div><div class="skeleton" style="width:60px;height:22px;border-radius:12px;"></div><div class="skeleton skeleton-text" style="width:8%;"></div></div>
             </div>`,
 
-        // Optimization: header + input card + metrics grid
+        // Optimization: header + three stat tiles + tab bar + the control row.
+        // A skeleton is a promise about the shape that is coming, so it moves
+        // whenever the screen does — this one still drew the old six-tile
+        // metrics grid and an input card, neither of which the page opens on.
         optimization: `
             <header class="dashboard-header skeleton-header">
-                <div><div class="skeleton skeleton-text" style="height:14px;width:80px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:180px;"></div></div>
+                <div><div class="skeleton skeleton-text" style="height:14px;width:130px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:180px;"></div></div>
             </header>
-            <div class="skeleton-card" style="margin-bottom:1.5rem;">
-                <div class="skeleton skeleton-text" style="height:14px;width:180px;margin-bottom:1rem;"></div>
-                <div style="display:flex;gap:0.75rem;"><div class="skeleton" style="flex:1;height:44px;border-radius:12px;"></div><div class="skeleton" style="width:130px;height:44px;border-radius:12px;"></div></div>
+            <div class="skeleton-stat-grid">
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:50px;"></div></div></div>
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:50px;"></div></div></div>
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:50px;"></div></div></div>
             </div>
-            <div class="skeleton-stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
+            <div class="skeleton-filter-bar" style="margin-bottom:1.5rem;">
+                <div class="skeleton" style="width:92px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:104px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:136px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:118px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:148px;height:34px;border-radius:999px;"></div>
+            </div>
+            <div class="skeleton-card">
+                <div class="skeleton skeleton-text" style="height:18px;width:170px;margin-bottom:0.75rem;"></div>
+                <div class="skeleton skeleton-text" style="height:12px;width:100%;max-width:520px;margin-bottom:1.5rem;"></div>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+                    <div class="skeleton" style="flex:1;min-width:220px;height:42px;border-radius:999px;"></div>
+                    <div class="skeleton" style="width:180px;height:42px;border-radius:999px;"></div>
+                    <div class="skeleton" style="width:130px;height:42px;border-radius:999px;"></div>
+                </div>
             </div>`
     };
 

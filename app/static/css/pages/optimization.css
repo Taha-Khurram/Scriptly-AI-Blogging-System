@@ -419,6 +419,7 @@
 /* No `overflow: hidden` — the tick deliberately overhangs the track, and
    clipping it would take its ring with it. */
 .opt-meter-track {
+    display: block;
     position: relative;
     height: 8px;
     border-radius: var(--radius-pill);
@@ -743,7 +744,12 @@
     white-space: nowrap;
 }
 
+/* Every track and fill on this page declares `display`. All of them are spans,
+   and an inline box drops width and height on the floor — which is exactly how
+   the shared .stat-meter-fill shipped empty at every value. Relying on a flex
+   parent to blockify them works until someone changes the parent. */
 .kw-difficulty-track {
+    display: block;
     width: 44px;
     height: 5px;
     border-radius: var(--radius-pill);
@@ -830,6 +836,7 @@
 }
 
 .opt-metric-track {
+    display: block;
     height: 5px;
     margin-top: var(--sp-2);
     border-radius: var(--radius-pill);
