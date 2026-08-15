@@ -36,6 +36,16 @@ function applyUrlParams() {
             }
         });
     }
+
+    // ?search= is how the dashboard's header search hands a query off to this
+    // screen — mirror it into the field so the reader can see and edit what is
+    // being filtered on, rather than facing a narrowed list with an empty box.
+    var search = (params.get('search') || '').trim();
+    if (search) {
+        currentSearch = search;
+        var searchField = document.getElementById('searchInput');
+        if (searchField) searchField.value = search;
+    }
 }
 
 // ==================== FILTER TABS ====================

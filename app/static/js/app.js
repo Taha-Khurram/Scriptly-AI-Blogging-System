@@ -149,6 +149,133 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 document.addEventListener('DOMContentLoaded', syncThemeControls);
 
 // --------------------------------------------------------------------------
+// Page header
+//
+// Drives partials/page_header.html: the condense-on-scroll state and the
+// search field's keyboard affordances.
+//
+// The header lives *inside* .dashboard-main, so PJAX destroys and rebuilds it
+// on every navigation. Everything here is therefore either delegated off
+// document/window or re-read at event time — nothing holds a reference to the
+// element across a page change. The search field owns no behaviour of its own:
+// it emits `page-search` and the page decides what that means.
+// --------------------------------------------------------------------------
+
+(function initPageHeader() {
+    const STUCK_ON = 12;   // px scrolled before the bar condenses…
+    const STUCK_OFF = 4;   // …and where it relaxes again. The gap is hysteresis,
+    // so a header sitting exactly on the threshold cannot
+    // flicker as its own height change nudges the scroll.
+    let ticking = false;
+
+    function applyStuck() {
+        ticking = false;
+        const header = document.querySelector('[data-page-header]');
+        if (!header) return;
+
+        const y = window.scrollY || document.documentElement.scrollTop || 0;
+        if (y > STUCK_ON) header.classList.add('is-stuck');
+        else if (y < STUCK_OFF) header.classList.remove('is-stuck');
+    }
+
+    function onScroll() {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(applyStuck);
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    function getSearchInput() {
+        return document.querySelector('[data-page-search] .page-search-input');
+    }
+
+    function emitSearch(value, submit) {
+        document.dispatchEvent(new CustomEvent('page-search', {
+            detail: { value: value, submit: !!submit }
+        }));
+    }
+
+    function syncSearchState(input) {
+        const box = input.closest('[data-page-search]');
+        if (box) box.classList.toggle('has-value', input.value.trim() !== '');
+    }
+
+    document.addEventListener('input', (e) => {
+        const input = e.target.closest('[data-page-search] .page-search-input');
+        if (!input) return;
+        syncSearchState(input);
+        emitSearch(input.value, false);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('[data-page-search-clear]')) return;
+        const input = getSearchInput();
+        if (!input) return;
+        input.value = '';
+        syncSearchState(input);
+        emitSearch('', false);
+        input.focus();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        const input = getSearchInput();
+        if (!input) return;
+
+        const inField = document.activeElement === input;
+
+        if (inField && e.key === 'Enter') {
+            e.preventDefault();
+            emitSearch(input.value, true);
+            return;
+        }
+
+        if (inField && e.key === 'Escape') {
+            if (input.value) {
+                input.value = '';
+                syncSearchState(input);
+                emitSearch('', false);
+            } else {
+                input.blur();
+            }
+            return;
+        }
+
+        // ⌘K / Ctrl+K from anywhere, and a bare "/" when the user is not
+        // already typing into something.
+        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
+            || document.activeElement.isContentEditable;
+
+        if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            input.focus();
+            input.select();
+        } else if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+            e.preventDefault();
+            input.focus();
+        }
+    });
+
+    // The shortcut hint has to name the key the reader actually has.
+    function labelShortcut() {
+        const platform = (navigator.userAgentData && navigator.userAgentData.platform)
+            || navigator.platform || '';
+        if (!/mac|iphone|ipad|ipod/i.test(platform)) return;
+        document.querySelectorAll('[data-search-hint]').forEach((el) => {
+            el.textContent = '⌘ K';
+        });
+    }
+
+    function refresh() {
+        labelShortcut();
+        applyStuck();
+    }
+
+    document.addEventListener('DOMContentLoaded', refresh);
+    document.addEventListener('pjax:complete', refresh);
+})();
+
+// --------------------------------------------------------------------------
 // Account menu
 //
 // Lives in the sidebar, which sits outside .dashboard-main and so survives

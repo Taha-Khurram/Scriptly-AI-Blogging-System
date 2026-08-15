@@ -168,6 +168,32 @@
     --dur-slow: 0.4s;
     --transition-base: all var(--dur-base) var(--ease-standard);
 
+    /* --- Canvas padding --------------------------------------------------
+       Published as tokens so a full-bleed element inside .dashboard-main
+       (the sticky page header) can cancel the canvas inset with a negative
+       margin that stays correct at every breakpoint. */
+    --canvas-pad-x: var(--sp-10);
+    --canvas-pad-y: var(--sp-8);
+
+    /* Translucent canvas for the blurred sticky header. Kept as a token
+       because a backdrop needs the canvas colour with alpha, which no
+       existing surface token carries. */
+    --canvas-glass: rgba(240, 244, 249, 0.78);
+
+    /* --- Data-viz: pipeline ramp ----------------------------------------
+       Draft → In review → Published is an *ordered* scale, so it takes an
+       ordinal ramp (one hue, monotone lightness) rather than categorical or
+       status hues: the system's --success / --warning pair separates at only
+       ΔE 5 under deuteranopia, which is unreadable in a stacked bar. These
+       steps pass the ordinal checks (monotone L, ΔL ≥ 0.06, light end ≥ 2:1
+       on the surface). Status colour stays where it belongs — the badges.
+       --viz-stage-other is deliberately outside the ramp: it is the "not in
+       the pipeline" remainder, not a further stage. */
+    --viz-stage-1: #7CACF8;
+    --viz-stage-2: #1B6EF3;
+    --viz-stage-3: #0842A0;
+    --viz-stage-other: #C4C7C5;
+
     /* ------------------------------------------------------------------
        Legacy aliases — page CSS written against the previous system keeps
        working, and now re-themes automatically with the tokens above.
@@ -243,6 +269,16 @@
         --elev-1: 0 1px 2px rgba(0, 0, 0, 0.30), 0 1px 3px 1px rgba(0, 0, 0, 0.20);
         --elev-2: 0 1px 3px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.32);
         --elev-3: 0 4px 8px rgba(0, 0, 0, 0.40), 0 16px 32px rgba(0, 0, 0, 0.44);
+
+        --canvas-glass: rgba(19, 19, 20, 0.78);
+
+        /* Dark mode is *selected*, not flipped: the ramp is re-stepped so the
+           far stage is the brightest against the dark surface, and re-run
+           through the ordinal checks on #1E1F20. */
+        --viz-stage-1: #3B6FBF;
+        --viz-stage-2: #6BA0F5;
+        --viz-stage-3: #A8C7FA;
+        --viz-stage-other: #5F6368;
     }
 }
 
@@ -292,6 +328,13 @@
     --elev-1: 0 1px 2px rgba(0, 0, 0, 0.30), 0 1px 3px 1px rgba(0, 0, 0, 0.20);
     --elev-2: 0 1px 3px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.32);
     --elev-3: 0 4px 8px rgba(0, 0, 0, 0.40), 0 16px 32px rgba(0, 0, 0, 0.44);
+
+    --canvas-glass: rgba(19, 19, 20, 0.78);
+
+    --viz-stage-1: #3B6FBF;
+    --viz-stage-2: #6BA0F5;
+    --viz-stage-3: #A8C7FA;
+    --viz-stage-other: #5F6368;
 }
 
 /* ==========================================================================
@@ -1204,64 +1247,9 @@ pre {
     flex-shrink: 0;
 }
 
-/* --- Theme switch ----------------------------------------------------
-   Borrows the nav item's geometry exactly, so it reads as the last row of
-   the menu rather than a control bolted on underneath.
-   --------------------------------------------------------------------- */
-.sidebar-theme-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-3);
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    margin-inline: auto;
-    flex-shrink: 0;
-    border: none;
-    background: transparent;
-    color: var(--text-2);
-    border-radius: 50%;
-    font-family: inherit;
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-regular);
-    cursor: pointer;
-    overflow: hidden;
-    transition: background-color var(--dur-fast) var(--ease-standard),
-        color var(--dur-fast) var(--ease-standard);
-}
-
-.dashboard-sidebar.expanded .sidebar-theme-toggle {
-    justify-content: flex-start;
-    width: 100%;
-    height: 40px;
-    padding: 0 var(--sp-3);
-    margin-inline: 0;
-    border-radius: var(--radius-pill);
-}
-
-.sidebar-theme-toggle .material-symbols-outlined {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.sidebar-theme-toggle .nav-label {
-    display: none;
-    white-space: nowrap;
-}
-
-.dashboard-sidebar.expanded .sidebar-theme-toggle .nav-label {
-    display: inline;
-}
-
-.sidebar-theme-toggle:hover {
-    background: var(--surface-3);
-    color: var(--text-strong);
-}
+/* The rail's theme switch was removed — the control lives in the page header
+   now, with the account menu as the fallback on screens that have not adopted
+   that component. The rail is navigation only. */
 
 /* --- User row -------------------------------------------------------- */
 .sidebar-user-card {
@@ -1670,7 +1658,7 @@ pre {
     flex: 1;
     min-width: 0;
     margin-left: calc(var(--sidebar-width) + var(--sidebar-gap));
-    padding: var(--sp-8) var(--sp-10) var(--sp-12);
+    padding: var(--canvas-pad-y) var(--canvas-pad-x) var(--sp-12);
     min-height: 100vh;
     transition: margin-left var(--dur-base) var(--ease-emphasized);
     animation: contentFade var(--dur-base) var(--ease-standard);
@@ -1690,8 +1678,13 @@ pre {
    ========================================================================== */
 
 @media (max-width: 1210px) {
+    :root {
+        --canvas-pad-x: var(--sp-6);
+        --canvas-pad-y: var(--sp-6);
+    }
+
     .dashboard-main {
-        padding: var(--sp-6) var(--sp-6) var(--sp-10);
+        padding: var(--canvas-pad-y) var(--canvas-pad-x) var(--sp-10);
     }
 }
 
@@ -1709,6 +1702,8 @@ pre {
 @media (max-width: 768px) {
     :root {
         --sidebar-width: 64px;
+        --canvas-pad-x: var(--sp-4);
+        --canvas-pad-y: var(--sp-4);
     }
 
     .dashboard-sidebar {
@@ -1721,7 +1716,7 @@ pre {
     }
 
     .dashboard-main {
-        padding: var(--sp-4) var(--sp-4) var(--sp-8);
+        padding: var(--canvas-pad-y) var(--canvas-pad-x) var(--sp-8);
     }
 
     .logo-img {
@@ -2197,6 +2192,327 @@ pre {
     color: var(--text-strong);
     letter-spacing: 0;
     margin: 0;
+}
+
+/* ==========================================================================
+   11. PAGE HEADER — the shared top bar
+
+   A sticky, full-bleed command bar that sits as the first child of
+   .dashboard-main. It has two states: resting (transparent, eyebrow + H1 at
+   full size) and stuck (translucent blurred canvas, hairline rule, condensed
+   to a single dense row). Markup comes from partials/page_header.html;
+   behaviour from the PageHeader module in app.js.
+
+   The bleed works by cancelling the canvas inset with a negative margin, which
+   is why .dashboard-main's padding is published as --canvas-pad-x/y: the
+   header then stays edge-to-edge at every breakpoint without duplicating the
+   media queries.
+   ========================================================================== */
+
+.page-header {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    margin: calc(var(--canvas-pad-y) * -1) calc(var(--canvas-pad-x) * -1) var(--sp-8);
+    padding: var(--canvas-pad-y) var(--canvas-pad-x) var(--sp-5);
+    border-bottom: 1px solid transparent;
+    transition:
+        padding var(--dur-base) var(--ease-emphasized),
+        background-color var(--dur-base) var(--ease-standard),
+        border-color var(--dur-base) var(--ease-standard),
+        box-shadow var(--dur-base) var(--ease-standard);
+}
+
+/* Opaque canvas is the fallback; the blur is an enhancement layered on top,
+   because a 0.78-alpha fill with nothing behind it would let the content
+   scroll through legibly-but-wrong. */
+.page-header.is-stuck {
+    padding-top: var(--sp-3);
+    padding-bottom: var(--sp-3);
+    background: var(--bg-canvas);
+    border-bottom-color: var(--border-subtle);
+    box-shadow: var(--elev-1);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .page-header.is-stuck {
+        background: var(--canvas-glass);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        backdrop-filter: blur(16px) saturate(180%);
+    }
+}
+
+.page-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-6);
+    flex-wrap: wrap;
+}
+
+/* --- Title block ------------------------------------------------------- */
+.page-header-lead {
+    min-width: 0;
+}
+
+.page-header-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-1);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+    max-height: 2em;
+    opacity: 1;
+    transition:
+        max-height var(--dur-base) var(--ease-emphasized),
+        opacity var(--dur-fast) var(--ease-standard),
+        margin-bottom var(--dur-base) var(--ease-emphasized);
+}
+
+/* The eyebrow is context, not identity — it is the first thing to go when the
+   bar condenses, so the H1 can stay on one line beside the tools. */
+.page-header.is-stuck .page-header-eyebrow {
+    max-height: 0;
+    margin-bottom: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.page-header-title {
+    margin: 0;
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+    line-height: var(--lh-tight);
+    transition: font-size var(--dur-base) var(--ease-emphasized);
+}
+
+.page-header.is-stuck .page-header-title {
+    font-size: var(--fs-h2);
+}
+
+/* --- Tools ------------------------------------------------------------- */
+.page-header-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-left: auto;
+}
+
+/* --- Search ------------------------------------------------------------ */
+/* --surface-3, not --surface-2: the bar sits directly on --bg-canvas, and in
+   light mode --surface-2 *is* the canvas colour, so the field would vanish. */
+.page-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    width: clamp(200px, 24vw, 340px);
+    height: 44px;
+    padding: 0 var(--sp-2) 0 var(--sp-4);
+    background: var(--surface-3);
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    transition: var(--transition-base);
+}
+
+.page-search:hover {
+    background: var(--surface-4);
+}
+
+.page-search:focus-within {
+    background: var(--surface-1);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.page-search-icon {
+    flex-shrink: 0;
+    display: flex;
+    color: var(--text-muted);
+}
+
+.page-search-input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    background: none;
+    outline: none;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+}
+
+.page-search-input::placeholder {
+    color: var(--text-faint);
+}
+
+.page-search-kbd {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    padding: 3px 7px;
+    margin-right: var(--sp-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--surface-1);
+    font-family: var(--font-sans);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-faint);
+    line-height: 1;
+    transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.page-search:focus-within .page-search-kbd {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.page-search-clear {
+    position: absolute;
+    right: var(--sp-2);
+    display: none;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--surface-3);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.page-search-clear:hover {
+    background: var(--surface-4);
+    color: var(--text-strong);
+}
+
+.page-search.has-value .page-search-clear {
+    display: grid;
+}
+
+.page-search.has-value .page-search-kbd {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* --- Actions ----------------------------------------------------------- */
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+.page-header-action {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 44px;
+    padding: 0 var(--sp-5);
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    line-height: 1;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+/* A shared component cannot assume what a page stylesheet has already claimed.
+   Icons and labels inside an action take the button's colour explicitly rather
+   than by inheritance, so a page rule that happens to match a child — a class
+   name reused for something else on that screen — cannot repaint the text to
+   something illegible on the accent fill. */
+.page-header-action>* {
+    color: inherit;
+}
+
+.page-header-action.is-primary {
+    background: var(--accent);
+    color: var(--text-on-accent);
+    box-shadow: var(--elev-1);
+}
+
+.page-header-action.is-primary:hover {
+    background: var(--accent-hover);
+    color: var(--text-on-accent);
+    box-shadow: var(--elev-2);
+}
+
+.page-header-action.is-ghost {
+    background: var(--surface-3);
+    color: var(--text-1);
+}
+
+.page-header-action.is-ghost:hover {
+    background: var(--surface-4);
+    color: var(--text-strong);
+}
+
+.page-header-icon-btn {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.page-header-icon-btn:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.page-header-icon-btn .material-symbols-outlined {
+    font-size: 22px;
+}
+
+.page-header :is(.page-search-clear, .page-header-action, .page-header-icon-btn):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* --- Responsive -------------------------------------------------------- */
+@media (max-width: 1024px) {
+    .page-header-tools {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .page-search {
+        flex: 1;
+        width: auto;
+    }
+}
+
+@media (max-width: 620px) {
+    .page-search-kbd {
+        display: none;
+    }
+
+    /* Below this the label is the first thing to cost more than it earns —
+       the icon and the pill shape still say "primary action". */
+    .page-header-action.is-primary {
+        padding: 0 var(--sp-4);
+    }
+
+    .page-header-action .page-header-label {
+        display: none;
+    }
 }
 
 /* Respect reduced-motion preferences */

@@ -1,0 +1,66 @@
+{#
+  Page header — the shared top bar for dashboard screens.
+
+  A sticky, full-bleed command bar: eyebrow + H1 on the left, an optional
+  search field and a caller-supplied action row on the right. It condenses to
+  a single dense row once the canvas scrolls (see .page-header.is-stuck in
+  dashboard.css, driven by the PageHeader module in app.js).
+
+  It must be the FIRST child of .dashboard-main — both because the sticky
+  offset assumes the canvas inset, and because PJAX only swaps that element's
+  innerHTML, so anything outside it would not re-render on navigation.
+
+  Usage — actions are the call body:
+
+    {% raw %}{% from 'partials/page_header.html' import page_header with context %}
+    {% call page_header(title='Dashboard', eyebrow='Overview', search=true,
+                        search_placeholder='Search your content') %}
+      <a href="…" class="page-header-action is-primary">New blog</a>
+    {% endcall %}{% endraw %}
+
+  Search does not submit anywhere by itself. It emits a `page-search` event on
+  `document` ({ detail: { value, submit } }) and the page decides what that
+  means — the dashboard filters its recent-work list live and hands Enter off
+  to All Blogs.
+#}
+
+{% macro page_header(title, eyebrow='', search=false, search_placeholder='Search', search_id='pageSearch') %}
+<header class="page-header" data-page-header>
+    <div class="page-header-bar">
+
+        <div class="page-header-lead">
+            {% if eyebrow %}
+            <p class="page-header-eyebrow">{{ eyebrow }}</p>
+            {% endif %}
+            <h1 class="page-header-title">{{ title }}</h1>
+        </div>
+
+        <div class="page-header-tools">
+            {% if search %}
+            <div class="page-search" data-page-search>
+                <span class="page-search-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round">
+                        <circle cx="11" cy="11" r="7" />
+                        <path d="m20 20-3.6-3.6" />
+                    </svg>
+                </span>
+                <label class="visually-hidden" for="{{ search_id }}">{{ search_placeholder }}</label>
+                <input type="search" id="{{ search_id }}" class="page-search-input" autocomplete="off"
+                    placeholder="{{ search_placeholder }}">
+                {# Filled in as ⌘K on Apple platforms by app.js. #}
+                <kbd class="page-search-kbd" data-search-hint aria-hidden="true">Ctrl K</kbd>
+                <button type="button" class="page-search-clear" data-page-search-clear aria-label="Clear search">
+                    <span class="material-symbols-outlined" style="font-size:18px">close</span>
+                </button>
+            </div>
+            {% endif %}
+
+            {% if caller %}
+            <div class="page-header-actions">{{ caller() }}</div>
+            {% endif %}
+        </div>
+
+    </div>
+</header>
+{% endmacro %}

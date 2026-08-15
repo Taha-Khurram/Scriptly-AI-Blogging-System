@@ -1,269 +1,982 @@
 /* ==========================================================================
-   Home Dashboard Page Styles
+   Home / Dashboard
+
+   A bento canvas under the shared sticky page header:
+
+     ┌ hero (7) ───────────────────┐ ┌ pipeline (5) ─┐
+     │ gradient headline + actions │ │ hero figure   │
+     │ + nudge strip               │ │ stacked bar   │
+     └─────────────────────────────┘ └───────────────┘
+     ┌ recent work (8) ────────────┐ ┌ jump back in ─┐
+     │ segmented tabs + rows       │ │ action tiles  │
+     └─────────────────────────────┘ └───────────────┘
+
+   Every colour is a token from dashboard.css. The one gradient moment on the
+   screen is the hero — its aura and its headline clause — per §4 of the
+   design system ("the gradient is rationed").
    ========================================================================== */
 
-/* Welcome Banner */
-.welcome-banner {
-    background: var(--brand-gradient-diag);
-    border-radius: var(--radius-lg);
-    padding: 2.5rem;
-    color: var(--text-on-accent);
-    position: relative;
-    overflow: hidden;
-    margin-bottom: 2rem;
-    box-shadow: var(--elev-3);
-}
+/* ==========================================================================
+   LAYOUT
+   ========================================================================== */
 
-.welcome-banner h2 {
-    color: white;
-    margin-bottom: 0.5rem;
-    font-size: 1.8rem;
-}
-
-.welcome-banner p {
-    opacity: 0.9;
-    font-size: 1.1rem;
-}
-
-.welcome-banner::after {
-    content: '';
-    position: absolute;
-    right: -50px;
-    bottom: -50px;
-    width: 200px;
-    height: 200px;
-    background: rgba(255, 255, 255, 0.12);
-    border-radius: 50%;
-}
-
-/* Grid Layout */
-.dashboard-grid {
+/* Stretch, not start: a bento row reads as one band only if both cards end on
+   the same line. The cards absorb the extra height internally — the pipeline
+   drops its legend to the bottom, the work card lets its panel grow — rather
+   than leaving a ragged edge under the shorter one. */
+.dash-bento,
+.dash-split {
     display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 2rem;
+    gap: var(--sp-6);
+    margin-bottom: var(--sp-6);
+    align-items: stretch;
 }
 
-.col-span-8 { grid-column: span 8; }
-.col-span-4 { grid-column: span 4; }
-.col-span-3 { grid-column: span 3; }
-.col-span-6 { grid-column: span 6; }
-
-@media (max-width: 1024px) {
-    .dashboard-grid {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .col-span-8,
-    .col-span-4,
-    .col-span-3,
-    .col-span-6 {
-        width: 100%;
-    }
+.dash-bento {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
 }
 
-/* Stats Cards */
-.stat-card {
+.dash-split {
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    margin-bottom: 0;
+}
+
+/* ==========================================================================
+   CARD PRIMITIVES
+   ========================================================================== */
+
+.hero-card,
+.pipeline-card,
+.work-card,
+.actions-card {
     background: var(--surface-1);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    box-shadow: var(--elev-1);
+    transition: box-shadow var(--dur-base) var(--ease-standard);
+}
+
+.card-head {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    box-shadow: var(--shadow-sm);
+    justify-content: space-between;
+    gap: var(--sp-4);
+    padding: var(--sp-6) var(--sp-6) 0;
+}
+
+.card-head.is-stacked {
+    flex-wrap: wrap;
+    row-gap: var(--sp-4);
+}
+
+.card-title {
+    margin: 0;
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+}
+
+.card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+    text-decoration: none;
+    white-space: nowrap;
     transition: var(--transition-base);
 }
 
-.stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-hover);
+.card-link:hover {
+    background: var(--accent-tint);
+    color: var(--accent);
 }
 
-.stat-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
+.card-link i {
+    font-size: 0.9em;
+    transition: transform var(--dur-fast) var(--ease-standard);
 }
 
-.icon-purple { background: var(--accent-tint); color: var(--primary-color); }
-.icon-green { background: var(--success-soft); color: var(--success-color); }
-.icon-orange { background: var(--warning-soft); color: var(--warning-color); }
-
-/* ==================== BLOG LIST CARDS GRID ==================== */
-.dashboard-cards-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.5rem;
+.card-link:hover i {
+    transform: translateX(2px);
 }
 
-@media (max-width: 1200px) {
-    .dashboard-cards-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+/* Entrance — staggered by --reveal-delay on each card */
+.reveal {
+    animation: fadeInUp var(--dur-slow) var(--ease-standard) both;
+    animation-delay: var(--reveal-delay, 0ms);
 }
 
-@media (max-width: 768px) {
-    .dashboard-cards-grid {
-        grid-template-columns: 1fr;
-    }
-}
+/* ==========================================================================
+   HERO
 
-/* ==================== LIST CARD ==================== */
-.dashboard-list-card {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
+   Surface-1 with a brand-gradient aura bled into the top-right corner and a
+   masked 64px grid — the same recipe as the auth brand pane, dialled down so
+   it reads as light rather than as a panel. The pointer spotlight is layered
+   over both and only exists while the pointer is inside the card.
+   ========================================================================== */
+
+.hero-card {
+    position: relative;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    padding: var(--sp-10);
+    isolation: isolate;
 }
 
-.list-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--border-subtle);
+.hero-aura,
+.hero-grid {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
 }
 
-.list-card-title {
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+.hero-aura {
+    background:
+        radial-gradient(60% 90% at 100% 0%, rgba(217, 101, 112, 0.20), transparent 62%),
+        radial-gradient(55% 85% at 85% 10%, rgba(155, 114, 203, 0.22), transparent 60%),
+        radial-gradient(70% 100% at 68% -10%, rgba(66, 133, 244, 0.20), transparent 64%);
 }
 
-.list-card-title i {
-    font-size: 1rem;
-    color: var(--primary-color);
+.hero-grid {
+    background-image:
+        linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: radial-gradient(120% 100% at 100% 0%, #000 10%, transparent 70%);
+    mask-image: radial-gradient(120% 100% at 100% 0%, #000 10%, transparent 70%);
+    opacity: 0.7;
 }
 
-.list-card-viewall {
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: var(--primary-color);
-    text-decoration: none;
+/* Pointer spotlight. --mx/--my are written by home.js; the fallback keeps the
+   highlight parked in the corner for touch and keyboard users. */
+.hero-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(420px circle at var(--mx, 85%) var(--my, 0%),
+            rgba(var(--accent-rgb), 0.10), transparent 62%);
+    opacity: 0;
+    transition: opacity var(--dur-slow) var(--ease-standard);
+}
+
+.hero-card:hover::after {
+    opacity: 1;
+}
+
+.hero-body {
+    position: relative;
+    max-width: 34rem;
+}
+
+.hero-eyebrow {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 0.35rem 0.75rem;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-4);
+    padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-1);
     border-radius: var(--radius-pill);
-    background: var(--accent-tint);
-    transition: all 0.2s ease;
+    background: var(--surface-2);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-2);
 }
 
-.list-card-viewall:hover {
-    background: var(--accent-tint);
-    color: var(--primary-color);
+.hero-spark {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--surface-1);
+    color: var(--accent);
+    font-size: 11px;
 }
 
-.list-card-body {
-    padding: 0;
-    flex: 1;
+.hero-headline {
+    margin: 0 0 var(--sp-4);
+    font-size: clamp(1.9rem, 1.2rem + 2.2vw, 2.75rem);
+    font-weight: var(--fw-medium);
+    line-height: 1.12;
+    letter-spacing: -0.025em;
+    color: var(--text-strong);
 }
 
-/* ==================== LIST ITEM ==================== */
-.list-card-item {
+/* inline-block so the ramp spans the glyphs rather than the whole column */
+.hero-gradient {
+    display: inline-block;
+    background: var(--brand-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.hero-lede {
+    margin: 0 0 var(--sp-8);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.hero-actions {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.85rem 1.5rem;
-    border-bottom: 1px solid var(--border-subtle);
-    transition: background 0.15s ease;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
 }
 
-.list-card-item:hover {
+.hero-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 48px;
+    padding: 0 var(--sp-6);
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: var(--transition-base);
+}
+
+.hero-cta.is-primary {
+    background: var(--accent);
+    color: var(--text-on-accent);
+    box-shadow: var(--elev-1);
+}
+
+.hero-cta.is-primary:hover {
+    background: var(--accent-hover);
+    color: var(--text-on-accent);
+    box-shadow: var(--elev-2);
+    transform: translateY(-1px);
+}
+
+.hero-cta.is-ghost {
+    background: var(--surface-2);
+    color: var(--text-1);
+}
+
+.hero-cta.is-ghost:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.hero-cta.is-ghost i {
+    transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.hero-cta.is-ghost:hover i {
+    transform: translateX(3px);
+}
+
+/* --- Nudge strip ------------------------------------------------------- */
+.hero-nudges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-top: var(--sp-8);
+    padding-top: var(--sp-5);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.hero-nudge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-4);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+    text-decoration: none;
+    transition: var(--transition-base);
+}
+
+a.hero-nudge:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.hero-nudge.is-live {
+    background: var(--warning-soft);
+    color: var(--warning);
+    box-shadow: inset 0 0 0 1px var(--warning-border);
+}
+
+a.hero-nudge.is-live:hover {
+    background: var(--warning-soft);
+    color: var(--warning);
+    filter: brightness(0.98);
+}
+
+/* ==========================================================================
+   PIPELINE
+
+   Hero figure, then an ordered stacked bar. The legend carries every value in
+   text, so the hover layer only ever enhances — nothing is gated behind it.
+   ========================================================================== */
+
+.pipeline-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: var(--sp-6);
+}
+
+.pipeline-figure {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: var(--sp-6) 0 0;
+    padding: 0 var(--sp-6);
+}
+
+/* Proportional figures, not tabular: equal-width digits read loose at this size */
+.figure-value {
+    font-size: clamp(2.75rem, 1.6rem + 3vw, 3.5rem);
+    font-weight: var(--fw-medium);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--text-strong);
+    font-variant-numeric: proportional-nums;
+}
+
+.figure-unit {
+    font-size: var(--fs-body);
+    color: var(--text-muted);
+}
+
+/* auto takes the row's slack here, so the bar and legend stay anchored to the
+   bottom of the card, level with the hero's nudge strip. */
+.pipeline-caption {
+    margin: var(--sp-1) 0 auto;
+    padding: 0 var(--sp-6);
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+/* --- The bar ----------------------------------------------------------- */
+.viz-stack {
+    display: flex;
+    gap: 2px;
+    /* the surface gap — separation is negative space, never a stroke */
+    height: 14px;
+    margin: var(--sp-6) var(--sp-6) var(--sp-5);
+    flex-shrink: 0;
+}
+
+.viz-stack.is-empty {
+    background: var(--surface-3);
+    border-radius: 4px;
+}
+
+.viz-seg {
+    display: block;
+    position: relative;
+    flex: 0 1 calc(var(--share, 0) * 1%);
+    min-width: 6px;
+    height: 100%;
+    border-radius: 0;
+    text-decoration: none;
+    transition:
+        flex-basis 0.7s var(--ease-emphasized),
+        transform var(--dur-fast) var(--ease-standard);
+    transition-delay: calc(var(--i, 0) * 80ms), 0ms;
+    transform-origin: center;
+}
+
+/* 4px rounded data-ends on the outside of the stack; interior ends stay square
+   and let the 2px gap do the separating. */
+.viz-seg:first-child {
+    border-radius: 4px 0 0 4px;
+}
+
+.viz-seg:last-child {
+    border-radius: 0 4px 4px 0;
+}
+
+.viz-seg:only-child {
+    border-radius: 4px;
+}
+
+/* The bar draws itself in on load. Rendering the final width by default means
+   a page without JS still shows the true proportions — home.js adds this class
+   for one frame and then removes it, which is what starts the transition. */
+.viz-stack.is-preparing .viz-seg {
+    flex-basis: 0%;
+    transition: none;
+}
+
+/* A 6px-wide segment is not a hit target; this extends it to ~38px vertically
+   without changing what is drawn. */
+.viz-seg::before {
+    content: '';
+    position: absolute;
+    inset: -12px 0;
+}
+
+.viz-seg:hover,
+.viz-seg:focus-visible {
+    transform: scaleY(1.5);
+    outline: none;
+}
+
+.viz-seg:focus-visible {
+    box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--accent);
+}
+
+.viz-draft {
+    background: var(--viz-stage-1);
+}
+
+.viz-review {
+    background: var(--viz-stage-2);
+}
+
+.viz-published {
+    background: var(--viz-stage-3);
+}
+
+.viz-other {
+    background: var(--viz-stage-other);
+}
+
+/* --- Tooltip ----------------------------------------------------------- */
+.viz-tooltip {
+    position: absolute;
+    z-index: 5;
+    transform: translate(-50%, -100%);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-xs);
+    background: var(--inverse-surface);
+    color: var(--on-inverse);
+    font-size: var(--fs-xs);
+    line-height: 1.35;
+    white-space: nowrap;
+    box-shadow: var(--elev-3);
+    pointer-events: none;
+}
+
+.viz-tooltip[hidden] {
+    display: none;
+}
+
+.viz-tooltip b {
+    font-weight: var(--fw-medium);
+}
+
+.viz-tooltip .tip-share {
+    color: var(--on-inverse);
+    opacity: 0.7;
+}
+
+/* --- Legend (doubles as the table view) -------------------------------- */
+.viz-legend {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0 var(--sp-6);
+    list-style: none;
+}
+
+.viz-legend-row {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto 3.25rem;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) 0;
+    border-radius: var(--radius-xs);
+    transition: background var(--dur-fast) var(--ease-standard);
+}
+
+.viz-legend-row:hover {
     background: var(--surface-2);
 }
 
-.list-card-item:last-child {
-    border-bottom: none;
+.viz-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
 }
 
-.list-card-item-info {
+/* Text wears text tokens — identity comes from the swatch beside it */
+.viz-legend-label {
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.viz-legend-row:hover .viz-legend-label {
+    color: var(--text-strong);
+}
+
+.viz-legend-count {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.viz-legend-share {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.pipeline-empty {
+    margin: 0;
+    padding: 0 var(--sp-6);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-faint);
+}
+
+/* ==========================================================================
+   RECENT WORK
+   ========================================================================== */
+
+.work-card {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
-    min-width: 0;
-    flex: 1;
-    margin-right: 0.75rem;
+    padding-bottom: var(--sp-4);
 }
 
-.list-card-item-title {
-    font-size: 0.875rem;
-    font-weight: 500;
+/* Segmented control. Active takes --accent-soft, the same treatment the nav
+   rail gives its current item, so "selected" looks the same everywhere. */
+.work-tabs {
+    display: flex;
+    gap: var(--sp-1);
+    padding: var(--sp-1);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.work-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.work-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-4);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.work-tab:hover {
+    color: var(--text-strong);
+}
+
+.work-tab.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-on-soft);
+}
+
+.work-tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.tab-count {
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    font-size: var(--fs-2xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+.work-tab.is-active .tab-count {
+    background: var(--surface-1);
+    color: var(--accent-on-soft);
+}
+
+.work-panels {
+    flex: 1;
+    display: flex;
+    padding: var(--sp-4) var(--sp-4) 0;
+}
+
+.work-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.work-panel[hidden] {
+    display: none;
+}
+
+.work-empty {
+    margin: auto 0;
+}
+
+.work-rows {
+    display: grid;
+    gap: 2px;
+}
+
+.work-row {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-4);
+    padding: var(--sp-3);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    transition: background var(--dur-fast) var(--ease-standard);
+}
+
+.work-row:hover {
+    background: var(--surface-2);
+}
+
+.work-row[hidden] {
+    display: none;
+}
+
+.work-row-mark {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-xs);
+    background: var(--surface-3);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+}
+
+.work-row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.work-row-title {
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
     color: var(--text-strong);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.list-card-item-meta {
-    font-size: 0.75rem;
-    color: var(--text-faint);
-    font-weight: 500;
-}
-
-/* ==================== STATUS BADGES ==================== */
-.list-card-badge {
-    display: inline-flex;
+.work-row-meta {
+    display: flex;
     align-items: center;
-    padding: 0.25rem 0.6rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.68rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-    flex-shrink: 0;
+    gap: var(--sp-2);
+    min-width: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
 }
 
-.badge-draft {
+.work-row-cat {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.work-row-sep {
+    color: var(--text-faint);
+}
+
+.work-row-time {
+    white-space: nowrap;
+    color: var(--text-faint);
+}
+
+/* --- Status pills — the reserved status palette, always with a label ---- */
+.status-pill {
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+}
+
+.status-draft {
     background: var(--surface-3);
     color: var(--text-muted);
 }
 
-.badge-under_review {
+.status-under_review {
     background: var(--warning-soft);
     color: var(--warning);
 }
 
-.badge-published {
+.status-published {
     background: var(--success-soft);
     color: var(--success);
 }
 
-.badge-rejected {
+.status-rejected {
     background: var(--danger-soft);
     color: var(--danger);
 }
 
-/* ==================== EMPTY STATE ==================== */
-.list-card-empty {
+/* auto pins the link to the bottom of the panel, so a three-row list and an
+   eight-row list still end on the same line as the card beside them. */
+.work-more {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: auto;
+    padding: var(--sp-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+    text-decoration: none;
+    transition: var(--transition-base);
+}
+
+.work-more:hover {
+    background: var(--accent-tint);
+    color: var(--accent);
+}
+
+.work-more i {
+    transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.work-more:hover i {
+    transform: translateX(3px);
+}
+
+.work-noresults {
+    margin: 0;
+    padding: var(--sp-8) var(--sp-3);
+    text-align: center;
+    font-size: var(--fs-sm);
+    color: var(--text-faint);
+}
+
+.work-noresults[hidden] {
+    display: none;
+}
+
+.work-empty {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 2.5rem 1rem;
+    gap: var(--sp-3);
+    padding: var(--sp-12) var(--sp-4);
     text-align: center;
 }
 
-.list-card-empty i {
-    font-size: 2rem;
+.work-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--surface-2);
     color: var(--text-faint);
-    margin-bottom: 0.5rem;
+    font-size: 22px;
 }
 
-.list-card-empty p {
-    font-size: 0.85rem;
-    color: var(--text-faint);
-    font-weight: 500;
+.work-empty p {
     margin: 0;
+    max-width: 22rem;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-faint);
+}
+
+/* ==========================================================================
+   JUMP BACK IN
+   ========================================================================== */
+
+.actions-card {
+    padding-bottom: var(--sp-6);
+}
+
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3);
+    padding: var(--sp-5) var(--sp-6) 0;
+}
+
+.action-tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    text-decoration: none;
+    transition: var(--transition-base);
+}
+
+.action-tile:hover {
+    background: var(--surface-3);
+    transform: translateY(-2px);
+    box-shadow: var(--elev-1);
+}
+
+.action-icon {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--surface-1);
+    color: var(--text-2);
+    font-size: 16px;
+    transition: var(--transition-base);
+}
+
+.action-label {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-1);
+}
+
+.action-tile:hover .action-label {
+    color: var(--text-strong);
+}
+
+.action-tile.is-lead {
+    background: var(--accent-soft);
+}
+
+.action-tile.is-lead:hover {
+    background: var(--accent-soft);
+    filter: brightness(1.03);
+}
+
+.action-tile.is-lead .action-icon {
+    background: var(--surface-1);
+    color: var(--accent);
+}
+
+.action-tile.is-lead .action-label,
+.action-tile.is-lead:hover .action-label {
+    color: var(--accent-on-soft);
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 1080px) {
+
+    .dash-bento,
+    .dash-split {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hero-body {
+        max-width: none;
+    }
+
+    /* Stacked, the cards are full-canvas width. The auto margin that balanced
+       the two-column row now only opens a gap, and a four-row legend strung
+       down one side of a 900px card leaves the counts stranded from their
+       labels — so the legend turns into a strip under the bar instead. */
+    .pipeline-caption {
+        margin-bottom: var(--sp-6);
+    }
+
+    .viz-stack {
+        margin-top: 0;
+    }
+
+    .viz-legend {
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        column-gap: var(--sp-6);
+    }
+}
+
+@media (max-width: 900px) {
+    .hero-card {
+        padding: var(--sp-8) var(--sp-6);
+    }
+
+    .hero-nudges {
+        margin-top: var(--sp-6);
+    }
+}
+
+@media (max-width: 560px) {
+    .card-head {
+        padding: var(--sp-5) var(--sp-5) 0;
+    }
+
+    .pipeline-figure,
+    .pipeline-caption,
+    .viz-legend,
+    .pipeline-empty {
+        padding-inline: var(--sp-5);
+    }
+
+    .viz-stack {
+        margin-inline: var(--sp-5);
+    }
+
+    .action-grid {
+        padding-inline: var(--sp-5);
+    }
+
+    .hero-cta {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .work-row {
+        grid-template-columns: 32px minmax(0, 1fr);
+        row-gap: var(--sp-2);
+    }
+
+    .work-row-mark {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* The pill drops under the title rather than squeezing it to nothing */
+    .work-row .status-pill {
+        grid-column: 2;
+        justify-self: start;
+    }
+}
+
+/* The bar's draw-in and the card entrance are decoration; the reduced-motion
+   block in dashboard.css collapses both to ~0 globally. Explicitly park the
+   segments at their true width so nothing is left mid-transition. */
+@media (prefers-reduced-motion: reduce) {
+    .viz-stack.is-preparing .viz-seg {
+        flex-basis: calc(var(--share, 0) * 1%);
+    }
+
+    .hero-card::after {
+        display: none;
+    }
 }

@@ -79,12 +79,10 @@
         {% endif %}
     </div>
 
-    <!-- Theme switch — icon in the rail, labelled row in the drawer -->
-    <button type="button" class="sidebar-theme-toggle" data-theme-toggle aria-pressed="false"
-        aria-label="Switch to dark theme" title="Switch to dark theme">
-        <span class="material-symbols-outlined">dark_mode</span>
-        <span class="nav-label" data-theme-label>Dark theme</span>
-    </button>
+    {# The theme switch used to sit here, as the last row of the rail. It now
+       lives in the page header, with the account menu below as the fallback for
+       screens that have not adopted that component yet — so the rail is nothing
+       but navigation. #}
 
     <!-- User Card — opens the account menu -->
     {% set display_name = session.get('user_name', 'User').split('@')[0] %}

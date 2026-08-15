@@ -1,12 +1,85 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
 {% block title %}Dashboard | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/home.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/home.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
+
+{#
+   Pipeline arithmetic.
+
+   total_blogs is counted independently of the three status buckets, so it can
+   exceed their sum (a REJECTED post belongs to none of them). Rather than let
+   the bar quietly misrepresent the whole, the remainder becomes its own
+   "Other" segment and the bar is drawn against the real total.
+
+   A "set" inside an if-body is scoped to that body in Jinja and would not
+   survive it, so the optional fourth stage is appended in the same expression
+   that builds the list.
+#}
+{% set drafts_n = drafts_count | default(0) | int %}
+{% set review_n = pending_count | default(0) | int %}
+{% set published_n = published_count | default(0) | int %}
+{% set total_n = total_blogs | default(0) | int %}
+{% set staged_n = drafts_n + review_n + published_n %}
+{% set other_n = (total_n - staged_n) if total_n > staged_n else 0 %}
+{% set pipeline_n = staged_n + other_n %}
+
+{% set all_blogs_url = url_for('blogs_listing.all_blogs_page') %}
+{% set stages = [
+{'key': 'draft', 'label': 'Draft', 'count': drafts_n, 'href': url_for('blog.drafts_page')},
+{'key': 'review', 'label': 'In review', 'count': review_n, 'href': all_blogs_url ~ '?status=UNDER_REVIEW'},
+{'key': 'published', 'label': 'Published', 'count': published_n, 'href': all_blogs_url ~ '?status=PUBLISHED'}
+] + ([{'key': 'other', 'label': 'Other', 'count': other_n, 'href': all_blogs_url}] if other_n else []) %}
+
+{% set first_name = (username or 'there').split('@')[0] %}
+
+{#
+   One row of the recent-work list. data-search carries the lower-cased haystack
+   so the header's search can filter without reading back the DOM text.
+
+   The macro deliberately depends on nothing from the surrounding scope — only
+   its arguments and Jinja globals — because a macro resolves free names from
+   the template context, not from the block-local `set`s above it.
+#}
+{% macro work_row(blog, fallback_status) %}
+{% set st = (blog.status or fallback_status or 'DRAFT') | upper %}
+{% set stamp = (blog.updated_at or blog.created_at or '') | string %}
+{% set title = blog.title or 'Untitled' %}
+{% set status_labels = {
+'PUBLISHED': 'Published',
+'UNDER_REVIEW': 'Under review',
+'REJECTED': 'Rejected',
+'DRAFT': 'Draft'
+} %}
+<a class="work-row" href="{{ url_for('blogs_listing.all_blogs_page') }}"
+    data-search="{{ (title ~ ' ' ~ (blog.category or '')) | lower }}">
+    <span class="work-row-mark" aria-hidden="true">{{ title[0] | upper }}</span>
+    <span class="work-row-main">
+        <span class="work-row-title">{{ title }}</span>
+        <span class="work-row-meta">
+            <span class="work-row-cat">{{ blog.category or 'Uncategorized' }}</span>
+            {% if stamp %}
+            <span class="work-row-sep" aria-hidden="true">·</span>
+            <time class="work-row-time" datetime="{{ stamp }}" data-relative>{{ stamp[:10] }}</time>
+            {% endif %}
+        </span>
+    </span>
+    <span class="status-pill status-{{ st | lower }}">{{ status_labels.get(st, st | title) }}</span>
+</a>
+{% endmacro %}
+
+{% macro work_empty(icon, message) %}
+<div class="work-empty">
+    <span class="work-empty-icon"><i class="bi bi-{{ icon }}"></i></span>
+    <p>{{ message }}</p>
+</div>
+{% endmacro %}
+
 <div class="dashboard-layout">
 
     {% include 'partials/sidebar.html' %}
@@ -14,127 +87,274 @@
     <!-- MAIN CONTENT -->
     <main class="dashboard-main">
 
-        <header class="dashboard-header">
-            <div>
-                <div class="header-welcome-text">{{ greeting }}, {{ username }}</div>
-                <h1 class="header-title">Welcome Back!</h1>
-            </div>
-        </header>
+        {% call page_header(
+        title='Dashboard',
+        eyebrow=greeting ~ ', ' ~ first_name,
+        search=true,
+        search_placeholder='Search your content',
+        search_id='dashboardSearch') %}
+        <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+            <span class="material-symbols-outlined">dark_mode</span>
+        </button>
+        <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-primary">
+            <i class="bi bi-stars" aria-hidden="true"></i>
+            <span class="page-header-label">New blog</span>
+        </a>
+        {% endcall %}
 
-        <!-- Welcome Banner -->
-        <div class="welcome-banner animate-fade-up">
-            <h2>Your creative studio is ready.</h2>
-            <p>Start writing your next viral blog post or manage your existing content.</p>
+        <!-- ============================ ROW 1 — HERO + PIPELINE ============ -->
+        <div class="dash-bento">
+
+            <!-- Hero -->
+            <section class="hero-card reveal" data-spotlight aria-labelledby="heroHeading">
+                <span class="hero-aura" aria-hidden="true"></span>
+                <span class="hero-grid" aria-hidden="true"></span>
+
+                <div class="hero-body">
+                    <p class="hero-eyebrow">
+                        <span class="hero-spark" aria-hidden="true"><i class="bi bi-stars"></i></span>
+                        AI content studio
+                    </p>
+
+                    <h2 class="hero-headline" id="heroHeading">
+                        Your studio is
+                        <span class="hero-gradient">ready to write.</span>
+                    </h2>
+
+                    <p class="hero-lede">
+                        Outline, draft, optimise and publish in one pass — the agents do the
+                        heavy lifting while you keep the voice.
+                    </p>
+
+                    <div class="hero-actions">
+                        <a href="{{ url_for('blog.create_page') }}" class="hero-cta is-primary">
+                            <i class="bi bi-stars" aria-hidden="true"></i> Start a new blog
+                        </a>
+                        <a href="{{ url_for('blog.drafts_page') }}" class="hero-cta is-ghost">
+                            Continue in drafts <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                        </a>
+                    </div>
+
+                    {# The nudge strip is the page's only opinionated surface: it names the
+                       one or two things actually waiting on the reader, and says so plainly
+                       when nothing is. #}
+                    <div class="hero-nudges">
+                        {% if pipeline_n == 0 %}
+                        <span class="hero-nudge">
+                            <i class="bi bi-lightning-charge" aria-hidden="true"></i>
+                            Nothing here yet — your first post starts with one sentence
+                        </span>
+                        {% else %}
+                        {% if review_n %}
+                        <a class="hero-nudge is-live" href="{{ all_blogs_url }}?status=UNDER_REVIEW">
+                            <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                            {{ review_n }} awaiting review
+                        </a>
+                        {% endif %}
+                        {% if drafts_n %}
+                        <a class="hero-nudge" href="{{ url_for('blog.drafts_page') }}">
+                            <i class="bi bi-pencil" aria-hidden="true"></i>
+                            {{ drafts_n }} draft{{ '' if drafts_n == 1 else 's' }} open
+                        </a>
+                        {% endif %}
+                        {% if not review_n and not drafts_n %}
+                        <span class="hero-nudge">
+                            <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                            All caught up — nothing waiting on you
+                        </span>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pipeline -->
+            <section class="pipeline-card reveal" style="--reveal-delay: 60ms" aria-labelledby="pipelineHeading">
+                <header class="card-head">
+                    <h2 class="card-title" id="pipelineHeading">Content pipeline</h2>
+                    <a class="card-link" href="{{ all_blogs_url }}">
+                        All blogs <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                    </a>
+                </header>
+
+                <p class="pipeline-figure">
+                    <span class="figure-value" data-countup="{{ pipeline_n }}">{{ pipeline_n }}</span>
+                    <span class="figure-unit">{{ 'piece' if pipeline_n == 1 else 'pieces' }}</span>
+                </p>
+                <p class="pipeline-caption">across every stage</p>
+
+                {% if pipeline_n %}
+                {#
+                   Ordered stacked bar. Draft → In review → Published is a progression,
+                   so it takes the ordinal ramp (one hue, monotone lightness) rather than
+                   the status palette — see the --viz-stage-* note in dashboard.css.
+                   Every value is also printed in the legend below, so nothing is gated
+                   behind the hover layer.
+                #}
+                <div class="viz-stack is-preparing" data-viz-stack>
+                    {% for s in stages %}{% if s.count %}
+                    {# An anchor, not a button: each segment really is a link to that
+                       stage's list, and as an anchor it routes through PJAX and gets
+                       keyboard activation for free. #}
+                    <a class="viz-seg viz-{{ s.key }}" href="{{ s.href }}"
+                        style="--share: {{ (s.count / pipeline_n * 100) | round(2) }}; --i: {{ loop.index0 }}"
+                        data-label="{{ s.label }}" data-count="{{ s.count }}"
+                        data-share="{{ (s.count / pipeline_n * 100) | round | int }}"
+                        aria-label="{{ s.label }}: {{ s.count }} of {{ pipeline_n }} ({{ (s.count / pipeline_n * 100) | round | int }}%)">
+                    </a>
+                    {% endif %}{% endfor %}
+                </div>
+                {# Visual only — the same figures are in every segment's aria-label
+                   and printed in the legend, so announcing it again is just noise. #}
+                <div class="viz-tooltip" data-viz-tooltip aria-hidden="true" hidden></div>
+
+                <ul class="viz-legend">
+                    {% for s in stages %}
+                    <li class="viz-legend-row">
+                        <span class="viz-swatch viz-{{ s.key }}" aria-hidden="true"></span>
+                        <a class="viz-legend-label" href="{{ s.href }}">{{ s.label }}</a>
+                        <span class="viz-legend-count">{{ s.count }}</span>
+                        <span class="viz-legend-share">{{ (s.count / pipeline_n * 100) | round | int }}%</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="viz-stack is-empty" aria-hidden="true"></div>
+                <p class="pipeline-empty">
+                    Nothing in the pipeline yet. Published, drafted and in-review work will
+                    map itself here as you go.
+                </p>
+                {% endif %}
+            </section>
+
         </div>
 
-        <!-- Stats Grid -->
-        <div class="dashboard-grid mb-4 animate-fade-up" style="animation-delay: 0.1s;">
-            <div class="col-span-4 stat-card">
-                <div class="stat-icon icon-purple"><i class="bi bi-file-post"></i></div>
-                <div>
-                    <div class="text-muted small fw-bold text-uppercase">Total Blogs</div>
-                    <div class="fs-2 fw-bold text-dark">{{ total_blogs | int }}</div>
-                </div>
-            </div>
-            <div class="col-span-4 stat-card">
-                <div class="stat-icon icon-orange"><i class="bi bi-hourglass-split"></i></div>
-                <div>
-                    <div class="text-muted small fw-bold text-uppercase">Pending Review</div>
-                    <div class="fs-2 fw-bold text-dark">{{ pending_count | int }}</div>
-                </div>
-            </div>
-            <div class="col-span-4 stat-card">
-                <div class="stat-icon icon-green"><i class="bi bi-check2-circle"></i></div>
-                <div>
-                    <div class="text-muted small fw-bold text-uppercase">Published</div>
-                    <div class="fs-2 fw-bold text-dark">{{ published_count | int }}</div>
-                </div>
-            </div>
-        </div>
+        <!-- ============================ ROW 2 — WORK + ACTIONS ============ -->
+        <div class="dash-split">
 
-        <!-- Blog List Cards -->
-        <div class="dashboard-cards-grid animate-fade-up" style="animation-delay: 0.2s;">
+            <!-- Recent work -->
+            <section class="work-card reveal" style="--reveal-delay: 120ms" aria-labelledby="workHeading"
+                data-search-url="{{ all_blogs_url }}">
+                <header class="card-head is-stacked">
+                    <h2 class="card-title" id="workHeading">Recent work</h2>
 
-            <!-- All Blogs Card -->
-            <div class="dashboard-list-card">
-                <div class="list-card-header">
-                    <h4 class="list-card-title"><i class="bi bi-file-post"></i> All Blogs</h4>
-                    <a href="{{ url_for('blogs_listing.all_blogs_page') }}" class="list-card-viewall">View All <i class="bi bi-arrow-right"></i></a>
-                </div>
-                <div class="list-card-body">
-                    {% if all_blogs %}
-                    {% for blog in all_blogs %}
-                    <div class="list-card-item">
-                        <div class="list-card-item-info">
-                            <span class="list-card-item-title">{{ blog.title or 'Untitled' }}</span>
-                            <span class="list-card-item-meta">{{ blog.category or 'Uncategorized' }}</span>
+                    <div class="work-tabs" role="tablist" aria-label="Filter recent work">
+                        <button type="button" role="tab" id="tab-all" aria-controls="panel-all" aria-selected="true"
+                            class="work-tab is-active" data-tab="all">
+                            All <span class="tab-count">{{ all_blogs | length }}</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-review" aria-controls="panel-review"
+                            aria-selected="false" tabindex="-1" class="work-tab" data-tab="review">
+                            In review <span class="tab-count">{{ pending_blogs | length }}</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-published" aria-controls="panel-published"
+                            aria-selected="false" tabindex="-1" class="work-tab" data-tab="published">
+                            Published <span class="tab-count">{{ published_blogs | length }}</span>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="work-panels">
+
+                    <div class="work-panel" id="panel-all" role="tabpanel" aria-labelledby="tab-all" data-panel="all">
+                        {% if all_blogs %}
+                        <div class="work-rows">
+                            {% for blog in all_blogs %}{{ work_row(blog) }}{% endfor %}
                         </div>
-                        <span class="list-card-badge badge-{{ blog.status|lower }}">{{ blog.status }}</span>
+                        <p class="work-noresults" data-noresults hidden>No recent work matches that search.</p>
+                        <a class="work-more" href="{{ all_blogs_url }}">
+                            View all blogs <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                        </a>
+                        {% else %}
+                        {{ work_empty('journal-plus', 'No blogs yet. Your first one starts on the Create screen.') }}
+                        {% endif %}
                     </div>
-                    {% endfor %}
-                    {% else %}
-                    <div class="list-card-empty">
-                        <i class="bi bi-journal-x"></i>
-                        <p>No blogs yet. Start creating!</p>
+
+                    <div class="work-panel" id="panel-review" role="tabpanel" aria-labelledby="tab-review"
+                        data-panel="review" hidden>
+                        {% if pending_blogs %}
+                        <div class="work-rows">
+                            {% for blog in pending_blogs %}{{ work_row(blog, 'UNDER_REVIEW') }}{% endfor %}
+                        </div>
+                        <p class="work-noresults" data-noresults hidden>Nothing in review matches that search.</p>
+                        <a class="work-more" href="{{ all_blogs_url }}?status=UNDER_REVIEW">
+                            View everything in review <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                        </a>
+                        {% else %}
+                        {{ work_empty('check2-circle', 'No pending reviews. All caught up.') }}
+                        {% endif %}
                     </div>
+
+                    <div class="work-panel" id="panel-published" role="tabpanel" aria-labelledby="tab-published"
+                        data-panel="published" hidden>
+                        {% if published_blogs %}
+                        <div class="work-rows">
+                            {% for blog in published_blogs %}{{ work_row(blog, 'PUBLISHED') }}{% endfor %}
+                        </div>
+                        <p class="work-noresults" data-noresults hidden>Nothing published matches that search.</p>
+                        <a class="work-more" href="{{ all_blogs_url }}?status=PUBLISHED">
+                            View everything published <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                        </a>
+                        {% else %}
+                        {{ work_empty('megaphone', 'Nothing published yet. Approved drafts land here.') }}
+                        {% endif %}
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Quick actions -->
+            <section class="actions-card reveal" style="--reveal-delay: 180ms" aria-labelledby="actionsHeading">
+                <header class="card-head">
+                    <h2 class="card-title" id="actionsHeading">Jump back in</h2>
+                </header>
+
+                <div class="action-grid">
+                    <a class="action-tile is-lead" href="{{ url_for('blog.create_page') }}">
+                        <span class="action-icon"><i class="bi bi-stars" aria-hidden="true"></i></span>
+                        <span class="action-label">Create blog</span>
+                    </a>
+                    <a class="action-tile" href="{{ url_for('blog.drafts_page') }}">
+                        <span class="action-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+                        <span class="action-label">My drafts</span>
+                    </a>
+                    <a class="action-tile" href="{{ all_blogs_url }}">
+                        <span class="action-icon"><i class="bi bi-collection" aria-hidden="true"></i></span>
+                        <span class="action-label">All blogs</span>
+                    </a>
+                    <a class="action-tile" href="{{ url_for('blog.categories_page') }}">
+                        <span class="action-icon"><i class="bi bi-tags" aria-hidden="true"></i></span>
+                        <span class="action-label">Categories</span>
+                    </a>
+                    <a class="action-tile" href="{{ url_for('gallery.gallery_page') }}">
+                        <span class="action-icon"><i class="bi bi-images" aria-hidden="true"></i></span>
+                        <span class="action-label">Gallery</span>
+                    </a>
+                    <a class="action-tile" href="{{ url_for('optimization.optimization_page') }}">
+                        <span class="action-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
+                        <span class="action-label">Optimization</span>
+                    </a>
+
+                    {% if session.get('user_role') == 'ADMIN' %}
+                    <a class="action-tile" href="{{ url_for('blog.approval_page') }}">
+                        <span class="action-icon"><i class="bi bi-check2-square" aria-hidden="true"></i></span>
+                        <span class="action-label">Approvals</span>
+                    </a>
+                    <a class="action-tile" href="{{ url_for('schedule.schedule_page') }}">
+                        <span class="action-icon"><i class="bi bi-calendar3" aria-hidden="true"></i></span>
+                        <span class="action-label">Schedule</span>
+                    </a>
                     {% endif %}
                 </div>
-            </div>
-
-            <!-- Pending Review Card -->
-            <div class="dashboard-list-card">
-                <div class="list-card-header">
-                    <h4 class="list-card-title"><i class="bi bi-hourglass-split"></i> Pending Review</h4>
-                    <a href="{{ url_for('blogs_listing.all_blogs_page') }}?status=UNDER_REVIEW" class="list-card-viewall">View All <i class="bi bi-arrow-right"></i></a>
-                </div>
-                <div class="list-card-body">
-                    {% if pending_blogs %}
-                    {% for blog in pending_blogs %}
-                    <div class="list-card-item">
-                        <div class="list-card-item-info">
-                            <span class="list-card-item-title">{{ blog.title or 'Untitled' }}</span>
-                            <span class="list-card-item-meta">{{ blog.category or 'General' }}</span>
-                        </div>
-                        <span class="list-card-badge badge-under_review">Under Review</span>
-                    </div>
-                    {% endfor %}
-                    {% else %}
-                    <div class="list-card-empty">
-                        <i class="bi bi-check-circle"></i>
-                        <p>No pending reviews. All caught up!</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Published Card -->
-            <div class="dashboard-list-card">
-                <div class="list-card-header">
-                    <h4 class="list-card-title"><i class="bi bi-check2-circle"></i> Published</h4>
-                    <a href="{{ url_for('blogs_listing.all_blogs_page') }}?status=PUBLISHED" class="list-card-viewall">View All <i class="bi bi-arrow-right"></i></a>
-                </div>
-                <div class="list-card-body">
-                    {% if published_blogs %}
-                    {% for blog in published_blogs %}
-                    <div class="list-card-item">
-                        <div class="list-card-item-info">
-                            <span class="list-card-item-title">{{ blog.title or 'Untitled' }}</span>
-                            <span class="list-card-item-meta">{{ blog.category or 'Uncategorized' }}</span>
-                        </div>
-                        <span class="list-card-badge badge-published">Published</span>
-                    </div>
-                    {% endfor %}
-                    {% else %}
-                    <div class="list-card-empty">
-                        <i class="bi bi-megaphone"></i>
-                        <p>No published blogs yet.</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
+            </section>
 
         </div>
 
     </main>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/pages/home.js') }}?v=2"></script>
 {% endblock %}

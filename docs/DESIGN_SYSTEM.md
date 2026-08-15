@@ -103,8 +103,11 @@ top, the Material/Gemini convention.
 Dark mode follows the OS (`prefers-color-scheme`); `data-theme="dark"` /
 `data-theme="light"` on `<html>` overrides it in either direction.
 
-**The switch.** Every screen carries one — the last row of the nav rail on the
-dashboard, top-right of the form pane on auth and the error page. The choice is
+**The switch.** Every screen carries one. On dashboard screens it is an icon
+button in the page header, with the account menu carrying it as well — which is
+what reaches the screens that have not adopted the header component yet, now
+that the nav rail is navigation only. Auth and the error page put it top-right
+of the form pane. The choice is
 stored in `localStorage` under `scriptly-theme` and re-applied by an inline
 script in `base.html` *before first paint*, so the canvas never flashes the
 wrong surface. No stored value means "follow the OS", and while in that state
@@ -112,6 +115,42 @@ the app tracks OS changes live. `app.js` owns `setTheme()` / `toggleTheme()` /
 `getActiveTheme()`, keeps every `[data-theme-toggle]` control in sync (icon,
 `aria-pressed`, label) and repoints `<meta name="theme-color">` at the active
 canvas. The icon always shows the theme you would switch *to*.
+
+### Canvas geometry
+
+`--canvas-pad-x` / `--canvas-pad-y` publish the inset `.dashboard-main` uses
+(40/32 → 24/24 below 1210px → 16/16 below 768px). They exist so a full-bleed
+element *inside* the canvas — the sticky page header — can cancel the inset with
+a negative margin and stay edge-to-edge at every breakpoint without restating
+the media queries. `--canvas-glass` is the canvas colour at 0.78 alpha, for the
+header's blurred backdrop; no surface token carries alpha.
+
+### Colour — data-viz
+
+Charts do not reach into the status palette. Status colours mean *state* and are
+reserved for badges, where they ride a label; borrowing them for chart marks
+also fails on contrast — the system's `--success` `#1E8E3E` and `--warning`
+`#B06000` separate by only **ΔE 5** under deuteranopia, which is unreadable as
+two touching segments of one bar.
+
+The dashboard's pipeline is an *ordered* scale (Draft → In review → Published),
+so it takes an **ordinal ramp**: one hue, monotone lightness.
+
+| Token | Light | Dark |
+| --- | --- | --- |
+| `--viz-stage-1` | `#7CACF8` | `#3B6FBF` |
+| `--viz-stage-2` | `#1B6EF3` | `#6BA0F5` |
+| `--viz-stage-3` | `#0842A0` | `#A8C7FA` |
+| `--viz-stage-other` | `#C4C7C5` | `#5F6368` |
+
+Both sets pass the ordinal checks (monotone lightness, adjacent ΔL ≥ 0.06, light
+end ≥ 2:1 against that mode's surface) — dark is re-stepped so the *far* stage is
+the brightest against the dark canvas, not flipped. `--viz-stage-other` sits
+outside the ramp on purpose: it is the remainder that belongs to no stage.
+
+Separation between segments is a **2px gap in the surface colour**, never a
+stroke, and every segment is direct-labelled in the legend below the bar, so
+identity never rests on hue alone.
 
 ### Motion
 
@@ -158,27 +197,62 @@ user row) which pushes the canvas; below 900px it floats over instead. The choic
 is stored in `localStorage` under `scriptly-nav`, restored by a small inline
 script in `partials/sidebar.html` before first paint.
 
+Inside the canvas the dashboard is a **bento of four cards under a sticky page
+header** — the header is the shared component (below), not page furniture.
+
 ```
-┌ rail ─┬ canvas ───────────────────────────────────────────────┐
-│       │ eyebrow (muted, sentence case)                        │
-│       │ H1 page title                        [toast, top-right]│
-│       │ ┌ brand-gradient hero card ─────────────────────────┐ │
-│       │ └───────────────────────────────────────────────────┘ │
-│       │ ┌ stat tile ─┐ ┌ stat tile ─┐ ┌ stat tile ─┐          │
-│       │ │ ◐ label    │ │ ◐ label    │ │ ◐ label    │          │
-│       │ │   value    │ │   value    │ │   value    │          │
-│       │ └────────────┘ └────────────┘ └────────────┘          │
-│       │ ┌ list card ──┐ ┌ list card ──┐ ┌ list card ──┐       │
-│       │ │ title  pill │ │ …           │ │ empty state │       │
-│       │ │ row · badge │ │             │ │             │       │
-│       │ └─────────────┘ └─────────────┘ └─────────────┘       │
-└───────┴───────────────────────────────────────────────────────┘
+┌ rail ─┬ canvas ─────────────────────────────────────────────────────┐
+│       │ ╔ sticky page header (full-bleed, condenses on scroll) ════╗ │
+│       │ ║ eyebrow: greeting                                       ║ │
+│       │ ║ H1 Dashboard      [🔍 search  ⌘K]  ( ☾ )  ( ✦ New blog )║ │
+│       │ ╚═════════════════════════════════════════════════════════╝ │
+│       │ ┌ hero (7fr) ─────────────────┐ ┌ pipeline (5fr) ─────────┐ │
+│       │ │ ✦ eyebrow pill              │ │ Content pipeline    all→│ │
+│       │ │ Headline with a             │ │ 24 pieces   ← hero fig  │ │
+│       │ │ gradient clause.            │ │                         │ │
+│       │ │ lede                        │ │ ▓▓▓▐██▐████████▐░░  bar │ │
+│       │ │ ( primary ) ( ghost → )     │ │ ● Draft      5     21%  │ │
+│       │ │ ──────────────────────      │ │ ● In review  3     12%  │ │
+│       │ │ ( ⧗ n awaiting ) ( ✎ n )    │ │ ● Published 12     50%  │ │
+│       │ └─────────────────────────────┘ └─────────────────────────┘ │
+│       │ ┌ recent work (8fr) ──────────┐ ┌ jump back in (4fr) ─────┐ │
+│       │ │ Recent work  (All)(rev)(pub)│ │ ┌──────┐ ┌──────┐       │ │
+│       │ │ ▣ title · cat · when   pill │ │ │ tile │ │ tile │  …    │ │
+│       │ │ …                           │ │ └──────┘ └──────┘       │ │
+│       │ │ View all blogs →            │ │                         │ │
+│       │ └─────────────────────────────┘ └─────────────────────────┘ │
+└───────┴─────────────────────────────────────────────────────────────┘
 ```
 
-`.welcome-banner` carries the brand gradient — the one hero moment on the screen.
-`.stat-card` = `--surface-1` + `--elev-1`, circular `--accent-tint` /
-`--success-soft` / `--warning-soft` icon medallion. `.dashboard-list-card` rows
-end in a pill `.list-card-badge`.
+Both rows are `align-items: stretch`, and the shorter card absorbs the slack
+internally (the pipeline's caption takes `margin-bottom: auto`, the work card's
+"view all" takes `margin-top: auto`) so a row always ends on one line.
+
+**Hero.** `--surface-1` with the brand gradient as an *aura* — three radial stops
+bled into the top-right corner over a masked 64px grid — rather than as a
+saturated block, plus one gradient clause in the headline. A pointer spotlight
+(`--mx` / `--my`, written by `home.js`) tracks the cursor at 10% accent. That is
+the screen's whole gradient budget. The nudge strip beneath names only what is
+actually waiting: *n awaiting review*, *n drafts open*, or "all caught up".
+
+**Pipeline.** A hero figure (`≥48px`, proportional figures — `tabular-nums` reads
+loose at display size) over the ordinal stacked bar and its legend. `total_blogs`
+is counted independently of the status buckets, so the template folds any
+remainder into a neutral **Other** segment rather than letting the bar
+misrepresent the whole. Each segment is an `<a>` to that stage's filtered list —
+so it routes through PJAX and gets keyboard activation for free — and the legend
+prints every count and share, which is the chart's table view: the hover tooltip
+only ever enhances.
+
+**Recent work.** One list behind segmented tabs (All / In review / Published)
+replaces the three cramped columns; every row is `▣ monogram · title · category ·
+relative time · status pill`, and each tab keeps its own "view all" link and
+empty state. Status pills are the one place the reserved status palette is used,
+always with a label.
+
+**Search.** The header field filters these rows live across all three panels;
+Enter hands the query to All Blogs (`?search=`), which can search the whole
+collection rather than the five rows on screen.
 
 ### Agent start state — `create_blog.html`
 
@@ -319,8 +393,17 @@ Reusable pieces, all token-driven:
 | Nav scroll | `.sidebar-menu` | `min-height: 0` + `flex-shrink: 0` rows; thin thumb in the drawer, silent in the rail |
 | New action | `.sidebar-menu a[data-page="create"]` | Gemini's persistent "new" action, first in the rail; takes its fill only in the drawer |
 | User row | `.sidebar-user-card` | avatar alone in the rail; avatar + name/role + logout in the drawer |
-| Page header | `.dashboard-header` / `.header-title` | eyebrow + H1 |
+| Page header | `.page-header` | sticky full-bleed bar; see below |
+| Header search | `.page-search` | soft-filled pill, ⌘K/Ctrl K hint, clear button |
+| Header action | `.page-header-action` / `.page-header-icon-btn` | primary / ghost pill, 44px round icon button |
+| Page header (legacy) | `.dashboard-header` / `.header-title` | plain eyebrow + H1, still used by the other screens |
 | Stat tile | `.stat-card` / `.stat-icon` | tonal circular medallion |
+| Card head | `.card-head` / `.card-title` / `.card-link` | title row + pill "view all" link |
+| Stacked bar | `.viz-stack` / `.viz-seg` | ordinal ramp, 2px surface gaps, 4px outer ends |
+| Chart legend | `.viz-legend` | swatch · label · count · share — doubles as the table view |
+| Segmented tabs | `.work-tabs` / `.work-tab` | active = `--accent-soft`, same as the nav rail's current item |
+| Work row | `.work-row` | monogram · title/meta · status pill |
+| Action tile | `.action-tile` | 2-up grid; `.is-lead` takes `--accent-soft` |
 | List card | `.dashboard-list-card` | header + rows + empty state |
 | Status pill | `.list-card-badge`, `.blog-status-badge`, `.status-badge` | `-soft` fill + solid text |
 | Filter pill | `.filter-tab` | active = accent |
@@ -330,7 +413,7 @@ Reusable pieces, all token-driven:
 | Toast | `.custom-toast` | `--elev-3`, gradient progress line |
 | Skeleton | `.skeleton*` | accent-tinted shimmer |
 | Loaders | `#page-loader`, `#nav-progress`, `#action-loader` | brand gradient = working |
-| Theme switch | `[data-theme-toggle]` | `.sidebar-theme-toggle` in the rail, `.auth-theme-toggle` elsewhere |
+| Theme switch | `[data-theme-toggle]` | `.page-header-icon-btn` in the header, `.user-menu-action` in the account menu, `.auth-theme-toggle` on auth / 404 |
 | Brand pane | `.auth-brand` | fixed ink surface + `authAurora` + masked grid |
 | Auth field | `.auth-field` / `.input-wrapper` / `.auth-input` | soft fill, focus lifts to `--surface-1` |
 | Reveal | `.auth-reveal` | `data-reveal="<input id>"`, swaps the eye icon |
@@ -338,6 +421,42 @@ Reusable pieces, all token-driven:
 | OAuth button | `.auth-oauth` | outlined pill, official four-colour G |
 | Inline error | `.error-message.show` | flex row, Material `error` glyph |
 | Error screen | `.error-shell` / `.error-code` / `.error-jump-list` | gradient code, pill actions |
+
+### The page header
+
+`partials/page_header.html` is a Jinja macro, so the actions are the call body:
+
+```jinja
+{% from 'partials/page_header.html' import page_header with context %}
+{% call page_header(title='Dashboard', eyebrow=greeting, search=true,
+                    search_placeholder='Search your content') %}
+  <button class="page-header-icon-btn" data-theme-toggle>…</button>
+  <a href="…" class="page-header-action is-primary">New blog</a>
+{% endcall %}
+```
+
+It must be the **first child of `.dashboard-main`**: the sticky offset assumes
+the canvas inset, and PJAX only swaps that element's `innerHTML`, so a header
+placed outside it would not re-render on navigation.
+
+Two states. Resting: transparent, eyebrow visible, H1 at `--fs-h1`. Stuck (past
+12px of scroll): `--canvas-glass` + a 16px backdrop blur, hairline bottom rule,
+`--elev-1`, eyebrow collapsed to zero height, H1 down to `--fs-h2`. The
+thresholds are asymmetric — condense at 12px, relax at 4px — so a header sitting
+exactly on the line cannot flicker as its own height change nudges the scroll.
+Opaque `--bg-canvas` is the base and the blur is layered on in an `@supports`
+block, because a 0.78-alpha fill with no blur behind it lets content scroll
+through legibly-but-wrong.
+
+Behaviour lives in the `initPageHeader` IIFE in `app.js`, bound once and
+delegated off `document`/`window` — the header itself is destroyed and rebuilt by
+every PJAX navigation, so nothing may hold a reference to it.
+
+The search field owns no behaviour of its own. It emits `page-search` on
+`document` with `{ value, submit }` and the page decides what that means;
+⌘K/Ctrl+K focuses it from anywhere, a bare `/` focuses it when the reader is not
+already typing, Escape clears then blurs, and the hint relabels itself to `⌘ K`
+on Apple platforms.
 
 ### The brand assets
 
@@ -403,6 +522,19 @@ so a typo would otherwise ship silently. `--check` is the CI form.
   (what the error screen's pills do). Check both themes before calling it done.
 - **The gradient is rationed.** Branding, the hero banner, gradient headline text,
   and agent-working indicators. Nothing else.
+- **Status colour is for state, never for a chart series.** A badge that says
+  "Published" in green is state. A bar segment coloured green because it happens
+  to be the third one is not — and the system's `--success`/`--warning` pair is
+  ΔE 5 apart under deuteranopia, so as two touching segments it is unreadable.
+  Ordered stages take the `--viz-stage-*` ordinal ramp; identity is carried by a
+  direct label either way.
+- **An animation must not be able to strand a wrong value.** The dashboard's
+  count-up rewrites a number the server already rendered correctly, so it skips
+  entirely when the tab is hidden (`requestAnimationFrame` does not run there and
+  the figure would sit at 0) and carries a timeout that snaps to the true value
+  if the frame loop is throttled to a crawl. Same principle for the pipeline bar:
+  the CSS renders the real widths and JS zeroes them for one frame to start the
+  transition, so a page without JS still shows true proportions.
 - **Weight ≤ 600.** Reach for size, colour or spacing before bold.
 - **Elevation over borders.** A 1px `--border-subtle` divider is fine; a heavy
   stroke is not.
