@@ -1,0 +1,1647 @@
+/* ==========================================================================
+   Site Settings — a grouped rail beside one panel at a time
+
+   The screen this replaces carried 1028 lines of <style> and 590 of <script>
+   inline in the template: uncacheable, re-parsed on every visit, and PJAX had
+   to re-inject the whole style block into <head> each time. It was also the
+   only screen in the app with no @media queries at all — 113 form controls
+   with no responsive handling whatsoever.
+
+   What is left here is the settings vocabulary. Everything with a system
+   equivalent uses it: .page-header, .surface-card, .app-field, .app-btn,
+   .app-modal, .select-field + .menu (§13), .data-row, .list-empty,
+   .status-pill. The rail, the switch, the image field and the save bar are
+   this page's, because nothing else in the app needs them yet — a component
+   moves into dashboard.css when a *second* screen wants it, which is how
+   .filter-bar and .cal got there.
+   ========================================================================== */
+
+/* ==================== THE SITE STRIP ====================
+   Identity and the live URL, above the configuration itself: the one thing you
+   come to this screen already knowing you want to check. */
+.set-site {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    flex-wrap: wrap;
+    padding: var(--sp-5) var(--sp-6);
+    margin-bottom: var(--sp-6);
+}
+
+.set-site-mark {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-size: 1.25rem;
+    overflow: hidden;
+}
+
+/* A logo, once one is set, replaces the medallion glyph. */
+.set-site-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.set-site-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.set-site-name {
+    margin: 0;
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.set-site-desc {
+    margin: 2px 0 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* --surface-3, not --surface-2: the strip is --surface-1, and in light mode
+   --surface-2 is barely a step off it. */
+.set-url {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-width: 0;
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    font-size: var(--fs-xs);
+}
+
+.set-url a {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-2);
+    text-decoration: none;
+    font-family: var(--font-mono);
+}
+
+.set-url a:hover {
+    color: var(--accent);
+}
+
+.set-url-copy {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.set-url-copy:hover {
+    background: var(--surface-1);
+    color: var(--text-strong);
+}
+
+.set-url-copy:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* ==================== SHELL ====================
+   Rail beside one panel. Eleven sections do not fit in a horizontal strip:
+   .seg-tabs scrolls sideways, which means most of the sections are off-screen
+   at any moment and finding one is a hunt. A vertical rail shows all eleven at
+   once and has room for a group label and a per-section change marker. */
+.set-shell {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sp-6);
+}
+
+/* ==================== RAIL ==================== */
+/* Clears the stuck page header, and no more: the rail has to be reachable while
+   a long panel scrolls past it. */
+.set-nav {
+    position: sticky;
+    top: calc(var(--set-stuck-header) + var(--sp-4));
+    max-height: calc(100vh - var(--set-stuck-header) - var(--sp-8));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--sp-4) var(--sp-3);
+    scrollbar-width: thin;
+}
+
+.set-nav::-webkit-scrollbar {
+    width: 6px;
+}
+
+.set-nav::-webkit-scrollbar-thumb {
+    background: var(--surface-4);
+    border-radius: var(--radius-pill);
+}
+
+.set-nav-group+.set-nav-group {
+    margin-top: var(--sp-4);
+}
+
+.set-nav-label {
+    margin: 0 0 var(--sp-1);
+    padding: 0 var(--sp-3);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.set-nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    width: 100%;
+    padding: var(--sp-2) var(--sp-3);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.set-nav-item:hover {
+    background: var(--surface-2);
+    color: var(--text-strong);
+}
+
+.set-nav-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Current section takes --accent-soft, the same treatment the nav rail gives
+   its current item and the seg-tabs give theirs. */
+.set-nav-item.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-on-soft);
+}
+
+.set-nav-item>i {
+    flex-shrink: 0;
+    width: 16px;
+    font-size: 0.95em;
+    text-align: center;
+    opacity: 0.75;
+}
+
+.set-nav-item.is-active>i {
+    opacity: 1;
+}
+
+.set-nav-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Where the unsaved edits are. Without it the save bar can say "3 changes" and
+   leave the reader to open eleven sections looking for them. */
+.set-nav-dot {
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+.set-nav-dot[hidden] {
+    display: none;
+}
+
+.set-nav-item.is-active .set-nav-dot {
+    background: var(--accent-on-soft);
+}
+
+/* ==================== PANEL ====================
+   Vertical rhythm lives on the containers, never on adjacent-sibling margins.
+   A `.app-field + .app-field { margin-top }` rule is the trap: the children of a
+   two-column .set-grid are all .app-field, so every item after the first picked
+   up a top margin and each row sat 20px lower than the one beside it. One `gap`
+   per container cannot do that. */
+.set-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-6);
+    padding: var(--sp-6);
+}
+
+/* Higher specificity than the display above, so hiding a panel still wins. */
+.set-panel[hidden] {
+    display: none;
+}
+
+/* The section's own icon repeats here, so the panel and the rail item you clicked
+   are visibly the same thing. */
+.set-panel-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0;
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+}
+
+.set-panel-title>i {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: var(--radius-xs);
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-size: 0.85em;
+}
+
+.set-panel-lede {
+    margin: var(--sp-2) 0 0;
+    max-width: 66ch;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+}
+
+/* The sticky page header would otherwise cover whatever the header's search
+   scrolled to. One number, expressed once: the stuck bar is --sp-3 of padding
+   either side of a 44px control row, plus its hairline. */
+.set-shell {
+    --set-stuck-header: calc(var(--sp-3) * 2 + 44px + 1px);
+}
+
+.set-panel [data-field],
+.set-panel [data-switch],
+.set-panel .set-group {
+    scroll-margin-top: calc(var(--set-stuck-header) + var(--sp-6));
+}
+
+/* Prose and code get a vertical handle and a floor; a 3-row textarea that can be
+   dragged sideways breaks the grid column it sits in. */
+.app-field textarea {
+    resize: vertical;
+    min-height: 5.5rem;
+}
+
+/* --- Group inside a panel -----------------------------------------------
+   Replaces .section-divider + .section-title, which were two elements to say
+   one thing and put the rule above the label rather than under it. */
+.set-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+}
+
+/* The rule spans the panel, so a group reads as a band rather than as a heading
+   floating above unrelated fields. */
+.set-group-title {
+    margin: 0;
+    padding-bottom: var(--sp-3);
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* Title and its explanatory line are one block, so the note stays tight to the
+   rule instead of being pushed a full container gap away from the thing it
+   explains. A negative margin would have been the other way to get there, and
+   it breaks the moment the gap token changes. */
+.set-group-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.set-group-note {
+    margin: 0;
+    max-width: 66ch;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+}
+
+/* A quiet link on its own line under the control it belongs to — "open the live
+   page" beneath a policy body. */
+.set-inline-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    margin: 0;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.set-inline-link:hover {
+    text-decoration: underline;
+}
+
+/* --- Field layout -------------------------------------------------------
+   Two columns that collapse to one, replacing Bootstrap's .row/.col-md-* — the
+   grid holds a consistent gutter whatever a field's internal height is, which
+   a float-based row does not. */
+.set-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-5);
+    /* Fields keep their own heights; a taller neighbour must not stretch a
+       one-line field's control to match it. */
+    align-items: start;
+}
+
+.set-grid.is-thirds {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.set-grid.is-quarters {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Spans the whole grid — a description or a policy body has no business at
+   half width beside a one-word field. */
+.app-field.is-wide {
+    grid-column: 1 / -1;
+}
+
+/* --- What keeps controls on one line across a row -----------------------
+   A control's vertical position is set by the height of the label above it, so
+   two fields side by side line up only while their labels occupy the same number
+   of lines. Reserving one line explicitly means a field can never sit high
+   because its label happened to be short, and `text-wrap: balance` keeps a label
+   that does need two lines from breaking after a single word.
+
+   Grid rows are still ragged at the bottom — hints differ in length — and that is
+   correct: the gap absorbs it, and forcing equal heights would stretch inputs. */
+.app-field>label,
+.app-field>.field-label {
+    display: block;
+    min-height: calc(var(--fs-xs) * var(--lh-body));
+    text-wrap: balance;
+}
+
+/* --- The footer under a control ----------------------------------------
+   Hint and counter share one row: the counter used to be its own block above the
+   hint, so a field with both had a right-aligned number floating over a
+   left-aligned sentence. */
+.app-field-foot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+}
+
+.app-field-foot .app-field-hint {
+    flex: 1;
+    min-width: 0;
+}
+
+/* A hint may quote a literal — a URL shape, a placeholder token. Without this it
+   inherits the browser's default monospace at its default size, which sits a
+   step larger than the sentence around it. */
+.app-field-hint code,
+.set-switch-hint code {
+    padding: 1px 4px;
+    border-radius: var(--radius-xs);
+    background: var(--surface-3);
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+    color: var(--text-1);
+}
+
+/* A changed field is marked on the field itself, so the save bar's count and
+   the rail's dot both resolve to something you can see. */
+.app-field.is-dirty>label::after,
+.app-field.is-dirty>.field-label::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: var(--sp-2);
+    border-radius: 50%;
+    background: var(--accent);
+    vertical-align: middle;
+}
+
+/* Where the header's search landed. A ring rather than a fill, so it marks the
+   field without repainting a control the reader is about to type into — and it
+   fades on its own, because a permanent highlight becomes furniture. */
+.app-field.is-hit,
+.set-switch.is-hit {
+    border-radius: var(--radius-sm);
+    animation: setHit 2.4s var(--ease-standard) forwards;
+}
+
+@keyframes setHit {
+
+    0%,
+    60% {
+        box-shadow: 0 0 0 3px var(--focus-ring);
+    }
+
+    100% {
+        box-shadow: 0 0 0 3px transparent;
+    }
+}
+
+/* Monospace for content that is code or markup rather than prose. */
+.app-field textarea.is-mono {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+}
+
+/* --- Prefixed input ----------------------------------------------------- */
+.set-prefixed {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    transition: var(--transition-base);
+}
+
+.set-prefixed:hover {
+    background: var(--surface-3);
+}
+
+.set-prefixed:focus-within {
+    background: var(--surface-1);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.set-prefix {
+    display: grid;
+    place-items: center;
+    padding: 0 var(--sp-3);
+    border-right: 1px solid var(--border-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* The wrapper owns the chrome, so the input inside gives all of its up. */
+.set-prefixed input {
+    flex: 1;
+    min-width: 0;
+    border: 0 !important;
+    background: none !important;
+    box-shadow: none !important;
+}
+
+.set-prefixed-btn {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    border: 0;
+    border-left: 1px solid var(--border-subtle);
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.set-prefixed-btn:hover {
+    color: var(--accent);
+}
+
+.set-prefixed-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+/* --- Character counter --------------------------------------------------
+   Sits in .app-field-foot beside the hint, so `flex-shrink: 0` rather than a
+   self-alignment: the hint gives up width first, the count never wraps. */
+.set-counter {
+    flex-shrink: 0;
+    font-size: var(--fs-2xs);
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.set-counter.is-near {
+    color: var(--warning);
+}
+
+.set-counter.is-over {
+    color: var(--danger);
+}
+
+/* ==================== SWITCH ====================
+   Not Bootstrap's .form-switch: that draws its knob from a background-image
+   data URI in a fixed colour, so it cannot follow the accent and reads wrong
+   in dark mode. Page-scoped rather than promoted to dashboard.css, because
+   this is the only screen using it so far. */
+.set-switch {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--sp-5);
+    padding: var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.set-switch-body {
+    min-width: 0;
+}
+
+.set-switch-title {
+    display: block;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    cursor: pointer;
+}
+
+.set-switch-hint {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+}
+
+.set-switch-control {
+    position: relative;
+    flex-shrink: 0;
+    width: 44px;
+    height: 26px;
+}
+
+/* The input stays the control — transparent on top of the track, so it keeps
+   its own focus, keyboard and label semantics. The visual is the sibling. */
+.set-switch-control input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.set-switch-track {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--surface-4);
+    transition: background var(--dur-fast) var(--ease-standard);
+    pointer-events: none;
+}
+
+.set-switch-track::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--surface-1);
+    box-shadow: var(--elev-1);
+    transition: transform var(--dur-fast) var(--ease-emphasized);
+}
+
+.set-switch-control input:checked~.set-switch-track {
+    background: var(--accent);
+}
+
+.set-switch-control input:checked~.set-switch-track::after {
+    transform: translateX(18px);
+}
+
+.set-switch-control input:focus-visible~.set-switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* A changed switch gets the same marker a changed field does. */
+.set-switch.is-dirty .set-switch-title::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: var(--sp-2);
+    border-radius: 50%;
+    background: var(--accent);
+    vertical-align: middle;
+}
+
+/* ==================== IMAGE FIELD ====================
+   The wrapper is the positioning context. Without it `.set-image-actions` —
+   `position: absolute`, and a *sibling* of the preview button rather than a child,
+   because nesting a button inside a button is invalid — resolved against the
+   initial containing block and the replace/remove pair floated at the top-right
+   corner of the page. */
+.set-image-wrap {
+    position: relative;
+    display: block;
+    width: 100%;
+}
+
+.set-image-wrap.is-square {
+    max-width: 200px;
+}
+
+.set-image {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    transition: var(--transition-base);
+}
+
+.set-image:hover {
+    background: var(--surface-3);
+}
+
+.set-image:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Square, for a logo or a favicon where 16:9 would letterbox the artwork. The
+   width cap lives on the wrapper, so the overlay controls follow it. */
+.set-image.is-square {
+    aspect-ratio: 1 / 1;
+}
+
+.set-image-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-1);
+    height: 100%;
+    padding: var(--sp-4);
+    text-align: center;
+}
+
+.set-image-empty i {
+    font-size: 1.5rem;
+    color: var(--text-faint);
+}
+
+.set-image-empty span {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+}
+
+.set-image-empty small {
+    font-size: var(--fs-2xs);
+    color: var(--text-faint);
+}
+
+/* A checkerboard, so a transparent logo reads as transparent rather than
+   borrowing whatever surface sits behind it. Same construction and the same two
+   tokens .media-thumb uses in gallery.css — a logo and a gallery thumbnail are
+   the same problem. */
+.set-image-frame {
+    height: 100%;
+    background-color: var(--surface-2);
+    background-image:
+        linear-gradient(45deg, var(--surface-3) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--surface-3) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--surface-3) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--surface-3) 75%);
+    background-size: 24px 24px;
+    background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+}
+
+.set-image-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Overlay controls ride a scrim, because what sits behind them is an arbitrary
+   image and neither light nor dark chrome can be relied on to land well. */
+.set-image-actions {
+    position: absolute;
+    top: var(--sp-2);
+    right: var(--sp-2);
+    display: flex;
+    gap: var(--sp-1);
+}
+
+/* --media-chip / --on-media, the one token group that must NOT be themed: what
+   sits behind these is an arbitrary image, not a surface, so a light-mode value
+   would put dark chrome on a dark photo half the time. */
+.set-image-btn {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--media-chip-edge);
+    border-radius: 50%;
+    background: var(--media-chip);
+    color: var(--on-media);
+    font-size: 12px;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.set-image-btn:hover {
+    background: var(--media-chip-hover);
+    border-color: var(--media-chip-edge-hover);
+}
+
+.set-image-btn.is-danger:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+}
+
+.set-image-btn:focus-visible {
+    outline: 2px solid var(--on-media);
+    outline-offset: 1px;
+}
+
+/* ==================== COLOUR FIELD ==================== */
+.set-color {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+}
+
+/* The native swatch is the one place a browser-drawn control is kept: an OS
+   colour picker is a genuinely better instrument than anything we would build,
+   and unlike a <select> popup it is a deliberate, focused sub-task. Only the
+   well is ours.
+
+   `align-self: stretch` rather than a fixed height: the field beside it is sized
+   by its own padding and font, so any number here is a guess that drifts the
+   moment either token changes — and a 40px well beside a 43px input is visibly
+   crooked. */
+.set-color input[type="color"] {
+    flex-shrink: 0;
+    align-self: stretch;
+    width: 46px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.set-color input[type="color"]:hover {
+    border-color: var(--border-strong);
+}
+
+.set-color input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 3px;
+}
+
+.set-color input[type="color"]::-webkit-color-swatch {
+    border: 0;
+    border-radius: calc(var(--radius-sm) - 4px);
+}
+
+.set-color input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+}
+
+/* ==================== NOTE / CALLOUT ====================
+   Replaces four different Bootstrap .alert variants with hand-written inline
+   styles, one of which put a dashed border round a paragraph. */
+.set-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.set-note>i {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--text-muted);
+}
+
+.set-note strong {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.set-note code {
+    padding: 1px 5px;
+    border-radius: var(--radius-xs);
+    background: var(--surface-3);
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+    color: var(--text-1);
+}
+
+.set-note a {
+    color: var(--accent);
+}
+
+.set-note.is-warning {
+    background: var(--warning-soft);
+    border: 1px solid var(--warning-border);
+}
+
+.set-note.is-warning>i {
+    color: var(--warning);
+}
+
+.set-note ul {
+    margin: var(--sp-2) 0 0;
+    padding-left: var(--sp-5);
+}
+
+.set-note li+li {
+    margin-top: 2px;
+}
+
+.set-note-body {
+    min-width: 0;
+}
+
+/* A value to be copied — the service-account address, which has to be pasted
+   into Google's sharing dialog exactly. */
+.set-copyable {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-xs);
+    background: var(--surface-1);
+    font-family: var(--font-mono);
+    font-size: var(--fs-2xs);
+    color: var(--text-1);
+    word-break: break-all;
+}
+
+.set-copyable button {
+    flex-shrink: 0;
+    margin-left: auto;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.set-copyable button:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+/* ==================== RESOURCE CARD ====================
+   A generated file that exists at a URL — sitemap, robots.txt, RSS. Not a stat
+   tile: there is no value, no delta and no trend, only a thing you can open. */
+.set-resources {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--sp-4);
+}
+
+.set-resource {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.set-resource-icon {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-xs);
+    background: var(--accent-tint);
+    color: var(--accent);
+}
+
+.set-resource.is-feed .set-resource-icon {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+.set-resource-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.set-resource-name {
+    margin: 0;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.set-resource-url {
+    margin: 2px 0 0;
+    font-family: var(--font-mono);
+    font-size: var(--fs-2xs);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.set-resource-desc {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+}
+
+.set-resource-open {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    margin-top: var(--sp-3);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.set-resource-open:hover {
+    text-decoration: underline;
+}
+
+/* ==================== RADIO CARDS (PERMALINKS) ====================
+   These cards sit inside an .app-field, and dashboard.css styles *every* input
+   in one as a text field: `width: 100%`, padding, a --surface-2 fill. A radio
+   inheriting that becomes a full-width 43px box, so the glyph drew in the middle
+   of the card and the label was shoved past its right edge and off the screen.
+   The reset below is not tidiness — it is what makes the control a radio again.
+
+   Same trap as .set-prefixed input, which only escaped it because that rule
+   happened to override width and background already. */
+.set-radios {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+    gap: var(--sp-3);
+}
+
+.set-radio {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+/* Give the control its own box back. Declared for :hover and :focus too, because
+   .app-field input:hover / :focus weigh the same (0,2,1) as this selector and
+   would otherwise repaint a fill and a 3px ring onto the radio itself — the ring
+   belongs to the card, which draws it via :has(). */
+.set-radio input[type="radio"],
+.set-radio input[type="radio"]:hover,
+.set-radio input[type="radio"]:focus {
+    width: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+}
+
+.set-radio:hover {
+    background: var(--surface-2);
+}
+
+/* :has() so the whole card reflects its input without JS keeping a class in
+   sync — which is what the old inline onchange handler was doing, in one
+   expression spread over three statements inside an attribute.
+
+   --accent-soft, not --accent-tint: "selected" is that token everywhere else in
+   the system (the nav rail's current item, an active seg tab, an applied filter
+   pill), and an 8% wash was too faint to pick out of four stacked cards. */
+.set-radio:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.set-radio:has(input:focus-visible) {
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.set-radio input[type="radio"] {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin: 1px 0 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.set-radio-body {
+    min-width: 0;
+    flex: 1;
+}
+
+/* The pattern is the thing being chosen, so it leads and it is code. `break-all`
+   because /post/{year}/{month}/{day}/{slug} has no spaces to break at and would
+   otherwise push the card wider than its column. */
+.set-radio-pattern {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-strong);
+    word-break: break-all;
+}
+
+.set-radio-example {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--fs-2xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+    word-break: break-all;
+}
+
+.set-radio:has(input:checked) .set-radio-pattern {
+    color: var(--accent-on-soft);
+}
+
+/* ==================== DISCLOSURE (HERO SECTIONS) ====================
+   Four page-worth of hero copy, one open at a time. A real <details>, so it
+   keeps keyboard and find-in-page behaviour for free — the version this
+   replaces was a button plus a div plus a global toggleAccordion(id). */
+.set-disclosure {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.set-disclosure+.set-disclosure {
+    margin-top: var(--sp-3);
+}
+
+.set-disclosure[open] {
+    border-color: var(--accent);
+}
+
+.set-disclosure>summary {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    background: var(--surface-2);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    cursor: pointer;
+    list-style: none;
+    transition: var(--transition-base);
+}
+
+.set-disclosure>summary::-webkit-details-marker {
+    display: none;
+}
+
+.set-disclosure>summary:hover {
+    background: var(--surface-3);
+}
+
+.set-disclosure>summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.set-disclosure-icon {
+    flex-shrink: 0;
+    color: var(--accent);
+}
+
+.set-disclosure-caret {
+    margin-left: auto;
+    font-size: 0.8em;
+    color: var(--text-muted);
+    transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.set-disclosure[open] .set-disclosure-caret {
+    transform: rotate(180deg);
+}
+
+.set-disclosure-count {
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-1);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* A container with its own gap, like the panel and the group. Deleting the
+   adjacent-sibling margins fixed the staggered grid rows but left this one with
+   no spacing at all — every grid inside a hero disclosure sat flush against the
+   next. Rhythm has to be granted by the container, not merely taken away from
+   the siblings. */
+.set-disclosure-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    padding: var(--sp-5);
+}
+
+/* ==================== SMALL LAYOUT PIECES ====================
+   These replace twelve inline `style="…"` attributes. An inline style cannot be
+   re-themed, cannot be overridden by a media query, and hides a layout decision
+   from the stylesheet where the rest of them live. */
+
+/* A heading row: title on the left, one control on the right. */
+.set-row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    flex-wrap: wrap;
+}
+
+.set-row-head .set-panel-lede {
+    margin: 0;
+    flex: 1;
+    min-width: 14rem;
+}
+
+/* A label above something that is not a form control — the connection status
+   block, where the thing below is a row of pills rather than an input. */
+.set-standalone-label {
+    display: block;
+    margin-bottom: var(--sp-2);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* Status pills and their "open it" link on one wrapping line. */
+.set-status-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+}
+
+/* ==================== LOCALE PREVIEW ==================== */
+.set-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--sp-4);
+    padding: var(--sp-5);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.set-preview-cell {
+    text-align: center;
+}
+
+.set-preview-label {
+    display: block;
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.set-preview-value {
+    display: block;
+    margin-top: var(--sp-1);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.set-preview.is-loading .set-preview-value {
+    opacity: 0.45;
+}
+
+/* ==================== PUBLISHED BLOGS ==================== */
+.set-published {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+}
+
+.set-published-cat {
+    flex-shrink: 0;
+}
+
+/* Always visible, not hover-revealed: unpublishing is the only action on the
+   row and there is no ⋮ menu holding a duplicate of it. */
+.set-published .set-unpublish {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 32px;
+    padding: 0 var(--sp-3);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.set-published .set-unpublish:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.set-published .set-unpublish:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.set-blog-list {
+    max-height: 420px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.set-blog-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.set-blog-list::-webkit-scrollbar-thumb {
+    background: var(--surface-4);
+    border-radius: var(--radius-pill);
+}
+
+/* ==================== STAT ROW (GENERAL) ==================== */
+.set-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-4);
+}
+
+.stat-icon.stat-live {
+    background: var(--accent-tint);
+    color: var(--accent);
+}
+
+.stat-icon.stat-cats {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.stat-icon.stat-queue {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+/* ==================== IMAGE PICKER ==================== */
+.set-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    gap: var(--sp-3);
+}
+
+.set-picker-item {
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    cursor: pointer;
+    overflow: hidden;
+    transition: var(--transition-base);
+}
+
+.set-picker-item:hover {
+    border-color: var(--accent);
+}
+
+.set-picker-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.set-picker-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* ==================== SHEETS ACTIVITY TABLE ==================== */
+.set-table-scroll {
+    max-height: 320px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.set-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-xs);
+}
+
+.set-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--surface-3);
+    text-align: left;
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.set-table td {
+    padding: var(--sp-2) var(--sp-3);
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-1);
+    vertical-align: top;
+}
+
+.set-table tbody tr:hover {
+    background: var(--surface-3);
+}
+
+.set-table .set-td-time {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+.set-table .set-td-clip {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The event kind. An ordinal ramp is wrong here — these are unordered
+   categories — so they take the neutral chip and carry their own label, which
+   is the only thing identity may rest on. */
+.set-kind {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    font-size: var(--fs-2xs);
+    color: var(--text-2);
+    white-space: nowrap;
+}
+
+/* ==================== SAVE BAR ====================
+   Sticky, and present only while something has changed. 113 controls behind a
+   single always-on "Save All Settings" button said nothing about what was
+   edited or whether anything was; this states the count, names the sections and
+   offers the way back. */
+.set-savebar {
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    flex-wrap: wrap;
+    margin: var(--sp-6) 0 0;
+    padding: var(--sp-4) var(--sp-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    box-shadow: var(--elev-3);
+    transform: translateY(0);
+    transition: transform var(--dur-base) var(--ease-emphasized),
+        opacity var(--dur-base) var(--ease-standard);
+}
+
+/* Hidden by transform rather than `display`, so it slides rather than blinks —
+   and `visibility` keeps it out of the tab order while it is away. */
+.set-savebar.is-idle {
+    transform: translateY(calc(100% + var(--sp-6)));
+    opacity: 0;
+    visibility: hidden;
+}
+
+.set-savebar-dot {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+.set-savebar-text {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-2);
+}
+
+.set-savebar-text strong {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.set-savebar-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-shrink: 0;
+}
+
+/* ==================== RESPONSIVE ====================
+   The screen this replaces had no @media queries at all: 113 controls, a
+   fixed two-column Bootstrap grid and an eleven-item tab strip, at every
+   width. */
+@media (max-width: 1200px) {
+    .set-shell {
+        grid-template-columns: 200px minmax(0, 1fr);
+        gap: var(--sp-5);
+    }
+
+    .set-grid.is-quarters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1000px) {
+
+    /* The rail stops paying for its width. It becomes a horizontal scroller
+       above the panel — the groups flatten, because their labels would cost
+       more room than they earn in one line. */
+    .set-shell {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* The desktop rail is a sticky column that scrolls vertically. Both of those
+       have to be undone here, or the horizontal strip keeps a max-height and a
+       vertical scrollbar it has no use for. */
+    .set-nav {
+        position: static;
+        display: flex;
+        gap: var(--sp-1);
+        padding: var(--sp-2);
+        max-height: none;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+    }
+
+    .set-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .set-nav-group {
+        display: flex;
+        gap: var(--sp-1);
+    }
+
+    .set-nav-group+.set-nav-group {
+        margin-top: 0;
+    }
+
+    /* A separator where a group label used to be, so the grouping survives. */
+    .set-nav-group+.set-nav-group::before {
+        content: '';
+        flex-shrink: 0;
+        width: 1px;
+        margin: var(--sp-2) var(--sp-1);
+        background: var(--border-subtle);
+    }
+
+    .set-nav-label {
+        display: none;
+    }
+
+    .set-nav-item {
+        width: auto;
+        white-space: nowrap;
+    }
+
+    .set-grid.is-thirds {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+
+    .set-grid,
+    .set-grid.is-thirds,
+    .set-grid.is-quarters {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .set-stats {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .set-panel {
+        padding: var(--sp-5) var(--sp-4);
+    }
+
+    .set-site {
+        padding: var(--sp-4);
+    }
+
+    .set-url {
+        width: 100%;
+    }
+
+    /* The switch's label column gets the room; the control keeps its size. */
+    .set-switch {
+        gap: var(--sp-3);
+    }
+
+    .set-savebar {
+        padding: var(--sp-3) var(--sp-4);
+    }
+
+    .set-savebar-text {
+        flex-basis: 100%;
+        order: -1;
+    }
+
+    .set-savebar-actions {
+        width: 100%;
+    }
+
+    .set-savebar-actions .app-btn {
+        flex: 1;
+    }
+
+    .set-table .set-td-clip {
+        max-width: 120px;
+    }
+}

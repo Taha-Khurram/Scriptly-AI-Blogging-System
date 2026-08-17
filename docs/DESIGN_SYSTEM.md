@@ -964,6 +964,196 @@ that way would never appear on this calendar.
 Shares the schedule's vocabulary: stat tiles, status pills, and the requested
 publish time printed on the row awaiting a decision.
 
+### Site settings — `site_settings.html`
+
+Eleven sections, 113 controls, one save. The screen it replaces was the largest
+single template in the app — 3256 lines, of which **1028 were an inline
+`<style>` block and 590 an inline `<script>`**: uncacheable, re-parsed on every
+visit, and PJAX re-injecting the whole style block into `<head>` each time. It
+was also the only screen in the product with **no `@media` queries at all**.
+
+```
+╔ page header ═══════════════════════════════════════════════════════╗
+║ Configuration                                                      ║
+║ H1 Site Settings   [🔍 find a setting]  ( ☾ )  ( Visit your site ↗ )║
+╚════════════════════════════════════════════════════════════════════╝
+┌ ▣  My Awesome Blog ─────────────── [ 🔗 host/site/my-blog  ⧉ ] ────┐
+│    Notes on building things                                        │
+└────────────────────────────────────────────────────────────────────┘
+┌ rail ────────────┬ panel ──────────────────────────────────────────┐
+│ SITE             │  General                                        │
+│  ▸ General       │  ───────────────────────────────────────────────│
+│    Appearance    │  Site name              Niche or category       │
+│    Content       │  ▢ My Awesome Blog      ▢ Technology            │
+│ PAGES            │                                                 │
+│    Header/footer │  Site URL slug                                  │
+│    Hero sections │  ┌ /site/ │ my-blog                    (↻) ┐    │
+│    Legal      ●  │  Description                                    │
+│ DISCOVERY        │  ▢▢▢                                            │
+│    SEO           │  Visibility  [ 👁 Public — anyone can view ▾ ]   │
+│    Social        │                                                 │
+│    Permalinks    │  YOUR CONTENT AT A GLANCE                       │
+│ SYSTEM           │  ┌ 34 Published ┬ 8 Categories ┬ 2 Awaiting ┐   │
+│    Locale & time │  PUBLISHED POSTS                                │
+│    Google Sheets │  ▣ Title · category · date        [ Unpublish ] │
+└──────────────────┴─────────────────────────────────────────────────┘
+┌ sticky, only while dirty ──────────────────────────────────────────┐
+│ ● 3 unsaved changes in General and Legal      [Discard] [Save]     │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**A rail, not a tab strip.** `.seg-tabs` scrolls sideways, so at eleven items
+most sections are off-screen at any moment and finding one is a hunt. The rail
+shows all eleven at once, groups them (*Site · Pages · Discovery · System*), and
+has room for a per-section change marker. Below 1000px it becomes a horizontal
+scroller with the group labels dropped and a hairline where each label was, so
+the grouping survives the collapse.
+
+**The save bar states what it is about to do.** 113 controls behind one
+always-on *Save All Settings* button said nothing about what had been edited, or
+whether anything had. The bar is sticky, appears only while something differs
+from what was last saved, counts the edits, names the sections in the rail's own
+words, and offers Discard. Each changed field carries a dot, and so does its
+section in the rail — otherwise "3 changes" leaves you opening eleven panels
+looking for them.
+
+**Leaving is guarded.** PJAX swaps `.dashboard-main`, so navigating away took the
+whole form with it silently. The guard is bound in the **capture phase** on
+purpose: `app.js` binds its PJAX interceptor on `document` in the bubble phase
+and is registered first, so a bubble-phase guard would fire after the navigation
+had already started. `beforeunload` covers the hard reload the dialog cannot.
+
+**113 fields are eight Jinja macros.** `field` · `area` · `toggle` · `choose` ·
+`image` · `colour` · `field_foot` · `panel_head` / `nav_item`. Written longhand —
+as the old template was — that is ~2200 lines of near-identical markup, and every
+label association has to be got right 113 separate times.
+
+**Spacing belongs to the container, never to adjacent siblings.** Every panel,
+group and disclosure body is a flex column with one `gap`. The rule this replaces
+was a chain of `+` selectors ending in `.app-field + .app-field { margin-top }`,
+and the children of a two-column `.set-grid` are *all* `.app-field` — so items
+2..n each took a 20px top margin the first item did not, and **every two-column
+row sat staggered against the one beside it**. Deleting those rules is only half
+the fix: `.set-disclosure-body` had been relying on them, and lost its spacing
+entirely until it was given a gap of its own. Both halves are guarded by a test
+that refuses any `margin` on a `+` selector whose subject can be a grid child.
+
+What keeps controls on one line across a row is the **label reserving a line**
+(`min-height` of one line, plus `text-wrap: balance`), because a control's
+vertical position is set by the height of the label above it. Grid rows stay
+ragged at the *bottom* — hints differ in length — and that is correct: the gap
+absorbs it, and `align-items: start` stops a tall neighbour stretching a
+one-line field's input to match.
+
+**Hint and counter share one footer row.** As two blocks a field with both had a
+right-aligned number floating above a left-aligned sentence. `.app-field-foot` is
+emitted only when there is something to put in it, and every field type routes
+through it — a select's hint sits on the same baseline as a text input's in the
+same row.
+
+**The colour well stretches rather than guessing.** A fixed `height: 40px` beside
+an input sized by its own padding and font is visibly crooked and drifts the
+moment either token changes; `align-self: stretch` is the whole fix.
+
+**`.app-field` styles every input in it as a text field.** dashboard.css §14 sets
+`width: 100%`, padding, a `--surface-2` fill and a radius on
+`.app-field input, textarea, select` — which is right for the eighty text boxes on
+this screen and wrong for anything else in one. The permalink radios shipped that
+way: each became a full-width 43px filled box, so the glyph drew in the middle of
+its card and the label was pushed past the card's right edge and off the screen
+entirely. A control that is a *glyph* rather than a box has to take its box back:
+
+```css
+.set-radio input[type="radio"],
+.set-radio input[type="radio"]:hover,
+.set-radio input[type="radio"]:focus { width: auto; padding: 0; background: none; … }
+```
+
+The `:hover` and `:focus` copies are load-bearing, not thoroughness:
+`.app-field input:focus` weighs the same (0,2,1) as the page's own selector, so
+without them focusing a radio repaints a fill and a 3px ring onto the control —
+and the ring belongs to the card, which draws it with `:has()`.
+
+`.set-prefixed input` escaped the same trap only because it already overrode
+width and background for its own reasons. A `<input type="color">` is exempt: it
+*is* a box, declares its own geometry, and the inherited hover/focus states are
+wanted feedback on it. A guard now walks the rendered page for every non-text
+input inside an `.app-field` and checks each one either resets the chrome or owns
+its geometry deliberately.
+
+One positioning bug is worth recording because the markup makes it inevitable:
+the image field's replace/remove pair cannot be *children* of the preview — a
+button inside a button is invalid — so they are siblings, `position: absolute`,
+and with no positioned ancestor they resolved against the initial containing
+block and **floated at the top-right corner of the page**. `.set-image-wrap`
+exists to be that ancestor, and the guard checks the overlay is never emitted
+outside it.
+
+Also: twelve inline `style="…"` attributes became real classes (`.set-row-head`,
+`.set-standalone-label`, `.set-status-row`, `.set-group-head`, `.set-inline-link`).
+An inline style cannot be re-themed, cannot be overridden by a media query, and
+hides a layout decision from the stylesheet where the rest of them live. The only
+survivors are the two `--reveal-delay` values, which are that component's
+documented API. Each panel head repeats its rail icon, and the hero disclosures'
+field counts are asserted against the real number of controls inside them, so a
+hardcoded "21 fields" cannot go stale.
+
+**Ten native `<select>`s became ten `.select-field` listboxes**, so no
+browser-drawn popup is visible on the screen with the most dropdowns in the app.
+The trigger caption is the page's one line of glue, as §13 requires.
+
+**The switch is this page's, not the system's.** Bootstrap's `.form-switch`
+draws its knob from a fixed-colour `background-image` data URI, so it cannot
+follow the accent and reads wrong in dark mode. `.set-switch` keeps the real
+`<input>` as the control — transparent over the track — so label wiring, focus
+and keyboard behaviour are the platform's. It stays page-scoped because this is
+its first user; it is the obvious candidate to move into §12 when a second
+screen wants one.
+
+Nested maps are **normalised once** at the top of the template
+(`{% set seo = settings.seo or {} %}`, eleven of them). `settings.seo.x` raises
+`UndefinedError` the moment `seo` is absent — Jinja's `Undefined` raises on
+further attribute access — and the old template had ten such chained reads. The
+server's defaults do seed all eleven maps, which is the only reason it never
+fired; the page was one changed default away from 500ing for a fresh account.
+The binding also keeps the truthiness the template relies on, since an empty map
+is still falsy.
+
+Five things were broken rather than merely dated, and are fixed:
+
+- **The entire Legal section was never saved.** The hand-written payload built no
+  `legal` key, so `data.get('legal', {})` on the server always saw nothing. Nine
+  fields — the privacy policy body, the terms body, the legal contact address and
+  the whole cookie banner — could be typed, saved, and confirmed with a green
+  *Settings Saved* toast, and were never stored. `site_routes.py` reads every one
+  of them to serve `/privacy-policy`, `/terms-of-service` and the banner, so the
+  feature was wired at both ends and disconnected in the middle. Note the key
+  inside the map is `contact_email`, not the field's id.
+- **The route could not tell "omitted" from "cleared".** Every nested section was
+  written as `data.get(section, {})`, and only Firestore's field-by-field
+  `set(merge=True)` stopped an absent section from blanking the stored one. A
+  caller that omits a section now leaves it alone explicitly, so the behaviour
+  does not depend on that detail.
+- **Sheet rows and gallery filenames went into markup raw.** The activity table
+  interpolated `user`, `action` and `page` straight in, from a spreadsheet anyone
+  with edit access can write to, and the picker built `onclick="…('<url>')"` from
+  the filename. Both escape all five characters now, and the picker is
+  delegation rather than an inline attribute.
+- **The character counters never initialised on an in-app arrival.** They were
+  set from a `DOMContentLoaded` listener, which never fires again after the first
+  load, so every PJAX visit showed `0/70` regardless of the field's contents.
+- **The timezone did not refresh the time preview.** `updateTimePreview()` reads
+  the timezone, but was wired to `date_format` and `time_format` only — the one
+  field the preview exists to explain was the one that left it stale. The
+  refresh is also debounced and sequence-numbered now, so a slow earlier answer
+  cannot overwrite a newer one.
+
+One thing the old screen depended on and no longer does: the published/pending
+figures were found with `document.querySelector('[style*="rgba(67, 24, 255"] h2')`
+— matching on an inline style string that existed **only** to keep that selector
+working. A tidy-up of the CSS would have silently broken the counters. They are
+`[data-stat-published]` and `[data-stat-pending]` now.
+
 ### Analytics — `analytics.html`
 
 Card-based stat tiles on the same `--surface-1` / `--elev-1` / medallion pattern

@@ -1406,7 +1406,14 @@ def update_site_settings():
             # RSS Feed Settings
             'rss': data.get('rss', {}),
 
-            # Legal Pages Settings
+            # Legal Pages Settings.
+            #
+            # The client did not send this key at all until the settings screen was
+            # rebuilt, so every save wrote {} here: the privacy policy, the terms
+            # and the cookie banner could be typed, saved, confirmed with a green
+            # toast, and never stored. The nested maps below are all written the
+            # same way, so an absent one must not look like an empty one — a
+            # caller that omits a section leaves it alone rather than blanking it.
             'legal': data.get('legal', {}),
 
             # Google Sheets
@@ -1419,6 +1426,17 @@ def update_site_settings():
             settings['show_reading_time'] = settings['show_reading_time'].lower() == 'true'
         if isinstance(settings['show_author'], str):
             settings['show_author'] = settings['show_author'].lower() == 'true'
+
+        # Drop the nested sections the caller did not send, rather than writing an
+        # empty map over one. Firestore's set(merge=True) merges maps field by
+        # field, so {} contributes nothing and existing keys survive — but only
+        # because of that detail, and relying on it means a future switch to a
+        # plain set() would silently erase whole sections. Being explicit here
+        # makes "omitted" and "cleared" different requests, which is what they are.
+        for section in ('seo', 'rss', 'legal', 'header', 'footer', 'permalinks',
+                        'hero_home', 'hero_about', 'hero_blog', 'hero_contact'):
+            if section not in data or not isinstance(data.get(section), dict) or not data.get(section):
+                settings.pop(section, None)
 
         if not settings['site_name']:
             return jsonify({"success": False, "error": "Site name is required"}), 400
