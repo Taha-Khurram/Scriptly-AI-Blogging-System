@@ -1,161 +1,434 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Schedule | {{ app_config.app_name }}{% endblock %}
+{% block title %}Schedule | {{ app_config.app_name if app_config else 'ScriptlyAI' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/schedule.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/schedule.css') }}?v=2">
 {% endblock %}
+
+{#
+  The publish-time picker, used by both dialogs.
+
+  It replaces <input type="datetime-local">, which brings the browser's own
+  calendar-and-time popup: drawn by the browser, so it takes none of the
+  product's surfaces, radius or type, and on a forced dark theme over a light OS
+  it renders as a pale OS widget in the middle of a dark dialog. The same reason
+  All Blogs' date range is our own grid rather than two native date inputs.
+
+  It sits *inline* rather than in a popover, because .app-modal-body scrolls and
+  would clip one. The grid is dashboard.css §12's .cal; the time column and the
+  summary are this page's.
+
+  The value lives on a hidden input — the value-holder pattern the select pills
+  and the range calendar both use — so nothing that reads the field has to know
+  how it was filled in.
+#}
+{% macro when_picker(scope, label_id, label='Publish at') %}
+<div class="app-field sched-when-field">
+  <span class="field-label" id="{{ label_id }}">{{ label }}</span>
+
+  <div class="sched-when" data-when="{{ scope }}" role="group" aria-labelledby="{{ label_id }}">
+    <div class="sched-when-body">
+
+      <div class="cal" data-cal>
+        <div class="cal-head">
+          <button type="button" class="cal-nav" data-cal-prev aria-label="Previous month">
+            <i class="bi bi-chevron-left" aria-hidden="true"></i>
+          </button>
+          <span class="cal-title" data-cal-title aria-live="polite"></span>
+          <button type="button" class="cal-nav" data-cal-next aria-label="Next month">
+            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="cal-dow" aria-hidden="true">
+          <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
+          <span>Th</span><span>Fr</span><span>Sa</span>
+        </div>
+        <div class="cal-grid" data-cal-grid></div>
+      </div>
+
+      {# A scrolling column of quarter-hours rather than three number fields or
+         a native time input. Blog publishing is not a to-the-minute act, and a
+         list can disable the slots that have already gone by on today's date —
+         which a free-text field cannot do until you have already typed one. #}
+      <div class="sched-times">
+        <p class="sched-times-head">Time</p>
+        <div class="sched-times-list" data-time-list role="listbox"
+          aria-label="Publish time"></div>
+      </div>
+    </div>
+
+    {# The summary is the label for what the confirm button is about to do, the
+       same job it does in the date-range modal's footer. #}
+    <p class="sched-when-summary" data-when-summary>
+      <i class="bi bi-calendar-event" aria-hidden="true"></i>
+      <span data-when-text>Pick a day, then a time.</span>
+    </p>
+
+    <input type="hidden" data-when-value value="">
+  </div>
+</div>
+{% endmacro %}
 
 {% block content %}
 <div class="dashboard-layout">
 
   {% include 'partials/sidebar.html' %}
 
+  {#
+    Everything below — the toolbar, all four modals and the page script — lives
+    inside .dashboard-main. PJAX swaps only that element's innerHTML, so a modal
+    placed outside it is dropped on every in-app navigation and stays broken
+    until a hard reload; a script placed outside it survives only because PJAX
+    scrapes <script> tags from the whole document, which is the more confusing
+    half of the same fault.
+  #}
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <div class="header-welcome-text">Content Planning</div>
-        <h1 class="header-title">Blog Schedule</h1>
+
+    {% call page_header(title='Schedule', eyebrow='Content planning', search=true,
+                        search_placeholder='Find a scheduled post') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    <button type="button" class="page-header-action is-primary" data-action="open-add">
+      <i class="bi bi-calendar-plus" aria-hidden="true"></i>
+      <span class="page-header-label">Schedule a blog</span>
+    </button>
+    {% endcall %}
+
+    {#
+      A scheduled post whose time has passed and which is still SCHEDULED means
+      the publisher did not run — it fires every 60 seconds, so anything more
+      than a couple of minutes late is a failure, not a wait. The old screen drew
+      it identically to a future entry, so a stalled queue was invisible.
+    #}
+    <div class="sched-alert reveal" data-overdue-alert hidden>
+      <span class="sched-alert-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+      <div class="sched-alert-body">
+        <p class="sched-alert-title" data-overdue-title>A post is past its publish time</p>
+        <p class="sched-alert-text">
+          The publisher checks every minute, so anything still waiting here did not go out. Publish it by
+          hand, move it to a new time, or send it back to drafts.
+        </p>
       </div>
-      <button class="btn-add-schedule" id="addScheduleBtn">
-        <i class="bi bi-plus-lg"></i> Add Schedule
+      <button type="button" class="app-btn is-ghost sched-alert-action" data-action="show-overdue">
+        Show them
       </button>
-    </header>
-
-    <div class="dashboard-content-wrapper animate-fade-up">
-
-      <!-- Stats Row -->
-      <div class="schedule-stats-row">
-        <div class="stat-card">
-          <div class="stat-icon stat-scheduled"><i class="bi bi-calendar-check"></i></div>
-          <div class="stat-info">
-            <div class="stat-count" id="stat-scheduled">0</div>
-            <div class="stat-label">Scheduled</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-published"><i class="bi bi-check-circle"></i></div>
-          <div class="stat-info">
-            <div class="stat-count" id="stat-published">0</div>
-            <div class="stat-label">Published</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-month"><i class="bi bi-calendar-range"></i></div>
-          <div class="stat-info">
-            <div class="stat-count" id="stat-week">0</div>
-            <div class="stat-label">This Week</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Week Navigation -->
-      <div class="schedule-calendar-nav">
-        <button class="btn-nav" id="prevWeek"><i class="bi bi-chevron-left"></i></button>
-        <h3 class="calendar-week-title" id="weekTitle">May 18 – May 24, 2026</h3>
-        <button class="btn-nav" id="nextWeek"><i class="bi bi-chevron-right"></i></button>
-        <button class="btn-today" id="todayBtn">Today</button>
-      </div>
-
-      <!-- Weekly Calendar Grid -->
-      <div class="weekly-calendar" id="weeklyCalendar"></div>
-
     </div>
 
-    <!-- Reschedule Modal -->
-    <div class="modal fade" id="rescheduleModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="custom-modal-header">
-            <h5 class="custom-modal-title">
-              <i class="bi bi-calendar-event"></i> Reschedule Blog
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="custom-modal-body">
-            <p class="text-muted mb-3">Choose a new date and time for publishing:</p>
-            <p class="fw-bold mb-3" id="reschedule-blog-title">Blog Title</p>
-            <input type="datetime-local" class="schedule-datetime-input" id="rescheduleDateTime">
-            <div id="bestTimeSuggestionsReschedule" class="best-time-container mt-3">
-              <div class="best-time-header">
-                <i class="bi bi-robot"></i>
-                <span>AI Publish Time Agent — Recommended Times</span>
-              </div>
-              <div id="bestTimeSuggestionsListReschedule" class="best-time-list">
-                <div class="best-time-loading">
-                  <div class="spinner-border spinner-border-sm text-primary"></div>
-                  <span>Analyzing best publish times...</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="custom-modal-footer">
-            <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
-              <i class="bi bi-x-lg"></i> Cancel
-            </button>
-            <button type="button" class="btn-modal btn-modal-success" id="confirmRescheduleBtn">
-              <i class="bi bi-calendar-check"></i> Reschedule
-            </button>
-          </div>
-        </div>
+    {#
+      The full stat-tile contract — label · value · delta · trend — rather than a
+      medallion and a bare count. Every figure is derived in the browser from the
+      one /api/schedule/list payload the page already fetches, so none of it
+      costs an extra request.
+    #}
+    <div class="sched-stats reveal">
+
+      {# The third column is a genuine ratio: how much of the queue lands inside
+         the next seven days, which is what says whether the pipeline is
+         front-loaded or running thin. #}
+      <div class="stat-card">
+        <span class="stat-icon stat-queued"><i class="bi bi-calendar-check" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Queued</span>
+          <span class="stat-count" data-stat-queued>—</span>
+          <span class="stat-delta" data-delta-queued></span>
+        </span>
+        <span class="stat-meter" data-meter-queued hidden>
+          <span class="stat-meter-track">
+            <span class="stat-meter-fill" data-meter-fill style="width: 0%"></span>
+          </span>
+          <span class="stat-meter-note" data-meter-note></span>
+        </span>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-icon stat-published"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Published</span>
+          <span class="stat-count" data-stat-published>—</span>
+          <span class="stat-delta" data-delta-published></span>
+        </span>
+        <span data-trend-published></span>
+      </div>
+
+      {# No series and no ratio belongs here: "when is the next one" is a single
+         instant. The third column collapses to zero rather than carrying a
+         contrived picture. #}
+      <div class="stat-card sched-next-card">
+        <span class="stat-icon stat-next"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Next publish</span>
+          <span class="stat-count sched-next-value" data-stat-next>—</span>
+          <span class="stat-delta" data-delta-next></span>
+        </span>
       </div>
     </div>
 
-    <!-- Add Schedule Modal -->
-    <div class="modal fade" id="addScheduleModal" tabindex="-1" aria-hidden="true">
+    {#
+      Three views of one queue. Week and Month answer "what does the plan look
+      like"; Upcoming answers "what goes out next", which the old week-only grid
+      could not — and it is the only one of the three that is readable on a
+      phone.
+    #}
+    <section class="surface-card sched-toolbar reveal" style="--reveal-delay: 60ms" aria-label="Schedule views">
+      <div class="seg-tabs" role="tablist" aria-label="Schedule views">
+        <button type="button" class="seg-tab is-active" role="tab" aria-selected="true" aria-controls="schedBody"
+          data-view-tab="week">Week</button>
+        <button type="button" class="seg-tab" role="tab" aria-selected="false" aria-controls="schedBody"
+          data-view-tab="month">Month</button>
+        <button type="button" class="seg-tab" role="tab" aria-selected="false" aria-controls="schedBody"
+          data-view-tab="upcoming">
+          Upcoming <span class="seg-count" data-upcoming-count>0</span>
+        </button>
+      </div>
+
+      {# Hidden in the Upcoming view, which is not bounded by a range. #}
+      <div class="sched-range" data-range-nav>
+        <button type="button" class="sched-nav" data-action="prev" aria-label="Previous">
+          <i class="bi bi-chevron-left" aria-hidden="true"></i>
+        </button>
+        <p class="sched-range-title" data-range-title aria-live="polite">&nbsp;</p>
+        <button type="button" class="sched-nav" data-action="next" aria-label="Next">
+          <i class="bi bi-chevron-right" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="app-btn is-ghost sched-today" data-action="today">Today</button>
+      </div>
+    </section>
+
+    {#
+      Empty · loading · error · results are four states of one region switched by
+      one attribute, the pattern optimization.html uses. The old screen had no
+      loading state (it painted an empty grid, then repainted it once the fetch
+      landed) and no error state at all — a failed request only reached the
+      console, so a broken API looked exactly like an empty calendar.
+    #}
+    <section class="surface-card sched-card reveal" style="--reveal-delay: 120ms" aria-labelledby="schedHeading">
+      <h2 class="visually-hidden" id="schedHeading">Publishing schedule</h2>
+
+      {# One panel behind three tabs: the views are alternative renderings of the
+         same queue, not three separate regions. #}
+      <div class="sched-body" id="schedBody" role="tabpanel" tabindex="0" data-state="loading">
+
+        <div class="sched-state" data-for="loading">
+          <div class="list-empty">
+            <span class="list-empty-icon"><span class="spinner-border spinner-border-sm"></span></span>
+            <p>Loading your schedule…</p>
+          </div>
+        </div>
+
+        <div class="sched-state" data-for="error">
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <p data-error-text>Could not load your schedule.</p>
+            <button type="button" class="app-btn is-ghost" data-action="reload">Try again</button>
+          </div>
+        </div>
+
+        <div class="sched-state" data-for="empty">
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-calendar3" aria-hidden="true"></i></span>
+            <p>Nothing is scheduled yet. Pick a draft and a time, and Scriptly will publish it for you —
+              the queue and everything it has already sent show up here.</p>
+            <button type="button" class="app-btn is-primary" data-action="open-add">
+              <i class="bi bi-calendar-plus" aria-hidden="true"></i> Schedule a blog
+            </button>
+          </div>
+        </div>
+
+        <div class="sched-state" data-for="results">
+          {# Shown only while the header's search field has a query: a filtered
+             calendar reads as an empty one, so a query switches to the list of
+             every match instead, past and future. #}
+          <div class="sched-searchnote" data-search-note hidden>
+            <span data-search-text></span>
+            <button type="button" class="filter-clear" data-action="clear-search">
+              <i class="bi bi-x-lg" aria-hidden="true"></i> Clear
+            </button>
+          </div>
+          <div data-view-panel></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SCHEDULE A BLOG ===================== -->
+    <div class="modal fade" id="addScheduleModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="addScheduleTitle">
       <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-          <div class="custom-modal-header">
-            <h5 class="custom-modal-title">
-              <i class="bi bi-calendar-plus"></i> Schedule a Blog
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="custom-modal-body">
-            <div class="schedule-modal-search">
-              <i class="bi bi-search"></i>
-              <input type="text" id="blogSearchInput" placeholder="Search blogs..." autocomplete="off">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="addScheduleTitle">Schedule a blog</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="app-modal-body">
+            <div class="app-field sched-picker-field">
+              <label for="blogSearchInput">Which post?</label>
+              <input type="search" id="blogSearchInput" placeholder="Search drafts and posts awaiting approval"
+                autocomplete="off">
             </div>
-            <div class="schedule-blog-list" id="blogListContainer">
-              <div class="blog-list-loading">
-                <div class="spinner-border spinner-border-sm text-primary"></div>
-                <span>Loading blogs...</span>
+
+            <div class="sched-blog-list" data-blog-list role="listbox" aria-label="Available posts">
+              <div class="list-empty sched-list-loading">
+                <span class="list-empty-icon"><span class="spinner-border spinner-border-sm"></span></span>
+                <p>Loading posts…</p>
               </div>
             </div>
 
-            <!-- Schedule form (shown when a blog is selected) -->
-            <div class="schedule-form-section" id="scheduleFormSection" style="display:none;">
-              <div class="selected-blog-info" id="selectedBlogInfo"></div>
-              <label class="schedule-form-label">Pick date & time:</label>
-              <input type="datetime-local" class="schedule-datetime-input" id="scheduleDateTime">
-              <div id="bestTimeSuggestionsAdd" class="best-time-container mt-3">
-                <div class="best-time-header">
-                  <i class="bi bi-robot"></i>
-                  <span>AI Publish Time Agent — Recommended Times</span>
-                </div>
-                <div id="bestTimeSuggestionsListAdd" class="best-time-list">
-                  <div class="best-time-loading">
-                    <div class="spinner-border spinner-border-sm text-primary"></div>
-                    <span>Analyzing best publish times...</span>
+            <div class="sched-form" data-schedule-form hidden>
+              <p class="sched-chosen" data-chosen-blog></p>
+
+              {{ when_picker('add', 'addWhenLabel') }}
+
+              {#
+                The AI Publish Time Agent is commented out for now, here and in
+                the reschedule dialog. The endpoint it reads
+                (GET /api/schedule/best-time) is untouched and still serves
+                drafts.js and approval.js; only this screen's two panels are
+                withdrawn. To bring it back: restore this block, its twin below,
+                and the loadBestTimes() calls marked in schedule.js — the CSS
+                (.sched-besttime / .sched-slots / .sched-slot) is still in
+                schedule.css.
+
+                <div class="sched-besttime" data-besttime="add">
+                  <p class="sched-besttime-head">
+                    <i class="bi bi-robot" aria-hidden="true"></i>
+                    Publish Time Agent — recommended slots
+                  </p>
+                  <div class="sched-besttime-list" data-besttime-list>
+                    <p class="sched-besttime-loading">
+                      <span class="spinner-border spinner-border-sm"></span>
+                      Reading your traffic data...
+                    </p>
                   </div>
                 </div>
-              </div>
+              #}
             </div>
           </div>
-          <div class="custom-modal-footer">
-            <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
-              <i class="bi bi-x-lg"></i> Cancel
-            </button>
-            <button type="button" class="btn-modal btn-modal-primary" id="confirmScheduleBtn" disabled>
-              <i class="bi bi-calendar-check"></i> Schedule
-            </button>
-          </div>
+
+          <footer class="app-modal-foot">
+            <p class="app-modal-note" data-add-note></p>
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-primary" data-action="confirm-add" disabled>Schedule</button>
+          </footer>
         </div>
       </div>
     </div>
 
+    <!-- ===================== RESCHEDULE ===================== -->
+    <div class="modal fade" id="rescheduleModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="rescheduleTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="rescheduleTitle">Move this post</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="app-modal-body">
+            <p class="sched-chosen" data-reschedule-blog></p>
+
+            {# The time it is on now. Without it the dialog asked for a new time
+               while hiding the one being replaced. #}
+            <p class="sched-current" data-reschedule-current></p>
+
+            {{ when_picker('reschedule', 'reWhenLabel', 'New publish time') }}
+
+            {# Publish Time Agent withdrawn for now — see the note in the
+               Schedule-a-blog dialog above.
+
+              <div class="sched-besttime" data-besttime="reschedule">
+                <p class="sched-besttime-head">
+                  <i class="bi bi-robot" aria-hidden="true"></i>
+                  Publish Time Agent — recommended slots
+                </p>
+                <div class="sched-besttime-list" data-besttime-list>
+                  <p class="sched-besttime-loading">
+                    <span class="spinner-border spinner-border-sm"></span>
+                    Reading your traffic data...
+                  </p>
+                </div>
+              </div>
+            #}
+          </div>
+
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-primary" data-action="confirm-reschedule">Move post</button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PUBLISH NOW ===================== -->
+    {#
+      Both of these were window.confirm() — the browser's own dialog, which takes
+      none of the product's surfaces and cannot name what it is about to do. An
+      irreversible action states its blast radius and repeats it in the button's
+      own label, the rule the newsletter's send and the optimizer's run follow.
+    #}
+    <div class="modal fade" id="publishNowModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="publishNowTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="publishNowTitle">Publish this now?</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <p class="delete-copy">
+              <strong data-publish-blog>This post</strong> goes live on your site immediately, ahead of
+              its scheduled time of <strong data-publish-when>—</strong>. Readers and subscribers can
+              reach it as soon as you confirm.
+            </p>
+          </div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Keep it scheduled</button>
+            <button type="button" class="app-btn is-primary" data-action="confirm-publish">
+              Publish now
+            </button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== CANCEL SCHEDULE ===================== -->
+    <div class="modal fade" id="cancelScheduleModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="cancelScheduleTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="cancelScheduleTitle">Take this off the schedule?</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <p class="delete-copy">
+              <strong data-cancel-blog>This post</strong> will not publish at
+              <strong data-cancel-when>—</strong>. It goes back to your drafts with its content intact,
+              and drops off this calendar.
+            </p>
+          </div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Leave it scheduled</button>
+            <button type="button" class="app-btn is-danger" data-action="confirm-cancel">
+              Move back to drafts
+            </button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/pages/schedule.js') }}?v=2"></script>
   </main>
 </div>
-
-<script src="{{ url_for('static', filename='js/pages/schedule.js') }}?v={{ range(10000, 99999) | random }}"></script>
 {% endblock %}

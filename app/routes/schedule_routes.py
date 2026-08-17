@@ -34,6 +34,26 @@ def schedule_list():
         entries = db_service.get_schedule_entries_for_calendar(site_owner_id)
         print(f"[Schedule List] Found {len(entries)} entries from schedule_entries collection")
 
+        # Author names for the entries written before save_schedule_entry
+        # denormalised them. One read per *distinct* author, not per entry — a
+        # calendar is usually one or two people's work.
+        missing_authors = {
+            entry.get("author_id")
+            for entry in entries
+            if entry.get("author_id") and not entry.get("author_name")
+        }
+        author_names = {}
+        for author_id in missing_authors:
+            try:
+                doc = db_service.db.collection("users").document(author_id).get()
+                if doc.exists:
+                    u = doc.to_dict()
+                    author_names[author_id] = (
+                        u.get("name") or (u.get("email") or "").split("@")[0] or ""
+                    )
+            except Exception as e:
+                print(f"[Schedule List] Could not resolve author {author_id}: {e}")
+
         result = []
         for entry in entries:
             scheduled_at = entry.get('scheduled_at')
@@ -54,11 +74,15 @@ def schedule_list():
                     entry_status = "PUBLISHED"
                     db_service.update_schedule_entry_status(blog_id, "PUBLISHED")
 
+            # Empty, never a placeholder. These two used to default to
+            # "General" / "Unknown" against fields nothing had ever written, so
+            # every row on the calendar carried the same two invented values; the
+            # client now simply omits a label it has no value for.
             result.append({
                 "id": blog_id,
                 "title": (entry.get("title") or "Untitled").replace("**", ""),
-                "category": entry.get("category", "General"),
-                "author": entry.get("author", "Unknown"),
+                "category": entry.get("category") or "",
+                "author": entry.get("author_name") or author_names.get(entry.get("author_id"), ""),
                 "status": entry_status,
                 "scheduled_at": display_date
             })
@@ -262,12 +286,27 @@ def schedule_blog(blog_id):
 
         if success:
             site_owner_id = db_service.get_site_owner_for_user(user_id) or user_id
+
+            # Denormalised onto the entry so the calendar can label a row without
+            # reading the blog and the author back for every event it draws.
+            author_id = blog_data.get('author_id', user_id)
+            author_name = ''
+            try:
+                author_doc = db_service.db.collection("users").document(author_id).get()
+                if author_doc.exists:
+                    a = author_doc.to_dict()
+                    author_name = a.get('name') or (a.get('email') or '').split('@')[0] or ''
+            except Exception as e:
+                print(f"⚠ Could not resolve author name for schedule entry: {e}")
+
             db_service.save_schedule_entry(
                 blog_id=blog_id,
                 title=blog_data.get('title', 'Untitled'),
                 scheduled_at=scheduled_at,
-                author_id=blog_data.get('author_id', user_id),
-                site_owner_id=site_owner_id
+                author_id=author_id,
+                site_owner_id=site_owner_id,
+                category=blog_data.get('category') or '',
+                author_name=author_name
             )
 
             db_service.log_activity(

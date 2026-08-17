@@ -791,12 +791,178 @@ no stylesheet of ours is loaded, so it is the one place that carries literal
 hex — the light-theme token values, not the old `#4318FF` palette it shipped
 with.
 
-### Scheduling / publishing — `schedule.html`, `approval_queue.html`
+### Schedule — `schedule.html`
 
-Stat tiles, then a week navigator (`‹ May 18 – May 24 ›` + `Today` pill) above the
-calendar grid. Scheduled events are tonal chips; the pre-publish checklist and
-best-time suggestions render as `.best-time-chip` pills inside a `--surface-2`
-panel.
+Three views of one queue under the standard shell. The screen had adopted none of
+the components: the legacy `.dashboard-header`, its own stat tiles, its own
+`.custom-modal-*` chrome and its own buttons — ~450 lines of page CSS restating
+things that had already moved into `dashboard.css`.
+
+```
+╔ page header ═══════════════════════════════════════════════════════╗
+║ Content planning                                                   ║
+║ H1 Schedule    [🔍 search ⌘K]   ( ☾ )   ( 📅+ Schedule a blog )     ║
+╚════════════════════════════════════════════════════════════════════╝
+┌ ⚠ 1 post is past its publish time ────────────────── [ Show them ] ┐
+└────────────────────────────────────────────────────────────────────┘
+┌ 📅 QUEUED ─────────┬ ✓ PUBLISHED ────────┬ ⏳ NEXT PUBLISH ────────┐
+│ 5   ⚠ 1 past due   │ 34   5 in 30 days   │ in 3 days              │
+│      ▓▓▓▓▓▓▓▓░░ 4/5│      ╱╲__╱▔╲_●  ← 8w│ Tue, 19 Aug at 10:00 AM│
+└────────────────────┴─────────────────────┴────────────────────────┘
+┌ toolbar ───────────────────────────────────────────────────────────┐
+│ (Week)(Month)(Upcoming 5)         ‹  Aug 16 – 22, 2026  ›  [Today] │
+└────────────────────────────────────────────────────────────────────┘
+┌ calendar card ─────────────────────────────────────────────────────┐
+│  SUN   MON   TUE  (17)   THU   FRI   SAT     ← circled = today     │
+│   16    ▌9 AM  …                                                   │
+│         ▌Title                                                     │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Week is day columns, not time bands.** The old grid split each week into
+Morning / Afternoon / Evening — 21 cells for a queue that is usually three posts,
+and the band label said nothing the chip's own `9:30 AM` did not already say.
+Each day is now one ordered stack. Below 940px the seven columns become seven
+day *rows*, and below 640px an empty day drops out entirely.
+
+**Month and Upcoming are new.** A month-at-a-glance is what content planning is
+actually for, and *Upcoming* — the queue as `.data-row`s grouped under
+`Today` / `Tomorrow` / weekday heads, with `Past due` first — answers "what goes
+out next", which a week-only grid could not. It is also the only one of the three
+that is readable on a phone. The month grid always draws **six full weeks**, so
+the card never changes height mid-month, and a cell past three chips gets a
+`+n more` that expands it in place rather than opening one more surface;
+the expanded set lives in page state, so the minute tick can repaint without
+collapsing a cell the reader has opened.
+
+**Today is the circled date and nothing else.** Washing today's column in
+`--accent-tint` is the obvious move and it is wrong: that is exactly the fill a
+scheduled event carries, so every chip in today's column vanished into its own
+background.
+
+**The whole event is its own trigger, at every size.** The old chip hid a `⋮`
+button behind `:hover` — unreachable on touch, invisible to anyone who does not
+already know it is there, and impossible at month-chip width. A **published**
+entry gets no trigger at all, because it has no actions left; the affordance
+matches the capability instead of opening a menu holding one disabled row. In the
+agenda the `⋮` is pinned visible rather than hover-revealed, since there it *is*
+the menu and not a shortcut to one.
+
+**Search answers a different question here.** Filtering a calendar in place just
+empties cells, so a query switches to the list of every match across all of
+time, published included, with the count stated and a `Clear`. Any tab click
+leaves the search.
+
+**The publish time is our own picker, not `datetime-local`.** That control brings
+the browser's own calendar-and-time popup — unstylable, so it took none of the
+product's surfaces, radius or type, and on a forced dark theme over a light OS it
+landed as a pale OS widget in the middle of a dark dialog. It is the same reason
+All Blogs' date range is our own grid. Both dialogs now carry:
+
+```
+Publish at
+┌ --surface-2 ───────────────────────────────┬──────────┐
+│  ‹        August 2026        ›             │  TIME    │
+│  Su Mo Tu We Th Fr Sa                      │ ┌──────┐ │
+│  ░░ ░░ ░░ ░░ ░░ ░░  1    ← past: disabled  │ │ 9:00 │ │
+│   2  3  4  5  6  7  8                      │ │ 9:15 │ │
+│   9 10 11 12 13 14 15                      │ │(9:30)│ │← chosen
+│  16 ⟨17⟩ 18 (19) 20 21 22   ⟨today⟩ (pick) │ │ 9:45 │ │
+│  23 24 25 26 27 28 29                      │ └──────┘ │
+│  30 31  1  2  3  4  5                      │  scrolls │
+├────────────────────────────────────────────┴──────────┤
+│ 📅 Publishes Wednesday, 19 August 2026 at 9:30 AM     │
+└───────────────────────────────────────────────────────┘
+```
+
+- **Inline, not a popover.** `.app-modal-body` scrolls, so a popover would be
+  clipped by the dialog that contains it.
+- The grid is `.cal` from §12, which **moved out of all_blogs.css** now that this
+  is its second user. What stayed behind is only the *range* vocabulary
+  (`.is-start` / `.is-end` / `.is-in-range` / `.is-preview` / `.is-picking`); a
+  range is the specialisation, and a single selected day is the general case.
+- **Time is a scrolling column of quarter-hours**, not three number fields and
+  not a native time input. Blog publishing is not a to-the-minute act, and a list
+  can grey out the slots that have already gone by on today's date — which a
+  free-text field cannot do until you have already typed one. The column opens
+  scrolled to the choice, or to the first slot still open.
+- **Out-of-bounds is greyed, never removed.** A past day and a passed slot stay in
+  place, so the month keeps its shape and the column does not silently start at an
+  arbitrary row.
+- **Changing the day revalidates the time.** Pick 00:15 tomorrow, then switch to
+  today, and the time is dropped rather than left asserting an instant the server
+  would refuse.
+- **It opens on the value in force.** Reschedule lands on the time being replaced
+  — except for an overdue entry, whose own time is no longer offerable, so that
+  one opens unset. Schedule-a-blog always opens unset, because it is a fresh
+  choice rather than an edit. Both are built at init, not on first open: a widget
+  that only becomes valid after some other handler has run renders an empty grid
+  the first time anything reaches it another way.
+- **The summary is the label for what the confirm button will do**, the same job
+  it does in the date-range modal's footer — and while the pick is incomplete it
+  says which half is missing.
+- Arrow keys walk the grid and follow the focus into the next month; build and
+  paint are separate, so a repaint never destroys the button under the pointer.
+
+**The AI Publish Time Agent panel is commented out of both dialogs for now.**
+`GET /api/schedule/best-time` is untouched and still serves `drafts.js` and
+`approval.js` — only this screen stopped calling it. The JS block is commented
+rather than left live-but-unreachable (unreferenced functions that still compile
+are what a later reader keeps and a linter stays quiet about), and it carries the
+four-step restore note: the two template blocks, the JS block, the two
+`loadBestTimes()` calls, and an `apply-slot` case that now has to write through
+`resetPicker()` rather than into a datetime input that no longer exists. The CSS
+(`.sched-besttime` / `.sched-slots` / `.sched-slot`) is still in place.
+
+Six things were broken rather than merely dated, and are fixed:
+
+- **Two destructive actions were `window.confirm()`.** Publish-now puts a post
+  on a live site ahead of schedule and cancel-schedule un-publishes a plan, and
+  both fired from the browser's own dialog, which takes none of the product's
+  surfaces and cannot name what it is about to do. Both are now `.app-modal`
+  confirmations that state the post *and* its scheduled time and repeat the
+  consequence in the button's own label — `Publish now`, `Move back to drafts` —
+  the rule the newsletter's send and the optimizer's run already follow.
+- **A stalled publisher was invisible.** The job runs on a 60-second interval, so
+  an entry still `SCHEDULED` more than a few minutes past its time did not run.
+  The old screen drew it identically to a future post. Overdue is now its own
+  state — banner, tile, `Past due` pill, its own group at the top of Upcoming.
+- **The API fabricated two fields on every row.** `schedule_list` read
+  `entry.get("category", "General")` and `entry.get("author", "Unknown")` from
+  `schedule_entries` documents that have never carried either key, so every
+  entry came back labelled `General` / `Unknown`. `save_schedule_entry` now
+  denormalises the real category and author name at write time, older entries
+  get their author resolved by a lookup **per distinct author** rather than per
+  row, and anything genuinely unknown comes back empty so the client can omit
+  the label instead of inventing one.
+- **There was no loading state and no error state.** The calendar painted empty
+  and then repainted once the fetch landed, and a failed request reached only
+  `console.error` — so a broken API looked exactly like an empty schedule.
+  Empty · loading · error · results are now four states of one region switched
+  by one attribute, and the error state quotes what the server actually said and
+  offers the retry.
+- **Five globals and inline `onclick`.** Blog ids and titles were interpolated
+  straight into `onclick` attributes through the `textContent → innerHTML`
+  escaper, which leaves both quote characters alone — a title containing `"`
+  closed the attribute. It is delegation off `.dashboard-main` and the
+  five-character escaper now.
+- **The page script was not re-entrant.** PJAX re-injects it on every visit to
+  `/schedule`, and nothing was ever unbound. One IIFE, one `AbortController` the
+  next run aborts, `{ signal }` on every listener and every fetch — so a
+  response can no longer land in a screen that is no longer there, and an
+  `AbortError` is told apart from a real failure rather than reported as "check
+  your connection".
+
+Two gaps are *not* fixed, because they live outside this screen: a non-admin's
+`requested_schedule_at` is written and shown in the approval queue but the
+approval flow never acts on it, and `POST /api/blogs/<id>/status` accepts
+`SCHEDULED` without writing a `schedule_entries` document, so anything scheduled
+that way would never appear on this calendar.
+
+### Approval queue — `approval_queue.html`
+
+Shares the schedule's vocabulary: stat tiles, status pills, and the requested
+publish time printed on the row awaiting a decision.
 
 ### Analytics — `analytics.html`
 
@@ -928,7 +1094,9 @@ Reusable pieces, all token-driven:
 | Select field | `.select-field` / `.select-field-value` / `.select-field-caret` / `.menu.is-block` | the same listbox wearing `.app-field` chrome, for a select inside a form rather than a filter bar |
 | Clear filters | `.filter-clear` | ghost text button, present only while something is applied |
 | Date range | `.date-modal` / `.date-preset` / `.date-summary` | presets, then calendar, then what Apply will do |
-| Range calendar | `.cal` / `.cal-cell` / `.cal-day` | band on the cell, endpoints on the button; `.is-start` / `.is-end` / `.is-in-range` / `.is-preview` |
+| Calendar | `.cal` / `.cal-head` / `.cal-nav` / `.cal-dow` / `.cal-cell` / `.cal-day` | six full weeks, always; `.is-outside` / `.is-today` / `.is-selected`, and `:disabled` for out of bounds. In dashboard.css §12 since the schedule's publish-time picker became its second user |
+| Range band | `.cal-cell.is-start` / `.is-end` / `.is-in-range` / `.is-preview` / `.cal.is-picking` | all_blogs.css only — band on the cell, endpoints on the button |
+| Time column | `.sched-times` / `.sched-time` | scrolling quarter-hours beside a calendar; passed slots greyed, not removed |
 | Prompt entry | `.prompt-box` / `.prompt-submit` | soft-filled, 28px |
 | Toast | `.custom-toast` | `--elev-3`, gradient progress line |
 | Skeleton | `.skeleton*` | accent-tinted shimmer |
@@ -1083,9 +1251,10 @@ so a typo would otherwise ship silently. `--check` is the CI form.
   or a blog title containing `"` closes the attribute and the rest injects.
   `gallery.js` escapes all five characters, exactly as Jinja's autoescape does —
   which is also what keeps its client markup byte-identical to the server's.
+  `optimization.js`, `newsletter.js` and `schedule.js` escape all five.
   **`all_blogs.js`, `categories.js`, `comments.js`, `activity.js`, `leads.js`,
-  `schedule.js`, `analytics.js` and `site/comments.js` still use the two-line
-  version and still build attributes with it.**
+  `analytics.js` and `site/comments.js` still use the two-line version and still
+  build attributes with it.**
 - **On-media controls do not take a theme.** `--media-*` / `--on-media` are the
   one token group that must not be redefined per theme: what sits behind them is
   a photograph, not a surface, so a light-mode value would put dark chrome on a

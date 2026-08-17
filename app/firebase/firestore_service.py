@@ -1220,8 +1220,16 @@ class FirestoreService:
 
     # ==================== SCHEDULE ENTRIES ====================
 
-    def save_schedule_entry(self, blog_id, title, scheduled_at, author_id, site_owner_id):
-        """Save a schedule entry so it persists on the calendar even after publishing."""
+    def save_schedule_entry(self, blog_id, title, scheduled_at, author_id, site_owner_id,
+                            category=None, author_name=None):
+        """Save a schedule entry so it persists on the calendar even after publishing.
+
+        category / author_name are denormalised on purpose. The calendar reads this
+        collection alone, so without them it would need one blog read per entry plus
+        one user read per author just to label a row — and the route that used to
+        claim those two fields was in fact defaulting every entry to
+        "General" / "Unknown", because nothing had ever written them.
+        """
         try:
             doc_ref = self.db.collection("schedule_entries").document(blog_id)
             doc_ref.set({
@@ -1229,6 +1237,8 @@ class FirestoreService:
                 "title": title,
                 "scheduled_at": scheduled_at,
                 "author_id": author_id,
+                "author_name": author_name or "",
+                "category": category or "",
                 "site_owner_id": site_owner_id,
                 "status": "SCHEDULED",
                 "created_at": datetime.utcnow()

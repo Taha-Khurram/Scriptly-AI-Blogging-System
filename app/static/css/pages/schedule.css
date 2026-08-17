@@ -1,808 +1,1272 @@
 /* ==========================================================================
-   Schedule Page Styles — Weekly Calendar View
+   Schedule — week · month · upcoming
+
+   The screen composes from the shared primitives wherever one exists: the
+   sticky .page-header, .stat-card's full tile contract, .seg-tabs, .surface-card,
+   .data-row, .list-empty, .app-modal, .app-field, .app-btn, .status-pill. What
+   is left here is the calendar geometry itself, which nothing else in the app
+   needs, plus the medallion colours (what a tile means is a page decision).
+
+   The version this replaces re-implemented the header, the stat tiles, the
+   modal chrome and the buttons locally — ~450 lines restating things that had
+   already moved into dashboard.css.
    ========================================================================== */
 
-/* ==================== STATS ROW ==================== */
-.schedule-stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.25rem;
-    margin-bottom: 2rem;
-}
-
-.schedule-stats-row .stat-card {
-    background: var(--surface-1);
+/* ==================== OVERDUE ALERT ====================
+   Not .setup-banner: that name is owned by newsletter.css, and page CSS loads
+   after dashboard.css, so borrowing it would tie this strip to another
+   screen's rules. Same idea, its own block. */
+.sched-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-5);
+    margin-bottom: var(--sp-6);
+    border: 1px solid var(--warning-border);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 1.25rem 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    transition: all 0.2s ease;
+    background: var(--warning-soft);
 }
 
-.schedule-stats-row .stat-card:hover {
-    box-shadow: var(--shadow-card);
-    transform: translateY(-2px);
+.sched-alert[hidden] {
+    display: none;
 }
 
-.schedule-stats-row .stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
+.sched-alert-icon {
     flex-shrink: 0;
-}
-
-.schedule-stats-row .stat-icon.stat-scheduled { background: var(--accent-tint); color: var(--primary-color); }
-.schedule-stats-row .stat-icon.stat-published { background: var(--success-soft); color: var(--success); }
-.schedule-stats-row .stat-icon.stat-month { background: var(--info-soft); color: var(--info); }
-
-.schedule-stats-row .stat-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.schedule-stats-row .stat-count {
-    font-size: 1.5rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    line-height: 1.2;
-}
-
-.schedule-stats-row .stat-label {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    font-weight: 500;
-}
-
-/* ==================== ADD SCHEDULE BUTTON ==================== */
-.btn-add-schedule {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.65rem 1.5rem;
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: var(--elev-2);
-}
-
-.btn-add-schedule:hover {
-    background: var(--accent-hover);
-    transform: translateY(-1px);
-    box-shadow: var(--elev-2);
-}
-
-/* ==================== WEEK NAVIGATION ==================== */
-.schedule-calendar-nav {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 1rem 1.75rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-}
-
-.calendar-week-title {
-    font-size: 1.05rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    min-width: 220px;
-    text-align: center;
-    margin: 0;
-}
-
-.btn-nav {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    color: var(--text-muted);
-}
-
-.btn-nav:hover {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    border-color: var(--primary-color);
-    box-shadow: var(--elev-2);
-}
-
-.btn-today {
-    padding: 0.4rem 1rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-1);
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-today:hover {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    border-color: var(--primary-color);
-}
-
-/* ==================== WEEKLY CALENDAR GRID ==================== */
-.weekly-calendar {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    overflow: hidden;
-}
-
-.calendar-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 3.5rem 1rem;
-}
-
-.calendar-grid {
     display: grid;
-    grid-template-columns: 90px repeat(7, 1fr);
-    min-height: 420px;
-}
-
-/* Day headers */
-.calendar-header-row {
-    display: contents;
-}
-
-.calendar-header-spacer {
-    background: var(--surface-2);
-    border-bottom: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-}
-
-.calendar-day-header {
-    padding: 1rem 0.5rem;
-    text-align: center;
-    background: var(--surface-2);
-    border-bottom: 1px solid var(--border);
-    border-right: 1px solid var(--border-subtle);
-}
-
-.calendar-day-header:last-child {
-    border-right: none;
-}
-
-.calendar-day-header .day-name {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.calendar-day-header .day-number {
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    margin-top: 0.15rem;
-}
-
-.calendar-day-header.is-today .day-number {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
+    place-items: center;
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-top: 0.15rem;
-}
-
-/* Time block rows */
-.calendar-time-row {
-    display: contents;
-}
-
-.calendar-time-label {
-    padding: 1rem 0.75rem;
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border-subtle);
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    background: var(--surface-2);
-}
-
-.calendar-cell {
-    border-right: 1px solid var(--border-subtle);
-    border-bottom: 1px solid var(--border-subtle);
-    padding: 0.5rem;
-    min-height: 120px;
-    position: relative;
-    transition: background 0.15s ease;
-}
-
-.calendar-cell:last-child {
-    border-right: none;
-}
-
-.calendar-cell:hover {
-    background: var(--surface-2);
-}
-
-/* ==================== EVENT BLOCKS ==================== */
-.calendar-event {
-    background: var(--accent-tint);
-    border-left: 4px solid var(--primary-color);
-    border-radius: var(--radius-xs);
-    padding: 0.45rem 0.6rem;
-    margin-bottom: 0.35rem;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    position: relative;
-}
-
-.calendar-event:hover {
-    background: var(--accent-tint);
-    box-shadow: var(--elev-2);
-    transform: translateY(-1px);
-}
-
-/* Published (green) variant */
-.calendar-event.calendar-event-published {
-    background: var(--success-soft);
-    border-left-color: var(--success);
-}
-
-.calendar-event.calendar-event-published:hover {
-    background: var(--success-soft);
-    box-shadow: var(--elev-2);
-}
-
-.calendar-event-title {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.3;
-}
-
-.calendar-event-time {
-    font-size: 0.65rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    margin-top: 0.1rem;
-}
-
-/* Event dropdown */
-.calendar-event .event-dropdown {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-}
-
-.calendar-event:hover .event-dropdown {
-    opacity: 1;
-}
-
-.event-dropdown .btn-event-menu {
-    width: 22px;
-    height: 22px;
-    border: none;
     background: var(--surface-1);
-    border-radius: var(--radius-xs);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 0.7rem;
-    color: var(--text-muted);
+    color: var(--warning);
+    font-size: 15px;
 }
 
-.event-dropdown .btn-event-menu:hover {
-    background: var(--surface-1);
-    color: var(--text-strong);
-}
-
-.event-dropdown .dropdown-menu {
-    border: none;
-    border-radius: var(--radius-sm);
-    box-shadow: var(--elev-2);
-    padding: 0.4rem;
-    min-width: 180px;
-    font-size: 0.82rem;
-}
-
-.event-dropdown .dropdown-item {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.55rem 0.85rem;
-    border-radius: var(--radius-xs);
-    font-weight: 500;
-    color: var(--text-1);
-    transition: all 0.15s ease;
-}
-
-.event-dropdown .dropdown-item:hover {
-    background: var(--surface-2);
-}
-
-.event-dropdown .dropdown-item i {
-    font-size: 0.85rem;
-    width: 16px;
-    text-align: center;
-}
-
-.event-dropdown .dropdown-item.text-danger { color: var(--danger); }
-.event-dropdown .dropdown-item.text-danger:hover { background: var(--danger-soft); }
-
-/* ==================== EMPTY STATE ==================== */
-.calendar-empty {
-    padding: 3.5rem 1rem;
-    text-align: center;
-    grid-column: 1 / -1;
-}
-
-.calendar-empty i {
-    font-size: 2.5rem;
-    color: var(--text-faint);
-    margin-bottom: 0.75rem;
-    display: block;
-}
-
-.calendar-empty p {
-    color: var(--text-faint);
-    font-weight: 500;
-    font-size: 0.9rem;
-    margin: 0;
-}
-
-.calendar-empty .empty-sub {
-    font-weight: 500;
-    font-size: 0.82rem;
-    margin-top: 0.35rem;
-}
-
-/* ==================== MODALS ==================== */
-.custom-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid var(--border-subtle);
-}
-
-.custom-modal-title {
-    font-size: 1.25rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin: 0;
-}
-
-.custom-modal-title i { color: var(--primary-color); }
-
-.custom-modal-body {
-    padding: 1.5rem 2rem;
-    background: var(--surface-1);
-}
-
-.custom-modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding: 1rem 2rem;
-    border-top: 1px solid var(--border-subtle);
-}
-
-.btn-modal {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.6rem 1.25rem;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-modal-secondary {
-    background: var(--surface-3);
-    color: var(--text-muted);
-}
-
-.btn-modal-secondary:hover {
-    background: var(--surface-3);
-    color: var(--text-1);
-}
-
-.btn-modal-primary {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-}
-
-.btn-modal-primary:hover:not(:disabled) {
-    background: var(--accent-hover);
-    box-shadow: var(--elev-2);
-}
-
-.btn-modal-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.btn-modal-success {
-    background: var(--success);
-    color: var(--text-on-accent);
-}
-
-.btn-modal-success:hover {
-    background: var(--success);
-}
-
-/* ==================== ADD SCHEDULE MODAL ==================== */
-.schedule-modal-search {
-    position: relative;
-    margin-bottom: 1rem;
-}
-
-.schedule-modal-search i {
-    position: absolute;
-    left: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-faint);
-    font-size: 0.9rem;
-}
-
-.schedule-modal-search input {
-    width: 100%;
-    padding: 0.7rem 1rem 0.7rem 2.5rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    color: var(--text-1);
-    background: var(--surface-2);
-    transition: all 0.2s ease;
-}
-
-.schedule-modal-search input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    background: var(--surface-1);
-    box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
-.schedule-blog-list {
-    max-height: 280px;
-    overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--surface-2);
-}
-
-.schedule-blog-list::-webkit-scrollbar {
-    width: 5px;
-}
-
-.schedule-blog-list::-webkit-scrollbar-thumb {
-    background: var(--surface-4);
-    border-radius: var(--radius-sm);
-}
-
-.blog-list-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 2rem;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-}
-
-.blog-list-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.85rem 1.25rem;
-    border-bottom: 1px solid var(--border-subtle);
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.blog-list-item:last-child {
-    border-bottom: none;
-}
-
-.blog-list-item:hover {
-    background: var(--accent-tint);
-}
-
-.blog-list-item.selected {
-    background: var(--accent-tint);
-    border-left: 3px solid var(--primary-color);
-}
-
-.blog-list-item-info {
+.sched-alert-body {
     flex: 1;
     min-width: 0;
 }
 
-.blog-list-item-title {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.sched-alert-title {
+    margin: 0 0 2px;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--warning);
 }
 
-.blog-list-item-meta {
-    font-size: 0.72rem;
-    color: var(--text-faint);
-    margin-top: 0.15rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+.sched-alert-text {
+    margin: 0;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-2);
 }
 
-.blog-list-item-meta i {
-    font-size: 0.7rem;
-}
-
-.blog-status-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.2rem 0.55rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.62rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
+.sched-alert-action {
     flex-shrink: 0;
+    color: var(--warning);
 }
 
-.blog-status-badge.badge-draft {
+.sched-alert-action:hover {
+    background: var(--surface-1);
+    color: var(--warning);
+}
+
+/* ==================== STAT TILES ====================
+   Geometry and medallion colour only — .stat-card itself lives in
+   dashboard.css §12 now that six screens share it. */
+.sched-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-5);
+    margin-bottom: var(--sp-6);
+}
+
+.stat-icon.stat-queued {
+    background: var(--accent-tint);
+    color: var(--accent);
+}
+
+.stat-icon.stat-published {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.stat-icon.stat-next {
     background: var(--info-soft);
     color: var(--info);
 }
 
-.blog-status-badge.badge-review {
+/* "in 3 days" and "Tue, 19 Aug" are words, not figures — at --fs-h1 they wrap
+   the tile. One step down keeps the tile on two lines at every width. */
+.sched-next-value {
+    font-size: var(--fs-h2);
+    line-height: var(--lh-tight);
+}
+
+.sched-next-card .stat-delta {
+    white-space: normal;
+}
+
+/* An overdue queue turns the tile's own figure, not just the banner. */
+.stat-count.is-overdue {
+    color: var(--warning);
+}
+
+/* Not .stat-delta.is-down: that is --danger, which means "this got worse". A
+   post running late is a warning about the job, not a metric moving the wrong
+   way, and the two must not read as the same thing. */
+.stat-delta.is-late {
+    color: var(--warning);
+}
+
+/* ==================== TOOLBAR ==================== */
+.sched-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+    margin-bottom: var(--sp-6);
+}
+
+.sched-range {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+.sched-range[hidden] {
+    display: none;
+}
+
+.sched-nav {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-2);
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.sched-nav:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.sched-nav:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Fixed width so stepping from "1 – 7 Sep" to "29 Sep – 5 Oct" does not shuffle
+   the arrows either side of it. */
+.sched-range-title {
+    min-width: 13rem;
+    margin: 0;
+    text-align: center;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.sched-today {
+    height: 36px;
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-xs);
+}
+
+/* ==================== BODY STATES ====================
+   One attribute owns the region: empty · loading · error · results. Two
+   mechanisms for one question is how a screen ends up showing a spinner over a
+   result set. */
+.sched-card {
+    padding: var(--sp-5);
+}
+
+.sched-state {
+    display: none;
+}
+
+.sched-body[data-state="loading"] .sched-state[data-for="loading"],
+.sched-body[data-state="error"] .sched-state[data-for="error"],
+.sched-body[data-state="empty"] .sched-state[data-for="empty"],
+.sched-body[data-state="results"] .sched-state[data-for="results"] {
+    display: block;
+}
+
+/* ==================== SEARCH NOTE ==================== */
+.sched-searchnote {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+    margin-bottom: var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+}
+
+.sched-searchnote[hidden] {
+    display: none;
+}
+
+/* ==================== A NOTE UNDER A VIEW ==================== */
+.sched-note {
+    margin: var(--sp-5) 0 0;
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--border-subtle);
+    text-align: center;
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+/* ==================== WEEK VIEW ====================
+   Seven day columns, each an ordered stack. The version this replaces split the
+   week into Morning / Afternoon / Evening bands — 21 cells for a queue that is
+   usually three posts, and the band label said nothing the chip's own "9:30 AM"
+   did not already say. */
+.sched-week {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.sched-day {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-left: 1px solid var(--border-subtle);
+}
+
+.sched-day:first-child {
+    border-left: 0;
+}
+
+.sched-day-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--sp-3) var(--sp-2);
+}
+
+.sched-day-name {
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.sched-day-num {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Today is the circled date and nothing else. Washing the whole column in
+   --accent-tint is the obvious move and it is wrong: that is exactly the fill a
+   scheduled event carries, so every chip in today's column disappeared into its
+   own background. */
+.sched-day.is-today .sched-day-num {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+/* A day already gone is context for the ones ahead of it, not a target. */
+.sched-day.is-past .sched-day-name,
+.sched-day.is-past .sched-day-num {
+    color: var(--text-faint);
+}
+
+.sched-day-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-height: 132px;
+    padding: 0 var(--sp-2) var(--sp-3);
+}
+
+/* ==================== EVENT ====================
+   The whole event is the trigger for its own action menu, at every size. The
+   old chip hid a ⋮ button that appeared on hover — unreachable on touch, and
+   invisible to anyone who does not already know it is there. */
+.sched-event {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: var(--sp-2) var(--sp-3);
+    border: 0;
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-xs);
+    background: var(--accent-tint);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.sched-event:hover {
+    box-shadow: var(--elev-2);
+}
+
+.sched-event:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.sched-event-time {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.sched-event-title {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* --- Published: nothing left to do, so nothing to click ----------------- */
+.sched-event.is-published {
+    border-left-color: var(--success);
+    background: var(--success-soft);
+    cursor: default;
+}
+
+.sched-event.is-published:hover {
+    box-shadow: none;
+}
+
+.sched-event.is-published .sched-event-time {
+    color: var(--success);
+}
+
+/* --- Overdue: still queued with its time behind it ---------------------- */
+.sched-event.is-overdue {
+    border-left-color: var(--warning);
+    background: var(--warning-soft);
+}
+
+.sched-event.is-overdue .sched-event-time {
+    color: var(--warning);
+}
+
+/* ==================== MONTH VIEW ==================== */
+.sched-month-dow {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.sched-month-dow span {
+    text-align: center;
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* Six full weeks always, so the card does not change height between a month
+   that spills over five rows and one that spills over six. */
+.sched-month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-auto-rows: minmax(96px, auto);
+}
+
+.sched-month-cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    min-width: 0;
+    padding: var(--sp-2);
+    border-right: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.sched-month-cell:nth-child(7n) {
+    border-right: 0;
+}
+
+.sched-month-cell:nth-last-child(-n+7) {
+    border-bottom: 0;
+}
+
+/* The spill days either side of the month are dated context, not part of it. */
+.sched-month-cell.is-outside {
+    background: var(--surface-2);
+}
+
+.sched-month-cell.is-outside .sched-month-num {
+    color: var(--text-faint);
+}
+
+.sched-month-num {
+    align-self: flex-start;
+    display: grid;
+    place-items: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 4px;
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.sched-month-cell.is-today .sched-month-num {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.sched-month-events {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+/* The wrapper that "+n more" reveals. min-width:0 so a long title inside can
+   ellipsis instead of forcing the cell — and therefore the whole column — wider
+   than its 1fr share. */
+.sched-month-slot {
+    min-width: 0;
+}
+
+.sched-month-slot[hidden] {
+    display: none;
+}
+
+/* One line: time then title, clipped. The month grid answers "which day", and
+   the chip's menu answers everything else. */
+.sched-chip {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    width: 100%;
+    padding: 3px var(--sp-2);
+    border: 0;
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-xs);
+    background: var(--accent-tint);
+    font-family: inherit;
+    font-size: var(--fs-2xs);
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.sched-chip:hover {
+    box-shadow: var(--elev-2);
+}
+
+.sched-chip:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.sched-chip-time {
+    flex-shrink: 0;
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.sched-chip-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-strong);
+}
+
+.sched-chip.is-published {
+    border-left-color: var(--success);
+    background: var(--success-soft);
+    cursor: default;
+}
+
+.sched-chip.is-published:hover {
+    box-shadow: none;
+}
+
+.sched-chip.is-published .sched-chip-time {
+    color: var(--success);
+}
+
+.sched-chip.is-overdue {
+    border-left-color: var(--warning);
+    background: var(--warning-soft);
+}
+
+.sched-chip.is-overdue .sched-chip-time {
+    color: var(--warning);
+}
+
+/* Expands the cell in place rather than opening one more surface to hold three
+   chips. */
+.sched-more {
+    align-self: flex-start;
+    padding: 2px var(--sp-2);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.sched-more:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+/* ==================== UPCOMING (AGENDA) ==================== */
+.sched-agenda-group+.sched-agenda-group {
+    margin-top: var(--sp-6);
+}
+
+.sched-agenda-day {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    margin: 0 0 var(--sp-2);
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.sched-agenda-date {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+}
+
+/* .data-row's default first column is a 36px monogram; here it is a time, which
+   needs the width. Everything else is the shared row. */
+.sched-row {
+    grid-template-columns: 58px minmax(0, 1fr) auto;
+}
+
+.sched-time-mark {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    width: 58px;
+    height: 40px;
+    border-radius: var(--radius-xs);
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.sched-time-mark .sched-time-hm {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    line-height: 1.2;
+}
+
+.sched-time-mark .sched-time-ap {
+    font-size: 0.625rem;
+    letter-spacing: 0.04em;
+}
+
+/* Pinned visible, unlike .row-action's default. On the listings that control is
+   a shortcut to something the ⋮ menu also holds; here it *is* the menu, and the
+   only way to reach reschedule, publish and cancel. A hover-revealed control
+   cannot be the sole route to an action. */
+.sched-row .row-action {
+    opacity: 1;
+}
+
+.sched-row.is-published .sched-time-mark {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.sched-row.is-overdue .sched-time-mark {
     background: var(--warning-soft);
     color: var(--warning);
 }
 
-/* Schedule form section */
-.schedule-form-section {
-    margin-top: 1.25rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--border);
+.status-pill.status-overdue {
+    background: var(--warning-soft);
+    color: var(--warning);
 }
 
-.selected-blog-info {
+.status-pill.status-scheduled {
     background: var(--accent-tint);
-    border-radius: var(--radius-sm);
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--primary-color);
+    color: var(--accent);
+}
+
+/* ==================== EVENT MENU ====================
+   Bootstrap's dropdown machinery on our chrome. Its data-api is delegated off
+   document, so re-rendering the events never needs a constructor call —
+   categories.js broke exactly there, calling `new bootstrap.Dropdown` at module
+   scope before the deferred bundle had loaded. */
+.sched-menu-wrap {
+    position: relative;
+    min-width: 0;
+}
+
+.sched-menu {
+    min-width: 200px;
+    padding: var(--sp-2);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    box-shadow: var(--elev-3);
+}
+
+.sched-menu .dropdown-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-xs);
+    font-size: var(--fs-sm);
+    color: var(--text-1);
 }
 
-.schedule-form-label {
-    font-size: 0.8rem;
-    font-weight: 500;
+.sched-menu .dropdown-item:hover,
+.sched-menu .dropdown-item:focus {
+    background: var(--surface-2);
+    color: var(--text-strong);
+}
+
+.sched-menu .dropdown-item i {
+    width: 16px;
+    font-size: 0.9em;
+    text-align: center;
     color: var(--text-muted);
-    margin-bottom: 0.5rem;
-    display: block;
 }
 
-.schedule-datetime-input {
+.sched-menu .dropdown-item.is-danger {
+    color: var(--danger);
+}
+
+.sched-menu .dropdown-item.is-danger:hover,
+.sched-menu .dropdown-item.is-danger:focus {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.sched-menu .dropdown-item.is-danger i {
+    color: var(--danger);
+}
+
+.sched-menu .dropdown-divider {
+    margin: var(--sp-1) 0;
+    border-top-color: var(--border-subtle);
+}
+
+/* The header of a menu, naming what the actions apply to. */
+.sched-menu-head {
+    padding: var(--sp-1) var(--sp-3) var(--sp-2);
+    font-size: var(--fs-2xs);
+    color: var(--text-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 240px;
+}
+
+/* ==================== SCHEDULE-A-BLOG MODAL ==================== */
+.sched-picker-field {
+    margin-bottom: var(--sp-4);
+}
+
+.sched-picker-field input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.sched-blog-list {
+    max-height: 260px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+
+.sched-blog-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sched-blog-list::-webkit-scrollbar-thumb {
+    background: var(--surface-4);
+    border-radius: var(--radius-pill);
+}
+
+.sched-list-loading {
+    padding: var(--sp-8) var(--sp-4);
+}
+
+.sched-blog-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-3);
     width: 100%;
-    padding: 0.6rem 0.85rem;
+    padding: var(--sp-3) var(--sp-4);
+    border: 0;
+    border-left: 3px solid transparent;
+    background: none;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.sched-blog-item+.sched-blog-item {
+    border-top: 1px solid var(--border-subtle);
+}
+
+.sched-blog-item:hover {
+    background: var(--surface-3);
+}
+
+.sched-blog-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.sched-blog-item.is-selected {
+    border-left-color: var(--accent);
+    background: var(--accent-tint);
+}
+
+.sched-blog-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.sched-blog-title {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sched-blog-meta {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ==================== SCHEDULE FORM ==================== */
+.sched-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    margin-top: var(--sp-5);
+    padding-top: var(--sp-5);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.sched-form[hidden] {
+    display: none;
+}
+
+.sched-chosen {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--accent-tint);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+}
+
+.sched-chosen i {
+    flex-shrink: 0;
+}
+
+.sched-chosen span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sched-current {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: var(--sp-3) 0 var(--sp-4);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.sched-current i {
+    color: var(--text-faint);
+}
+
+/* ==================== PUBLISH-TIME PICKER ====================
+   Calendar beside a column of quarter-hours, with a summary underneath. It
+   replaces <input type="datetime-local">, whose popup the browser draws itself:
+   unstylable, and on a forced dark theme over a light OS it lands as a pale OS
+   widget in the middle of a dark dialog.
+
+   Inline rather than in a popover, because .app-modal-body scrolls and would
+   clip one. The grid is dashboard.css §12's .cal. */
+.sched-when-field {
+    gap: var(--sp-3);
+}
+
+.sched-when {
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    overflow: hidden;
+}
+
+/* Calendar takes the slack; the time column is fixed so "12:45 AM" never wraps
+   and the grid keeps a stable width as the month changes. */
+.sched-when-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 108px;
+    align-items: start;
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+}
+
+.sched-times {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-width: 0;
+}
+
+.sched-times-head {
+    margin: 0;
+    padding-left: var(--sp-1);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* Height matched to the six-week grid beside it, so the two columns end level
+   and the dialog does not grow a ragged bottom edge. */
+.sched-times-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    height: 268px;
+    padding-right: 2px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+.sched-times-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sched-times-list::-webkit-scrollbar-thumb {
+    background: var(--surface-4);
+    border-radius: var(--radius-pill);
+}
+
+.sched-time {
+    flex-shrink: 0;
+    padding: var(--sp-2) var(--sp-3);
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-xs);
+    color: var(--text-1);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.sched-time:hover {
+    background: var(--surface-3);
+}
+
+.sched-time:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.sched-time.is-selected {
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-weight: var(--fw-medium);
+}
+
+/* Already gone by, on today's date. Greyed rather than dropped, so the column
+   does not silently start at an arbitrary row. */
+.sched-time:disabled {
+    color: var(--text-faint);
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.sched-time:disabled:hover {
+    background: none;
+}
+
+/* Every slot on the chosen day has passed — the column would otherwise be a
+   scrollable list of nothing but dead rows. */
+.sched-times-none {
+    margin: 0;
+    padding: var(--sp-4) var(--sp-2);
+    text-align: center;
+    font-size: var(--fs-2xs);
+    line-height: var(--lh-body);
+    color: var(--text-faint);
+}
+
+.sched-when-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: var(--sp-3) var(--sp-4);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+/* Complete and valid: the line stops being an instruction and becomes the
+   statement of what the confirm button will do. */
+.sched-when-summary.is-set {
+    color: var(--text-2);
+}
+
+.sched-when-summary.is-set strong {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+/* A real element, not a ::before with a hardcoded codepoint: the icon font's
+   private-use mappings are not a stable contract, and a wrong one renders as a
+   tofu box with nothing to explain it. */
+.sched-when-summary>i {
+    flex-shrink: 0;
+    font-size: 0.9em;
+    color: var(--text-faint);
+}
+
+.sched-when-summary.is-set>i {
+    color: var(--accent);
+}
+
+/* ==================== BEST-TIME SUGGESTIONS ==================== */
+.sched-besttime {
+    padding: var(--sp-4);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+
+.sched-besttime-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+}
+
+.sched-besttime-head i {
+    color: var(--accent);
+}
+
+.sched-besttime-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.sched-besttime-loading {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+/* Where the numbers came from, stated before the numbers. A recommendation from
+   28 days of the reader's own analytics and one from a general rule of thumb
+   are not the same claim. */
+.sched-besttime-source {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-1);
+    font-size: var(--fs-2xs);
+    color: var(--text-muted);
+}
+
+.sched-besttime-source .bi-check-circle-fill {
+    color: var(--success);
+}
+
+.sched-besttime-source .bi-lightbulb-fill {
+    color: var(--info);
+}
+
+.sched-besttime-source.is-warning {
+    color: var(--warning);
+}
+
+.sched-besttime-source.is-warning i {
+    color: var(--warning);
+}
+
+.sched-slots {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--sp-2);
+}
+
+.sched-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--sp-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    color: var(--text-1);
     background: var(--surface-1);
-    transition: all 0.2s ease;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-base);
 }
 
-.schedule-datetime-input:focus {
+.sched-slot:hover {
+    border-color: var(--accent);
+    background: var(--accent-tint);
+}
+
+.sched-slot:focus-visible {
     outline: none;
-    border-color: var(--primary-color);
+    border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
-/* ==================== BEST TIME SUGGESTIONS ==================== */
-.best-time-container {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 1rem;
+.sched-slot.is-applied {
+    border-color: var(--accent);
+    background: var(--accent-soft);
 }
 
-.best-time-header {
+.sched-slot-when {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    margin-bottom: 0.75rem;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
 }
 
-.best-time-header i {
-    color: var(--primary-color);
+.sched-slot-when i {
+    color: var(--accent);
 }
 
-.best-time-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.best-time-chip {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.2rem;
-    padding: 0.5rem 0.85rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-1);
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text-1);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.best-time-chip:hover {
-    border-color: var(--primary-color);
-    background: var(--accent-tint);
-    color: var(--primary-color);
-}
-
-.best-time-chip i {
-    color: var(--primary-color);
-}
-
-.best-time-score {
-    font-size: 0.7rem;
-    font-weight: 400;
+.sched-slot-why {
+    font-size: var(--fs-2xs);
+    line-height: var(--lh-body);
     color: var(--text-muted);
 }
 
-.best-time-loading {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    padding: 0.25rem 0;
+.sched-slot-date {
+    font-size: var(--fs-2xs);
+    color: var(--text-faint);
 }
-
-.best-time-source {
-    display: block;
-    width: 100%;
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    margin-bottom: 0.5rem;
-}
-
-.best-time-source i { font-size: 0.7rem; }
-.best-time-source .bi-check-circle-fill { color: var(--success); }
-.best-time-source .bi-lightbulb-fill { color: var(--warning); }
-.best-time-source-warning { color: var(--warning); }
-.best-time-source-warning i { color: var(--warning); }
 
 /* ==================== RESPONSIVE ==================== */
-@media (max-width: 1200px) {
-    .schedule-stats-row {
-        grid-template-columns: repeat(3, 1fr);
+@media (max-width: 1100px) {
+    .sched-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    /* Odd tile out takes the full row rather than leaving a hole. */
+    .sched-next-card {
+        grid-column: 1 / -1;
     }
 }
 
-@media (max-width: 992px) {
-    .calendar-grid {
-        grid-template-columns: 70px repeat(7, 1fr);
+@media (max-width: 940px) {
+
+    /* Seven columns of ~90px stops being a calendar and starts being a
+       spreadsheet. The week becomes day rows: the head moves to the left, the
+       stack of events to the right. */
+    .sched-week {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sp-1);
     }
 
-    .calendar-cell {
-        min-height: 90px;
-        padding: 0.35rem;
+    .sched-day {
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr);
+        align-items: start;
+        gap: var(--sp-3);
+        padding: var(--sp-2);
+        border-left: 0;
     }
 
-    .calendar-event-title {
-        font-size: 0.68rem;
+    .sched-day+.sched-day {
+        border-top: 1px solid var(--border-subtle);
+    }
+
+    .sched-day-head {
+        flex-direction: row;
+        align-items: center;
+        gap: var(--sp-2);
+        padding: var(--sp-2) 0;
+    }
+
+    .sched-day-body {
+        min-height: 0;
+        padding: var(--sp-1) 0;
+    }
+
+    .sched-day-body:empty::after {
+        content: '—';
+        font-size: var(--fs-xs);
+        color: var(--text-faint);
+    }
+
+    .sched-event-title {
+        -webkit-line-clamp: 1;
+        line-clamp: 1;
+    }
+
+    .sched-month-grid {
+        grid-auto-rows: minmax(76px, auto);
+    }
+
+    .sched-chip-time {
+        display: none;
     }
 }
 
 @media (max-width: 768px) {
-    .schedule-stats-row {
-        grid-template-columns: 1fr;
+    .sched-stats {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .schedule-calendar-nav {
+    .sched-toolbar {
+        justify-content: center;
+    }
+
+    .sched-range {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .sched-range-title {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .sched-card {
+        padding: var(--sp-4);
+    }
+
+    .sched-alert {
         flex-wrap: wrap;
-        padding: 1rem;
     }
 
-    .calendar-grid {
-        grid-template-columns: 60px repeat(7, 1fr);
+    /* The two columns stop fitting side by side inside the dialog. The time
+       column becomes a short horizontal shelf under the grid — still ours, still
+       able to disable the slots that have gone by. */
+    .sched-when-body {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .calendar-day-header {
-        padding: 0.75rem 0.25rem;
+    .sched-times-list {
+        height: auto;
+        max-height: 132px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+        gap: var(--sp-1);
+        padding-top: var(--sp-1);
     }
 
-    .calendar-day-header .day-name {
-        font-size: 0.65rem;
-    }
-
-    .calendar-day-header .day-number {
-        font-size: 0.9rem;
-    }
-
-    .calendar-cell {
-        min-height: 70px;
-        padding: 0.25rem;
-    }
-
-    .calendar-time-label {
-        font-size: 0.65rem;
-        padding: 0.5rem 0.25rem;
+    /* Clears the 32px icon plus the row's gap, so the button lines up under the
+       text rather than under the medallion. */
+    .sched-alert-action {
+        margin-left: calc(32px + var(--sp-4));
     }
 }
 
-/* ==================== EMPTY BLOGS LIST ==================== */
-.blog-list-empty {
-    text-align: center;
-    padding: 2rem 1rem;
-    color: var(--text-faint);
-    font-size: 0.85rem;
-    font-weight: 500;
-}
+@media (max-width: 640px) {
 
-.blog-list-empty i {
-    font-size: 1.5rem;
-    display: block;
-    margin-bottom: 0.5rem;
-    color: var(--text-faint);
+    /* An empty day is a row of nothing at this width. The week's own "nothing
+       scheduled" note still covers the case where every day is empty. */
+    .sched-day.is-empty:not(.is-today) {
+        display: none;
+    }
+
+    .sched-month-num {
+        min-width: 20px;
+        height: 20px;
+        font-size: var(--fs-2xs);
+    }
+
+    .sched-chip-title {
+        font-size: 0.625rem;
+    }
+
+    .sched-row {
+        grid-template-columns: 48px minmax(0, 1fr) auto;
+    }
+
+    .sched-time-mark {
+        width: 48px;
+    }
 }

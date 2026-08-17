@@ -3409,6 +3409,151 @@ pre {
     color: var(--text-faint);
 }
 
+/* --- Calendar ----------------------------------------------------------
+   A month grid we draw ourselves. `<input type="date">` brings the browser's
+   own popup, which is unstylable — square corners and an OS-blue highlight
+   dropped into the middle of a rounded, tokenised screen, and on a forced dark
+   theme over a light OS it renders white-on-blue. Every calendar in the app is
+   therefore this grid over a hidden input that holds the value.
+
+   Lived in all_blogs.css until the schedule's publish-time picker became its
+   second user. What stayed behind there is only the *range* vocabulary
+   (`.is-start` / `.is-end` / `.is-in-range` / `.is-preview` / `.is-picking`),
+   because a range is the specialisation; a single selected day is the general
+   case and lives here.
+
+   Six full weeks always render, so a grid never changes height as the month
+   changes — a picker that resizes under the pointer loses the day you were
+   about to click.
+   ------------------------------------------------------------------------ */
+
+.cal {
+    user-select: none;
+}
+
+.cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+}
+
+.cal-title {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.cal-nav {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-2);
+    font-size: 12px;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.cal-nav:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.cal-nav:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.cal-dow,
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+}
+
+.cal-dow {
+    margin-bottom: var(--sp-1);
+}
+
+.cal-dow span {
+    text-align: center;
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-faint);
+}
+
+/* No column gap: a range band has to be able to run edge to edge. */
+.cal-cell {
+    display: grid;
+    place-items: center;
+    padding: 1px 0;
+}
+
+.cal-day {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-xs);
+    color: var(--text-1);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-standard),
+        color var(--dur-fast) var(--ease-standard);
+}
+
+.cal-day:hover {
+    background: var(--surface-3);
+}
+
+.cal-day:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+/* Days spilling in from the neighbouring months stay pickable but recede. */
+.cal-cell.is-outside .cal-day {
+    color: var(--text-faint);
+}
+
+.cal-cell.is-today .cal-day {
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+/* A single chosen day. The today ring underneath it would just read as a
+   double border, so the fill replaces it. */
+.cal-cell.is-selected .cal-day {
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-weight: var(--fw-medium);
+    box-shadow: none;
+}
+
+.cal-cell.is-selected .cal-day:hover {
+    background: var(--accent-hover);
+}
+
+/* Out of bounds — a publish time in the past, say. Greyed rather than removed,
+   so the month keeps its shape and the reader can see *why* the row starts
+   where it does. `pointer-events: none` would also swallow the title. */
+.cal-day:disabled {
+    color: var(--text-faint);
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.cal-day:disabled:hover {
+    background: none;
+}
+
 /* --- Entrance ---------------------------------------------------------- */
 /* `backwards`, not `both`. Both would keep the final keyframe applied forever,
    and that keyframe sets `transform` — which gives every revealed card a
