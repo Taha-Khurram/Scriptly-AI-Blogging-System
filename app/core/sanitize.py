@@ -22,7 +22,6 @@ is generous -- blog bodies legitimately need tables, figures, code blocks and
 embedded iframes for video. ``BASIC_ALLOWED_TAGS`` covers short prose fields
 where a heading or a table would be a formatting mistake anyway.
 """
-
 from __future__ import annotations
 
 import logging

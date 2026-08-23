@@ -20,7 +20,6 @@ the original code: it stops a signed-in non-admin from mapping which admin
 routes exist. API calls still get a true 403 because the frontend needs to
 distinguish "not allowed" from "gone".
 """
-
 from __future__ import annotations
 
 import hmac

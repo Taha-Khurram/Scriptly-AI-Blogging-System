@@ -3,6 +3,7 @@ import re
 from app.agents.content_agent import ContentAgent
 from app.agents.formatting_agent import FormattingAgent
 from app.agents.seo_agent import SEOAgent
+from app.services.gemini_client import gemini
 from app.utils.parallel import TimedExecution
 from app.core.logging import get_logger
 
@@ -91,7 +92,9 @@ class BlogAgent:
                 "seo": seo_data if seo_data else {"enabled": False},
                 "metadata": {
                     "word_count": word_count,
-                    "model_used": "gemini-flash-lite-latest",
+                    # Read from the client so this metadata cannot drift
+                    # out of date the next time the model changes.
+                    "model_used": gemini.default_model,
                     "status": "success",
                     "seo_enabled": enable_seo,
                     "humanized": False,

@@ -49,12 +49,20 @@ from app.repositories import (
 
 logger = get_logger(__name__)
 
-# Re-exported: modules imported these helpers from this module before the split.
-from app.repositories._helpers import (  # noqa: E402  (kept for import compatibility)
+# Re-exported for import compatibility: these helpers lived in this module
+# before the split, and tests plus scripts import them from here.
+from app.repositories._helpers import (  # noqa: F401
     _parse_filter_date,
     _safe_asset_url,
     _sanitize_blog_content,
 )
+
+__all__ = [
+    'FirestoreService',
+    '_parse_filter_date',
+    '_safe_asset_url',
+    '_sanitize_blog_content',
+]
 
 
 class FirestoreService(

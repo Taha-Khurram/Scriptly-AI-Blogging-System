@@ -19,12 +19,12 @@ import google.generativeai as genai
 import requests
 import os
 import re
-import math
 import inspect
 from typing import Dict, List, Optional
 from collections import Counter
 from app.utils.cache import cache
 from app.core.logging import get_logger
+from app.services.gemini_client import gemini
 
 logger = get_logger(__name__)
 
@@ -44,8 +44,7 @@ _SUPPORTS_REQUEST_OPTIONS = (
 
 class SEOAgent:
     def __init__(self):
-        genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
+        self.model = gemini.get_model()
 
         # Extended per-call deadline, passed to every generate_content call.
         self._gen_kwargs = {}

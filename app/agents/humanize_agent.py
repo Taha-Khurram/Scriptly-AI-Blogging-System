@@ -2,10 +2,10 @@ import re
 import random
 import inspect
 from google import generativeai as genai
-from flask import current_app
 
 from app.utils.parallel import run_parallel_simple
 from app.core.logging import get_logger
+from app.services.gemini_client import gemini
 
 logger = get_logger(__name__)
 
@@ -195,8 +195,7 @@ class HumanizeAgent:
     """
 
     def __init__(self):
-        genai.configure(api_key=current_app.config['GEMINI_API_KEY'])
-        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
+        self.model = gemini.get_model()
         # gemini-flash-lite-latest is a THINKING model: its internal reasoning tokens
         # are drawn from max_output_tokens BEFORE the visible answer. Measured
         # ~2,500-3,500 thinking tokens per chunk, so a low cap (the old 3072)
@@ -454,8 +453,6 @@ class HumanizeAgent:
         5-pass deterministic post-processing to disrupt AI detection patterns.
         Each pass targets a specific signal that detectors measure.
         """
-        before = len(text.split())
-
         text = self._replace_ai_words(text)
         logger.info(f"Pass 1/5: AI word replacement {len(text.split())} words")
 

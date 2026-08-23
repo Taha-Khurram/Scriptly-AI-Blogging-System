@@ -1,8 +1,8 @@
 import time
 import inspect
 import google.generativeai as genai
-from flask import current_app
 from app.core.logging import get_logger
+from app.services.gemini_client import gemini
 
 logger = get_logger(__name__)
 
@@ -23,9 +23,8 @@ _SUPPORTS_REQUEST_OPTIONS = (
 
 class ContentAgent:
     def __init__(self):
-        genai.configure(api_key=current_app.config['GEMINI_API_KEY'])
         # Using the stable 2026 identifier for speed and quality
-        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
+        self.model = gemini.get_model()
 
     def generate_blog(self, topic):
         """

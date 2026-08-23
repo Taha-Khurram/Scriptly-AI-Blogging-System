@@ -564,7 +564,6 @@ def site_sitemap(site_identifier):
     """
     try:
         from flask import Response
-        from datetime import datetime
 
         user_id, settings = _resolve_site(site_identifier)
         seo_settings = settings.get('seo', {})
@@ -655,7 +654,6 @@ def site_rss_feed(site_identifier):
     """
     try:
         from flask import Response
-        from datetime import datetime
         import html
 
         user_id, settings = _resolve_site(site_identifier)
@@ -782,7 +780,6 @@ def site_rss_feed(site_identifier):
 def site_privacy_policy(site_identifier):
     """Privacy Policy page"""
     try:
-        from datetime import datetime
 
         user_id, settings = _resolve_site(site_identifier)
         legal_settings = settings.get('legal', {})
@@ -824,7 +821,6 @@ def site_privacy_policy(site_identifier):
 def site_terms_of_service(site_identifier):
     """Terms of Service page"""
     try:
-        from datetime import datetime
 
         user_id, settings = _resolve_site(site_identifier)
         legal_settings = settings.get('legal', {})

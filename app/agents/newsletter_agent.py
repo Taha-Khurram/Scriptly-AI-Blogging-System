@@ -1,7 +1,6 @@
 import json
-import google.generativeai as genai
-from config import Config
 from app.core.logging import get_logger
+from app.services.gemini_client import gemini
 
 logger = get_logger(__name__)
 
@@ -13,8 +12,7 @@ class NewsletterAgent:
     """
 
     def __init__(self):
-        genai.configure(api_key=Config.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
+        self.model = gemini.get_model()
 
     def generate_newsletter(self, blogs: list, site_name: str = "My Blog",
                             custom_intro: str = None, topic: str = None):

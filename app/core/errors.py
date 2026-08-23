@@ -18,7 +18,6 @@ Content negotiation matters for a mixed app: the same failure must render an
 HTML error page for a browser navigation and a JSON body for a ``fetch()`` from
 the dashboard. ``_wants_json()`` decides, so no route has to.
 """
-
 from __future__ import annotations
 
 import logging

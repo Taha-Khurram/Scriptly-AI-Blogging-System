@@ -166,7 +166,6 @@ class SemanticSearchAgent:
         """
         query_lower = query.lower().strip()
         words = query_lower.split()
-        word_count = len(words)
 
         # 1. Check for question patterns → INFORMATIONAL
         question_patterns = [

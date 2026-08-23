@@ -122,7 +122,6 @@ def resend_invitation():
     """Resends the invitation email for a pending invitation."""
     data = request.json
     email = data.get('email', '').strip().lower()
-    admin_id = session.get('user_id')
     admin_name = session.get('user_name', 'Admin')
 
     if not email:

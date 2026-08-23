@@ -21,7 +21,6 @@ wrapped: on failure the backend degrades to the in-memory store, logs once, and
 periodically retries. A cache is an optimisation, and behaving as though it is
 simply cold is always safer than propagating the error.
 """
-
 from __future__ import annotations
 
 import logging

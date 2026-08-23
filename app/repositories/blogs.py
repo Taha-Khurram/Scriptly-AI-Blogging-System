@@ -19,7 +19,7 @@ from app.repositories._helpers import _parse_filter_date, _sanitize_blog_content
 from app.utils.cache import cache
 from app.utils.date_utils import ensure_aware, utcnow
 from app.utils.retry import retry_on_unavailable
-from datetime import datetime, timezone
+from datetime import datetime
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 

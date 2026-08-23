@@ -20,7 +20,6 @@ from app.repositories._helpers import _safe_asset_url
 from app.utils.cache import cache
 from app.utils.date_utils import utcnow
 from app.utils.retry import retry_on_unavailable
-from datetime import timezone
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.core.logging import get_logger

@@ -16,7 +16,7 @@ existing call sites are unchanged.
 ``FirestoreService.__init__``.
 """
 from app.utils.date_utils import ensure_aware, utcnow
-from datetime import datetime, timezone
+from datetime import datetime
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 

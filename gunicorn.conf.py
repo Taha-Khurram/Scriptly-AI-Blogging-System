@@ -15,7 +15,6 @@ attached.
 The remaining constraint is the AI task pool, which is still per-process. See
 ``WEB_CONCURRENCY`` below.
 """
-import multiprocessing
 import os
 
 

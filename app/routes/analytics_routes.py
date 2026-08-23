@@ -6,7 +6,7 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, current_app
-from datetime import datetime, timedelta
+from datetime import datetime
 from app.firebase.firestore_service import FirestoreService
 from app.core.security import admin_required
 from app.utils.date_utils import utcnow
@@ -29,7 +29,7 @@ def _get_analytics_config(user_id):
 def _get_credentials(user_id):
     from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request
-    from datetime import datetime, timezone
+    from datetime import timezone
     config = _get_analytics_config(user_id)
     if not config or not config.get('refresh_token'):
         return None
@@ -407,7 +407,6 @@ def disconnect():
 @admin_required
 def list_properties():
     from google.analytics.admin_v1beta import AnalyticsAdminServiceClient
-    from google.api_core import timeout as api_timeout
 
     user_id = session.get('user_id')
     creds = _get_credentials(user_id)

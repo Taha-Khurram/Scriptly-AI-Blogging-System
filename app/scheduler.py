@@ -21,7 +21,6 @@ Jobs are also made non-overlapping (``max_instances=1``) and given a
 ``misfire_grace_time``, so a run that takes longer than the interval queues
 rather than starting a second copy on top of itself.
 """
-
 from __future__ import annotations
 
 import atexit

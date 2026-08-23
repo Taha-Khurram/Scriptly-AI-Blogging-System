@@ -1221,9 +1221,9 @@ def analyze_draft_seo(blog_id):
         if not user_id:
             return jsonify({"success": False, "error": "Unauthorized"}), 401
 
-        data = request.get_json() or {}
-        region = data.get('region', 'PK')
-
+        # No `region` here: analyze_only() scores existing content and takes
+        # no target region. Reading one from the body implied the caller could
+        # influence the result, which it could not.
         # Get the blog
         blog_data = db_service.get_blog_by_id(blog_id)
         if not blog_data:

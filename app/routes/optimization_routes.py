@@ -1,15 +1,27 @@
-from flask import Blueprint, render_template, request, jsonify, session, current_app
-from urllib.parse import urlparse
-import requests
-import google.generativeai as genai
-import os
+"""SEO optimisation tools: keyword research, URL analysis and site audit.
 
-from app.utils.cache import SimpleCache
-from app.firebase.firestore_service import FirestoreService
+Every route here fans out to a paid third-party API (RapidAPI/Ahrefs) or to
+Gemini, so results are cached aggressively -- the same URL analysed twice in an
+hour should cost one upstream call, not two.
+"""
+from urllib.parse import urlparse
+
+import requests
+from flask import Blueprint, current_app, jsonify, render_template, request, session
+
+from app.core.logging import get_logger
 from app.core.security import admin_required
+from app.firebase.firestore_service import FirestoreService
+from app.services.gemini_client import GeminiError, gemini
+# The shared cache, not a private instance. This module previously built its own
+# SimpleCache(), so its entries were invisible to the rest of the application
+# and to every other worker -- meaning a cached audit could not be invalidated,
+# and the same lookup was paid for once per worker.
+from app.utils.cache import cache
+
+logger = get_logger(__name__)
 
 optimization_bp = Blueprint('optimization', __name__)
-_cache = SimpleCache()
 _db = FirestoreService()
 
 AHREFS_HOST = "ahrefs-url-research.p.rapidapi.com"
@@ -84,7 +96,7 @@ def url_metrics():
         return jsonify({"success": False, "error": "Please enter a valid URL."}), 400
 
     cache_key = f"ahrefs_url_metrics:{validated_url}"
-    cached = _cache.get(cache_key)
+    cached = cache.get('seo:' + cache_key)
     if cached:
         return jsonify({"success": True, "data": cached, "cached": True})
 
@@ -127,7 +139,7 @@ def url_metrics():
         data["urlRating"] = page.get("urlRating")
         data["numberOfWordsOnPage"] = page.get("numberOfWordsOnPage")
 
-        _cache.set(cache_key, data, ttl=CACHE_TTL)
+        cache.set('seo:' + cache_key, data, ttl=CACHE_TTL)
         return jsonify({"success": True, "data": data, "cached": False})
 
     except requests.exceptions.Timeout:
@@ -154,7 +166,7 @@ def keyword_metrics():
         country = 'us'
 
     cache_key = f"ahrefs_keyword:{keyword}:{country}"
-    cached = _cache.get(cache_key)
+    cached = cache.get('seo:' + cache_key)
     if cached:
         return jsonify({"success": True, "data": cached, "cached": True})
 
@@ -188,7 +200,7 @@ def keyword_metrics():
         raw = response.json()
         data = raw.get("data", raw) if raw.get("success") else raw
 
-        _cache.set(cache_key, data, ttl=CACHE_TTL)
+        cache.set('seo:' + cache_key, data, ttl=CACHE_TTL)
         return jsonify({"success": True, "data": data, "cached": False})
 
     except requests.exceptions.Timeout:
@@ -204,9 +216,6 @@ def keyword_metrics():
 
 def _extract_keywords_from_content(title, content):
     """Use Gemini to extract focus keywords from blog content."""
-    genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-    model = genai.GenerativeModel('gemini-flash-lite-latest')
-
     prompt = f"""Extract 5 high-value SEO keywords from this blog post.
 Return ONLY a comma-separated list of keywords, nothing else.
 
@@ -218,8 +227,15 @@ Focus on:
 - Long-tail search phrases users would type
 - High commercial/informational intent terms"""
 
-    response = model.generate_content(prompt)
-    text = (response.text or "") if response else ""
+    # Through the shared client for the timeout and retry policy. Keyword
+    # extraction is an enrichment step, so a failure degrades to the title
+    # rather than failing the whole optimisation run.
+    try:
+        text = gemini.generate_text(prompt, label='seo_keywords')
+    except GeminiError:
+        logger.warning('Keyword extraction unavailable; falling back to title')
+        return [title.lower()] if title else []
+
     if not text.strip():
         return [title.lower()] if title else []
     keywords = [kw.strip() for kw in text.split(',') if kw.strip()]
@@ -261,7 +277,7 @@ def draft_keywords():
         country = 'us'
 
     cache_key = f"draft_keywords:{blog_id}:{country}"
-    cached = _cache.get(cache_key)
+    cached = cache.get('seo:' + cache_key)
     if cached:
         return jsonify({"success": True, "data": cached, "cached": True})
 
@@ -303,7 +319,7 @@ def draft_keywords():
             results.append({"keyword": kw, "error": True})
 
     data = {"keywords": results, "blog_title": title}
-    _cache.set(cache_key, data, ttl=CACHE_TTL)
+    cache.set('seo:' + cache_key, data, ttl=CACHE_TTL)
     return jsonify({"success": True, "data": data, "cached": False})
 
 
@@ -332,7 +348,7 @@ def site_audit():
         return jsonify({"success": False, "error": "Please enter a valid domain (e.g., example.com)."}), 400
 
     cache_key = f"site_audit:{domain}"
-    cached = _cache.get(cache_key)
+    cached = cache.get('seo:' + cache_key)
     if cached:
         return jsonify({"success": True, "data": cached, "cached": True})
 
@@ -365,7 +381,7 @@ def site_audit():
             return jsonify({"success": False, "error": f"API returned status {response.status_code}."}), 502
 
         raw = response.json()
-        _cache.set(cache_key, raw, ttl=CACHE_TTL)
+        cache.set('seo:' + cache_key, raw, ttl=CACHE_TTL)
         return jsonify({"success": True, "data": raw, "cached": False})
 
     except requests.exceptions.Timeout:

@@ -21,7 +21,6 @@ What this module adds beyond deduplication:
 * **Model reuse.** ``GenerativeModel`` objects are cached per (model, config)
   so a request does not pay to rebuild one.
 """
-
 from __future__ import annotations
 
 import inspect

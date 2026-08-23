@@ -20,7 +20,6 @@ not cover same-site subdomain attacks. Flask-WTF adds a token check to every
 state-changing request; the token is injected into every page and read back
 from the ``X-CSRFToken`` header by the frontend fetch layer.
 """
-
 from __future__ import annotations
 
 import logging

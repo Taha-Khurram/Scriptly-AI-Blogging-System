@@ -1,8 +1,8 @@
 import json
 import re
 from google import generativeai as genai
-from flask import current_app
 from app.core.logging import get_logger
+from app.services.gemini_client import gemini
 
 logger = get_logger(__name__)
 
@@ -15,8 +15,10 @@ class CommentAgent:
     """
 
     def __init__(self):
-        genai.configure(api_key=current_app.config['GEMINI_API_KEY'])
-        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
+        self.model = gemini.get_model()
+        # Low temperature: moderation must be repeatable. The same comment
+        # judged twice should get the same verdict, or an author sees their
+        # comment accepted on one submission and removed on a retry.
         self.generation_config = genai.types.GenerationConfig(
             temperature=0.3,
             top_p=0.9,

@@ -52,7 +52,6 @@ class ScheduleRepository:
     def get_due_scheduled_blogs(self):
         """Returns blogs that are SCHEDULED and past their scheduled_at time."""
         try:
-            from datetime import timezone
             now = datetime.now(timezone.utc)
             blogs_ref = self.db.collection("blogs")
             docs = (
@@ -79,7 +78,6 @@ class ScheduleRepository:
     def get_all_scheduled_for_calendar(self, site_owner_id):
         """Returns scheduled and published (previously scheduled) blogs for the calendar page."""
         try:
-            from datetime import timezone
             blogs_ref = self.db.collection("blogs")
             results = []
 
