@@ -1,12 +1,20 @@
-from flask import Blueprint, request, jsonify, session
+import re
+
+from flask import Blueprint, jsonify, render_template, request, session
+from google.cloud.firestore_v1.base_query import FieldFilter
+
 from app.agents.newsletter_agent import NewsletterAgent
-from app.services.email_service import EmailService
-from app.firebase.firestore_service import FirestoreService
+from app.core.extensions import limiter
 from app.core.logging import get_logger
+from app.firebase.firestore_service import FirestoreService
+from app.services.email_service import EmailService
 
 logger = get_logger(__name__)
 
 newsletter_bp = Blueprint('newsletter', __name__)
+
+MAX_EMAIL_LENGTH = 254        # RFC 5321 maximum
+EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$')
 
 # Newsletter HTML template (inline for simplicity)
 NEWSLETTER_TEMPLATE = '''
@@ -289,86 +297,109 @@ def get_subscriber_count():
 # ==================== UNSUBSCRIBE (PUBLIC) ====================
 
 @newsletter_bp.route('/unsubscribe', methods=['GET', 'POST'])
+@limiter.limit('10 per minute; 60 per hour')
 def unsubscribe():
+    """Public one-click unsubscribe, reached from a newsletter footer link.
+
+    Deliberately unauthenticated: a recipient must be able to unsubscribe
+    without an account, and requiring one is both hostile and a CAN-SPAM
+    problem. It is rate-limited instead, because each POST is a write and the
+    ownerless path costs a collection query.
+
+    Rendered from a template rather than an f-string: the previous version
+    interpolated the `email` query parameter straight into the markup, which
+    made it a reflected XSS on this origin. Autoescaping removes the whole
+    class of defect rather than patching one instance.
     """
-    Public unsubscribe endpoint.
-    GET: Show unsubscribe confirmation page
-    POST: Process unsubscribe
-    """
-    email = request.args.get('email') or (request.json or {}).get('email')
-    site_owner_id = request.args.get('owner') or (request.json or {}).get('owner')
+    # get_json(silent=True) rather than request.json: the confirm button posts
+    # form-encoded data, and request.json raises UnsupportedMediaType on it --
+    # which is why every unsubscribe attempt used to return 415.
+    payload = request.get_json(silent=True) or {}
+
+    def _field(name):
+        return (
+            request.form.get(name)
+            or request.args.get(name)
+            or payload.get(name)
+            or ''
+        ).strip()
+
+    email = _field('email')[:MAX_EMAIL_LENGTH]
+    owner = _field('owner')[:128]
 
     if request.method == 'GET':
-        # Return simple HTML page for unsubscribe confirmation
-        return f'''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Unsubscribe</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }}
-                .btn {{ background: #4318FF; color: white; padding: 12px 24px; border: none; cursor: pointer; font-size: 16px; }}
-                .btn:hover {{ background: #3614CC; }}
-                .success {{ color: green; }}
-                .error {{ color: red; }}
-            </style>
-        </head>
-        <body>
-            <h2>Unsubscribe from Newsletter</h2>
-            <p>Email: <strong>{email or "Not provided"}</strong></p>
-            <form method="POST">
-                <input type="hidden" name="email" value="{email or ""}">
-                <input type="hidden" name="owner" value="{site_owner_id or ""}">
-                <button type="submit" class="btn">Confirm Unsubscribe</button>
-            </form>
-        </body>
-        </html>
-        '''
+        return render_template(
+            'newsletter/unsubscribe.html',
+            state='confirm',
+            heading='Unsubscribe from newsletter',
+            email=email,
+            owner=owner,
+        )
 
-    # POST - process unsubscribe
-    if not email:
-        return '<p class="error">Email is required</p>', 400
+    if not email or not EMAIL_RE.match(email):
+        return render_template(
+            'newsletter/unsubscribe.html',
+            state='error',
+            heading='That address does not look right',
+            message='Go back to the link in your email and try again.',
+        ), 400
 
     try:
-        firestore = FirestoreService()
+        removed = _unsubscribe_everywhere(email, owner)
+    except Exception:
+        logger.exception('Unsubscribe failed', extra={'owner': owner or None})
+        return render_template(
+            'newsletter/unsubscribe.html',
+            state='error',
+            heading='Something went wrong',
+            message='We could not process that just now. Please try again shortly.',
+        ), 500
 
-        # Find and unsubscribe
-        if site_owner_id:
-            success = firestore.unsubscribe_newsletter(site_owner_id, email)
-        else:
-            # Try to find the subscriber across all owners
-            docs = firestore.db.collection('newsletter_subscribers')\
-                .where('email', '==', email.lower())\
-                .where('active', '==', True)\
-                .limit(1)\
-                .stream()
+    if removed:
+        logger.info('Subscriber unsubscribed', extra={'owner': owner or None})
+        return render_template(
+            'newsletter/unsubscribe.html',
+            state='done',
+            heading='Unsubscribed',
+            message='You have been removed from the newsletter.',
+        )
 
-            for doc in docs:
-                data = doc.to_dict()
-                owner_id = data.get('site_owner_id')
-                if owner_id:
-                    success = firestore.unsubscribe_newsletter(owner_id, email)
-                    break
-            else:
-                success = False
+    # Deliberately the same wording as success. Saying "that address is not on
+    # our list" would turn this open endpoint into a subscriber-enumeration
+    # oracle, and the outcome the user cares about -- no more email -- holds
+    # either way.
+    return render_template(
+        'newsletter/unsubscribe.html',
+        state='done',
+        heading='Unsubscribed',
+        message='You have been removed from the newsletter.',
+    )
 
-        if success:
-            return '''
-            <html><body style="font-family: Arial; text-align: center; padding: 50px;">
-                <h2 style="color: green;">Successfully Unsubscribed</h2>
-                <p>You have been removed from the newsletter.</p>
-            </body></html>
-            '''
-        else:
-            return '''
-            <html><body style="font-family: Arial; text-align: center; padding: 50px;">
-                <h2 style="color: orange;">Email Not Found</h2>
-                <p>This email was not found in our subscriber list.</p>
-            </body></html>
-            '''
 
-    except Exception as e:
-        return f'<p class="error">Error: {e}</p>', 500
+def _unsubscribe_everywhere(email, owner=None):
+    """Deactivate ``email``, for one owner if known or wherever it is found.
+
+    With an owner it is a single indexed lookup. Without one -- an older link
+    that omits the parameter -- it falls back to a bounded query rather than
+    scanning the whole collection.
+    """
+    db = FirestoreService()
+
+    if owner:
+        return bool(db.unsubscribe_newsletter(owner, email))
+
+    query = (
+        db.db.collection('newsletter_subscribers')
+        .where(filter=FieldFilter('email', '==', email.lower()))
+        .where(filter=FieldFilter('active', '==', True))
+        .limit(10)
+    )
+    removed = False
+    for doc in query.stream():
+        owner_id = (doc.to_dict() or {}).get('site_owner_id')
+        if owner_id and db.unsubscribe_newsletter(owner_id, email):
+            removed = True
+    return removed
 
 
 # ==================== NEWSLETTER HISTORY ====================

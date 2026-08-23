@@ -52,6 +52,10 @@ CSRF_EXEMPT_ENDPOINTS = frozenset((
     'site_bp.site_subscribe',
     'site_bp.site_semantic_search',
     'site_bp.site_submit_comment',
+    # Public one-click unsubscribe, reached from a link in an email. There is
+    # no session and therefore no ambient authority for a CSRF token to
+    # protect; it is rate-limited instead.
+    'newsletter.unsubscribe',
 ))
 
 

@@ -62,7 +62,7 @@ class BlogRepository:
     def create_draft(self, blog_data, user_id):
         """Saves blog as DRAFT, increments category count, and generates unique slug."""
         try:
-            from app.utils.slug_utils import generate_slug, ensure_unique_slug
+            from app.utils.slug_utils import generate_slug
 
             blog_data['created_at'] = firestore.SERVER_TIMESTAMP
             blog_data['updated_at'] = utcnow()
@@ -77,8 +77,7 @@ class BlogRepository:
             site_owner = blog_data['site_owner_id']
             title = blog_data.get('title', 'Untitled')
             base_slug = generate_slug(title)
-            existing_slugs = self._get_user_slugs(site_owner)
-            blog_data['slug'] = ensure_unique_slug(base_slug, existing_slugs)
+            blog_data['slug'] = self._unique_slug_for(site_owner, base_slug)
             blog_data['old_slugs'] = []
             blog_data['numeric_id'] = self._get_next_numeric_id(site_owner)
 
@@ -113,7 +112,7 @@ class BlogRepository:
         Also handles SEO meta title and description fields.
         """
         try:
-            from app.utils.slug_utils import generate_slug, ensure_unique_slug
+            from app.utils.slug_utils import generate_slug
 
             doc_ref = self.db.collection(self.collection_name).document(blog_id)
             doc = doc_ref.get()
@@ -147,10 +146,9 @@ class BlogRepository:
                 base_slug = generate_slug(title)
                 user_id = current_data.get('site_owner_id') or current_data.get('author_id')
                 if user_id:
-                    existing_slugs = self._get_user_slugs(user_id)
-                    # Remove current slug from existing to allow keeping it
-                    existing_slugs.discard(current_slug)
-                    slug_to_set = ensure_unique_slug(base_slug, existing_slugs)
+                    slug_to_set = self._unique_slug_for(
+                        user_id, base_slug, exclude_blog_id=blog_id
+                    )
                 else:
                     slug_to_set = base_slug
 
@@ -632,10 +630,71 @@ class BlogRepository:
             logger.exception(f"Error fetching blog by slug {slug}")
             return None
 
-    def _get_user_slugs(self, user_id):
+    def _slug_taken(self, user_id, slug, exclude_blog_id=None):
+        """Whether ``slug`` is already used by this site owner.
+
+        One indexed equality query. ``exclude_blog_id`` lets a post keep its own
+        slug while its title is edited -- without it, saving a post without
+        renaming it would see its own slug as taken and append "-2" on every
+        save.
         """
-        Gets all existing slugs for a user's blogs (for uniqueness check).
-        Returns a set of slugs.
+        try:
+            query = (
+                self.db.collection(self.collection_name)
+                .where(filter=FieldFilter('site_owner_id', '==', user_id))
+                .where(filter=FieldFilter('slug', '==', slug))
+                .limit(2 if exclude_blog_id else 1)
+                .select([])
+            )
+            for doc in query.stream():
+                if exclude_blog_id and doc.id == exclude_blog_id:
+                    continue
+                return True
+            return False
+        except Exception:
+            # Failing closed here would block publishing entirely on a
+            # transient error. Treating the slug as free risks a duplicate,
+            # which is a cosmetic URL collision rather than lost work -- and
+            # _ensure_blog_slug already tolerates one.
+            logger.exception('Slug availability check failed')
+            return False
+
+    def _unique_slug_for(self, user_id, base_slug, exclude_blog_id=None):
+        """A slug not already used by this owner, suffixing only if needed.
+
+        Replaces the previous approach of streaming every one of the owner's
+        blog documents to build a set of slugs -- 500 reads for a 500-post site,
+        on every draft creation and every title change. Candidates are probed in
+        order, so the common case (a free slug) costs exactly one read.
+
+        The probe count is bounded: after 25 collisions it falls back to a
+        random suffix rather than continuing to query. Twenty-five posts sharing
+        one title means the numbering is not meaningful anyway, and an unbounded
+        loop here would be a read-amplification hazard driven by user input.
+        """
+        if not self._slug_taken(user_id, base_slug, exclude_blog_id):
+            return base_slug
+
+        for counter in range(2, 26):
+            candidate = f'{base_slug}-{counter}'
+            if not self._slug_taken(user_id, candidate, exclude_blog_id):
+                return candidate
+
+        import uuid
+        fallback = f'{base_slug}-{uuid.uuid4().hex[:6]}'
+        logger.info(
+            'Slug base exhausted after 24 probes; using a random suffix',
+            extra={'base_slug': base_slug},
+        )
+        return fallback
+
+    def _get_user_slugs(self, user_id):
+        """Every slug this owner uses.
+
+        Retained only for callers that genuinely need the whole set (there are
+        none in the application today; a reporting script might). Prefer
+        :meth:`_unique_slug_for`, which answers the uniqueness question in one
+        read instead of one per post.
         """
         try:
             slugs = set()
@@ -686,7 +745,7 @@ class BlogRepository:
             return blog_data
 
         try:
-            from app.utils.slug_utils import generate_slug, ensure_unique_slug
+            from app.utils.slug_utils import generate_slug
 
             title = blog_data.get('title', 'Untitled')
             base_slug = generate_slug(title)
@@ -694,8 +753,9 @@ class BlogRepository:
             # Get existing slugs for this user
             user_id = blog_data.get('site_owner_id') or blog_data.get('author_id')
             if user_id:
-                existing_slugs = self._get_user_slugs(user_id)
-                slug = ensure_unique_slug(base_slug, existing_slugs)
+                slug = self._unique_slug_for(
+                    user_id, base_slug, exclude_blog_id=blog_id
+                )
             else:
                 slug = base_slug
 

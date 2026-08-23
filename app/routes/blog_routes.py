@@ -11,6 +11,9 @@ from app.utils.date_utils import (
 )
 from app.utils.slug_utils import PERMALINK_STRUCTURES
 from app.utils.task_manager import task_manager
+from app.core.errors import AppError, ValidationError
+from app.core.extensions import limiter
+from app.core.security import api_login_required, current_user
 from datetime import datetime
 import math
 import markdown
@@ -21,6 +24,10 @@ logger = get_logger(__name__)
 
 blog_bp = Blueprint('blog', __name__)
 db_service = FirestoreService()
+
+# Ceiling on a generation prompt. Prompt length drives token spend, and the
+# field was previously unbounded -- a megabyte of text in one request.
+MAX_PROMPT_LENGTH = 2000
 
 
 # ---------------------------------------------------
@@ -367,39 +374,53 @@ def update_blog(blog_id):
 
 
 @blog_bp.route('/api/generate', methods=['POST'])
+@api_login_required
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_AI_GENERATE', '30 per hour'))
 def generate_and_submit():
-    try:
-        user_id = session.get('user_id')
-        user_name = session.get('user_name', 'User')
-        user_role = session.get('user_role')
+    """Queue a blog generation and return a task id to poll.
 
-        if not user_id:
-            return jsonify({"success": False, "error": "User session expired"}), 401
+    Rate-limited per user rather than per IP: one call is minutes of model work,
+    so the budget belongs to the account, and keying by address would let one
+    user multiply their allowance by rotating networks.
 
-        data = request.get_json()
-        prompt = data.get('prompt')
-        auto_submit = data.get('auto_submit', False)
+    ``create_task`` raises CapacityError when the queue is full; that propagates
+    to the error handler as a 503 with a Retry-After. Deliberately not caught
+    here -- the previous code would have reported it as a generic 500, telling
+    the user something broke when in fact they should simply retry.
+    """
+    user = current_user()
+    data = request.get_json(silent=True) or {}
 
-        if not prompt:
-            return jsonify({"success": False, "error": "Prompt is required"}), 400
-
-        app = current_app._get_current_object()
-        task_id = task_manager.create_task(user_id)
-        task_manager.submit(
-            task_id, _run_generation_task,
-            app=app,
-            user_id=user_id,
-            user_name=user_name,
-            user_role=user_role,
-            prompt=prompt,
-            auto_submit=auto_submit
+    prompt = (data.get('prompt') or '').strip()
+    if not prompt:
+        raise ValidationError('A prompt is required.')
+    if len(prompt) > MAX_PROMPT_LENGTH:
+        raise ValidationError(
+            f'Prompt must be {MAX_PROMPT_LENGTH} characters or fewer.'
         )
 
-        return jsonify({"success": True, "task_id": task_id}), 202
+    app = current_app._get_current_object()
+    task_id = task_manager.create_task(user.id, kind='generation')
+    task_manager.submit(
+        task_id, _run_generation_task,
+        app=app,
+        user_id=user.id,
+        user_name=user.name or 'User',
+        user_role=user.role,
+        prompt=prompt,
+        auto_submit=bool(data.get('auto_submit', False)),
+    )
 
-    except Exception as e:
-        logger.exception("Route Error in Generate")
-        return jsonify({"success": False, "error": str(e)}), 500
+    logger.info(
+        'Blog generation queued',
+        extra={'task_id': task_id, 'user_id': user.id,
+               'prompt_chars': len(prompt)},
+    )
+    return jsonify({
+        'success': True,
+        'task_id': task_id,
+        'queue_position': task_manager.queue_position(task_id),
+    }), 202
 
 
 def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, auto_submit):
@@ -505,27 +526,35 @@ def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, au
 
 @blog_bp.route('/api/generate/status/<task_id>', methods=['GET'])
 def generation_status(task_id):
-    user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({"error": "Session expired"}), 401
+    """Progress for one background job.
 
-    task = task_manager.get_task(task_id)
-    if not task:
-        return jsonify({"error": "Task not found or expired"}), 404
+    get_task_for_user raises NotFound for both "no such task" and "not yours",
+    so polling cannot be used to discover that another user's task id exists.
+    The previous version returned 403 for someone else's task, which confirmed
+    it did.
+    """
+    task = task_manager.get_task_for_user(task_id, current_user().id)
 
-    if task['user_id'] != user_id:
-        return jsonify({"error": "Unauthorized"}), 403
+    payload = {
+        'status': task['status'],
+        'progress': task['progress'],
+        'stage': task['stage'],
+        'result': task.get('result'),
+        'error': task.get('error'),
+        'error_code': task.get('error_code'),
+    }
 
-    return jsonify({
-        "status": task['status'],
-        "progress": task['progress'],
-        "stage": task['stage'],
-        "result": task.get('result'),
-        "error": task.get('error')
-    })
+    # Tell a waiting user where they are instead of leaving them watching a
+    # progress bar that has not moved.
+    if task['status'] == 'pending':
+        payload['queue_position'] = task_manager.queue_position(task_id)
+
+    return jsonify(payload)
 
 
 @blog_bp.route('/api/humanize/<blog_id>', methods=['POST'])
+@api_login_required
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_AI_GENERATE', '30 per hour'))
 def humanize_draft(blog_id):
     """
     Kick off humanization of an existing draft in the background and return a
@@ -534,12 +563,21 @@ def humanize_draft(blog_id):
     by an HTTP/server timeout while the model runs.
     """
     try:
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({"success": False, "error": "User session expired"}), 401
+        user = current_user()
+        user_id = user.id
 
         blog_data = db_service.get_blog_by_id(blog_id)
         if not blog_data:
+            return jsonify({"success": False, "error": "Blog not found"}), 404
+
+        # Ownership, checked before any model spend. Without it, any signed-in
+        # account could burn the AI budget rewriting another user's drafts --
+        # and overwrite their content with the result.
+        if not user.is_admin and blog_data.get('author_id') != user_id:
+            logger.warning(
+                'Humanize refused: not the author',
+                extra={'user_id': user_id, 'blog_id': blog_id},
+            )
             return jsonify({"success": False, "error": "Blog not found"}), 404
 
         # Extract markdown content up-front so we can fail fast on empty drafts.
@@ -562,11 +600,26 @@ def humanize_draft(blog_id):
             title=blog_data.get('title', '')
         )
 
-        return jsonify({"success": True, "task_id": task_id}), 202
+        logger.info(
+            'Humanization queued',
+            extra={'task_id': task_id, 'blog_id': blog_id, 'user_id': user_id},
+        )
+        return jsonify({
+            "success": True,
+            "task_id": task_id,
+            "queue_position": task_manager.queue_position(task_id),
+        }), 202
 
-    except Exception as e:
+    except AppError:
+        # CapacityError and friends carry their own status code and a message
+        # that is safe to show; let the error handler render them.
+        raise
+    except Exception:
         logger.exception("Humanize Route Error")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({
+            "success": False,
+            "error": "Could not start humanization. Please try again.",
+        }), 500
 
 
 def _run_humanize_task(task_id, app, blog_id, markdown_text, title):
