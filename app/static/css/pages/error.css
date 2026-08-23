@@ -80,6 +80,26 @@
     max-width: 44ch;
 }
 
+/* Correlation id shown on 5xx pages. It is the only handle a user has on the
+   exact failure in the logs, so it must be selectable and unambiguous --
+   monospace, tabular, and visually quieter than the body copy. */
+.error-ref {
+    font-size: var(--fs-caption, 0.8125rem);
+    color: var(--text-muted);
+    margin: calc(-1 * var(--sp-4)) auto var(--sp-8);
+    max-width: 44ch;
+}
+
+.error-ref code {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: 0.9em;
+    color: var(--text-strong);
+    background: var(--surface-sunken, rgba(127, 127, 127, 0.12));
+    border-radius: var(--radius-sm, 4px);
+    padding: 0.15em 0.45em;
+    user-select: all;
+}
+
 /* --- Actions ------------------------------------------------------------ */
 .error-actions {
     display: flex;

@@ -117,6 +117,105 @@ def _extract_domain(url):
     return url.split('/')[0]
 
 
+# ==================== PERIOD MATH ====================
+
+# The three periods the UI offers, as (days back, span in days). GA4 reads
+# "7daysAgo".."today" as an *inclusive* 8-day window, so the span is N + 1 —
+# and the comparison window has to be the same length or the delta is a lie.
+PERIODS = {'1': 1, '7': 7, '30': 30}
+
+
+def _period(raw):
+    """Normalise the ?period= argument to one of the three we support."""
+    return raw if raw in PERIODS else '7'
+
+
+def _ranges(period):
+    """
+    Current and previous windows for a period, as GA4 relative-date strings.
+
+    Relative keywords rather than computed ISO dates on purpose: "today" means
+    today *in the property's timezone*, which the server cannot know. A property
+    reporting in UTC+13 rolls over half a day before a UTC server does, and
+    computing the dates here would silently ask for the wrong day.
+
+      period=7 → current  7daysAgo..today     (8 days)
+                 previous 15daysAgo..8daysAgo (8 days)
+    """
+    n = PERIODS[period]
+    span = n + 1
+
+    if period == '1':
+        return ('today', 'today'), ('yesterday', 'yesterday'), 1
+
+    return (
+        (f'{n}daysAgo', 'today'),
+        (f'{2 * n + 1}daysAgo', f'{n + 1}daysAgo'),
+        span,
+    )
+
+
+def _fill_days(by_date, span, fallback_end):
+    """
+    Expand a sparse {YYYYMMDD: metrics} map into a dense, ordered series.
+
+    GA4 omits days with no traffic entirely. Plotting only the days it returns
+    compresses those gaps, so a quiet Sunday reads as "never happened" and the
+    x-axis silently misstates the range. Every missing day inside the window is
+    therefore a real zero.
+
+    The window ends at the latest day the property actually reported, not at the
+    server's today — same timezone problem as above. `fallback_end` covers a
+    property that returned nothing at all.
+    """
+    from datetime import date, timedelta
+
+    if by_date:
+        end = max(by_date)
+        end_date = date(int(end[0:4]), int(end[4:6]), int(end[6:8]))
+    else:
+        end_date = fallback_end
+
+    out = []
+    for i in range(span - 1, -1, -1):
+        day = end_date - timedelta(days=i)
+        key = day.strftime('%Y%m%d')
+        row = by_date.get(key) or {}
+        out.append({
+            'iso': day.isoformat(),
+            'label': day.strftime('%b %d'),
+            'page_views': int(row.get('page_views', 0)),
+            'sessions': int(row.get('sessions', 0)),
+            'users': int(row.get('users', 0)),
+        })
+    return out
+
+
+def _fill_hours(by_hour):
+    """
+    Today, by hour — and only up to the last hour that reported.
+
+    Padding out to 23:00 would draw a flat line across hours that have not
+    happened yet, which reads as "traffic stopped" rather than "the day is not
+    over". Gaps *before* the last reported hour are genuine zeros and are kept.
+    """
+    if not by_hour:
+        return []
+
+    last = max(int(h) for h in by_hour)
+    out = []
+    for h in range(0, last + 1):
+        row = by_hour.get('%02d' % h) or {}
+        out.append({
+            'iso': '%02d:00' % h,
+            'label': '%02d:00' % h,
+            'page_views': int(row.get('page_views', 0)),
+            'sessions': int(row.get('sessions', 0)),
+            'users': int(row.get('users', 0)),
+        })
+    return out
+
+
 # ==================== PAGES ====================
 
 @analytics_bp.route('/analytics')
@@ -428,13 +527,51 @@ def realtime_data():
         return jsonify({"error": str(e)}), 500
 
 
+OVERVIEW_METRICS = [
+    "screenPageViews", "sessions", "totalUsers",
+    "averageSessionDuration", "bounceRate",
+]
+
+
+def _overview_totals(client, property_id, start_date, end_date):
+    """The five headline metrics for one window, as one un-dimensioned row."""
+    from google.analytics.data_v1beta.types import RunReportRequest, DateRange, Metric
+
+    response = client.run_report(
+        RunReportRequest(
+            property=property_id,
+            date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
+            metrics=[Metric(name=m) for m in OVERVIEW_METRICS],
+        )
+    )
+
+    totals = {'page_views': 0, 'sessions': 0, 'users': 0,
+              'avg_duration': 0, 'bounce_rate': 0}
+    if response.rows:
+        v = response.rows[0].metric_values
+        totals['page_views'] = int(v[0].value)
+        totals['sessions'] = int(v[1].value)
+        totals['users'] = int(v[2].value)
+        totals['avg_duration'] = round(float(v[3].value), 1)
+        totals['bounce_rate'] = round(float(v[4].value) * 100, 1)
+    return totals
+
+
 @analytics_bp.route('/api/analytics/overview')
 @admin_required
 def overview_data():
+    """
+    Headline metrics for the selected period, plus the same metrics for the
+    window immediately before it.
+
+    The comparison is the point. A stat tile that shows only a figure says how
+    many and leaves the reader to guess whether that is good — the delta is what
+    turns the count into a fact. Two un-dimensioned reports rather than one
+    request carrying two date ranges: multiple ranges make GA4 append a
+    `dateRange` dimension and fold both windows into the same row set, which is
+    a shape worth avoiding for something this load-bearing.
+    """
     from google.analytics.data_v1beta import BetaAnalyticsDataClient
-    from google.analytics.data_v1beta.types import (
-        RunReportRequest, DateRange, Metric, Dimension
-    )
 
     user_id = session.get('user_id')
     config = _get_analytics_config(user_id)
@@ -448,42 +585,105 @@ def overview_data():
     try:
         client = BetaAnalyticsDataClient(credentials=creds)
         property_id = config['property_id']
-        period = request.args.get('period', '7')
-        start_date = "today" if period == "1" else f"{period}daysAgo"
+        period = _period(request.args.get('period', '7'))
+        (cur_start, cur_end), (prev_start, prev_end), _span = _ranges(period)
+
+        data = _overview_totals(client, property_id, cur_start, cur_end)
+
+        # The comparison is an enhancement, not the payload. If it fails — a
+        # brand-new property with no history, a partial API error — the tiles
+        # still render their figures and simply carry no delta.
+        previous = None
+        try:
+            previous = _overview_totals(client, property_id, prev_start, prev_end)
+        except Exception as e:
+            print(f"Overview comparison unavailable: {e}")
+
+        return jsonify({
+            "success": True,
+            "data": data,
+            "previous": previous,
+            "period": period,
+        })
+    except Exception as e:
+        print(f"Overview error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@analytics_bp.route('/api/analytics/timeseries')
+@admin_required
+def timeseries_data():
+    """
+    The selected period broken down over time — by hour for today, by day
+    otherwise — so the trend has a shape instead of a single total.
+
+    Deliberately a separate endpoint from /overview: the chart and the tiles
+    fail independently, so a time-series error leaves the headline figures on
+    screen instead of blanking the whole screen.
+
+    The daily totals are NOT summed to produce the period total. `totalUsers` is
+    a de-duplicated count, so a visitor who came back on Tuesday would be
+    counted twice; /overview asks GA4 for the period total directly. The series
+    is the shape, never the sum.
+    """
+    from google.analytics.data_v1beta import BetaAnalyticsDataClient
+    from google.analytics.data_v1beta.types import (
+        RunReportRequest, DateRange, Metric, Dimension, OrderBy
+    )
+    from datetime import date
+
+    user_id = session.get('user_id')
+    config = _get_analytics_config(user_id)
+    if not config or not config.get('property_id'):
+        return jsonify({"error": "Not configured"}), 400
+
+    creds = _get_credentials(user_id)
+    if not creds:
+        return jsonify({"error": "Not connected", "reconnect": True}), 401
+
+    try:
+        client = BetaAnalyticsDataClient(credentials=creds)
+        property_id = config['property_id']
+        period = _period(request.args.get('period', '7'))
+        (start_date, end_date), _prev, span = _ranges(period)
+
+        # Today is plotted by hour: one point is not a trend.
+        by_hour = period == '1'
+        dimension = 'hour' if by_hour else 'date'
 
         response = client.run_report(
             RunReportRequest(
                 property=property_id,
-                date_ranges=[DateRange(start_date=start_date, end_date="today")],
+                date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
+                dimensions=[Dimension(name=dimension)],
                 metrics=[
                     Metric(name="screenPageViews"),
                     Metric(name="sessions"),
                     Metric(name="totalUsers"),
-                    Metric(name="averageSessionDuration"),
-                    Metric(name="bounceRate")
-                ]
+                ],
+                order_bys=[OrderBy(dimension=OrderBy.DimensionOrderBy(dimension_name=dimension))],
+                limit=200,
             )
         )
 
-        data = {
-            'page_views': 0,
-            'sessions': 0,
-            'users': 0,
-            'avg_duration': 0,
-            'bounce_rate': 0
-        }
+        buckets = {}
+        for row in response.rows:
+            buckets[row.dimension_values[0].value] = {
+                'page_views': int(row.metric_values[0].value),
+                'sessions': int(row.metric_values[1].value),
+                'users': int(row.metric_values[2].value),
+            }
 
-        if response.rows:
-            row = response.rows[0]
-            data['page_views'] = int(row.metric_values[0].value)
-            data['sessions'] = int(row.metric_values[1].value)
-            data['users'] = int(row.metric_values[2].value)
-            data['avg_duration'] = round(float(row.metric_values[3].value), 1)
-            data['bounce_rate'] = round(float(row.metric_values[4].value) * 100, 1)
+        points = _fill_hours(buckets) if by_hour else _fill_days(buckets, span, date.today())
 
-        return jsonify({"success": True, "data": data, "period": period})
+        return jsonify({
+            "success": True,
+            "granularity": 'hour' if by_hour else 'day',
+            "points": points,
+            "period": period,
+        })
     except Exception as e:
-        print(f"Overview error: {e}")
+        print(f"Timeseries error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -507,13 +707,13 @@ def top_pages():
     try:
         client = BetaAnalyticsDataClient(credentials=creds)
         property_id = config['property_id']
-        period = request.args.get('period', '7')
-        start_date = "today" if period == "1" else f"{period}daysAgo"
+        period = _period(request.args.get('period', '7'))
+        (start_date, end_date), _prev, _span = _ranges(period)
 
         response = client.run_report(
             RunReportRequest(
                 property=property_id,
-                date_ranges=[DateRange(start_date=start_date, end_date="today")],
+                date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
                 dimensions=[Dimension(name="pagePath"), Dimension(name="pageTitle")],
                 metrics=[
                     Metric(name="screenPageViews"),
@@ -559,20 +759,26 @@ def traffic_sources():
     try:
         client = BetaAnalyticsDataClient(credentials=creds)
         property_id = config['property_id']
-        period = request.args.get('period', '7')
-        start_date = "today" if period == "1" else f"{period}daysAgo"
+        period = _period(request.args.get('period', '7'))
+        (start_date, end_date), _prev, _span = _ranges(period)
 
+        # Every channel, not the top 8. The screen draws each one as a share of
+        # the whole, and a truncated list makes those shares add up to the top
+        # 8 rather than to the real total — so a site with a long tail would
+        # read as more concentrated than it is. sessionDefaultChannelGroup is a
+        # fixed vocabulary of about sixteen values, so 25 is the whole thing;
+        # the client folds the tail into one "Other" row for the chart.
         response = client.run_report(
             RunReportRequest(
                 property=property_id,
-                date_ranges=[DateRange(start_date=start_date, end_date="today")],
+                date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
                 dimensions=[Dimension(name="sessionDefaultChannelGroup")],
                 metrics=[
                     Metric(name="sessions"),
                     Metric(name="totalUsers")
                 ],
                 order_bys=[OrderBy(metric=OrderBy.MetricOrderBy(metric_name="sessions"), desc=True)],
-                limit=8
+                limit=25
             )
         )
 
@@ -584,7 +790,11 @@ def traffic_sources():
                 'users': int(row.metric_values[1].value)
             })
 
-        return jsonify({"success": True, "sources": sources})
+        return jsonify({
+            "success": True,
+            "sources": sources,
+            "total_sessions": sum(src['sessions'] for src in sources),
+        })
     except Exception as e:
         print(f"Traffic sources error: {e}")
         return jsonify({"error": str(e)}), 500

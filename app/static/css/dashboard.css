@@ -3357,6 +3357,82 @@ pre {
     color: var(--text-faint);
 }
 
+/* --- Setup banner ------------------------------------------------------ */
+/* A blocked screen explaining itself: --warning-soft on --warning-border, so
+   "this feature needs configuring before it can work" looks the same wherever
+   it happens. In dashboard.css since analytics became its second user after
+   the newsletter; .is-danger is the variant for a failure that has already
+   happened rather than a prerequisite that is missing. */
+.setup-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-5);
+    margin-bottom: var(--sp-6);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-md);
+    background: var(--warning-soft);
+}
+
+.setup-banner[hidden] {
+    display: none;
+}
+
+.setup-banner-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--surface-1);
+    color: var(--warning);
+    font-size: 0.95rem;
+}
+
+.setup-banner-body {
+    min-width: 0;
+}
+
+.setup-banner-title {
+    margin: 0 0 2px;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.setup-banner-text {
+    margin: 0;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.setup-banner-text code {
+    padding: 1px 5px;
+    border-radius: var(--radius-xs);
+    background: var(--surface-1);
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+    color: var(--text-strong);
+}
+
+.setup-banner-text a {
+    color: var(--accent);
+}
+
+/* A connection that broke, rather than one never set up. Same shape, the
+   status palette's other half — and the icon and the title carry the meaning
+   too, so the hue is never the only channel. */
+.setup-banner.is-danger {
+    border-color: var(--danger-border);
+    background: var(--danger-soft);
+}
+
+.setup-banner.is-danger .setup-banner-icon {
+    color: var(--danger);
+}
+
 /* --- Pager ------------------------------------------------------------- */
 .pager {
     display: flex;

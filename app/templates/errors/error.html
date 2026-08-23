@@ -1,0 +1,96 @@
+{# Generic error page. Renders any status code; the copy adapts so one
+   template serves 404, 403, 500 and 503 without three near-duplicates.
+   `status_code` and `message` are supplied by the error handler in
+   app/core/errors.py and default to 404 when rendered directly. #}
+{% extends 'base.html' %}
+
+{% set code = status_code | default(404) %}
+{% set titles = {
+    400: "That request didn't look right",
+    401: "Please sign in to continue",
+    403: "We couldn't find that page",
+    404: "We couldn't find that page",
+    405: "That action isn't allowed here",
+    409: "That change conflicts with existing data",
+    413: "That file is too large",
+    429: "You're going a little fast",
+    500: "Something went wrong on our end",
+    502: "An external service is unavailable",
+    503: "We're busy right now"
+} %}
+{% set notes = {
+    400: "Some part of the request was missing or malformed. Try again, and check anything you typed in.",
+    401: "Your session isn't active. Sign in and you'll come right back here.",
+    403: "The link may have moved, or you might not have access to it. Everything else is still where you left it.",
+    404: "The link may have moved, or you might not have access to it. Everything else is still where you left it.",
+    405: "This page doesn't accept that kind of request. Head back and try from the interface.",
+    409: "Something else changed the same data first. Reload and take another look before retrying.",
+    413: "Pick a smaller file and try the upload again.",
+    429: "Too many requests in a short window. Wait a few seconds and try again.",
+    500: "This one is on us — it's been logged with the reference below. Try again in a moment.",
+    502: "A service we depend on didn't answer in time. Your work is safe; try again shortly.",
+    503: "The system is at capacity. Give it a moment and try again."
+} %}
+
+{% block title %}{{ titles.get(code, 'Error') }} | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/error.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="error-shell">
+    <div class="error-panel">
+        <img src="{{ url_for('static', filename='images/logo-lockup.png') }}"
+            alt="{{ app_config.app_name if app_config else 'Scriptly' }}" class="error-mark logo-img">
+
+        <div class="error-code">{{ code }}</div>
+
+        <h1 class="error-title">{{ titles.get(code, 'Something went wrong') }}</h1>
+        <p class="error-note">
+            {{ notes.get(code, 'The request could not be completed. Try again in a moment.') }}
+        </p>
+
+        {# The request id is the only way a user can point support at the exact
+           failure in the logs, so surface it whenever the fault is ours. #}
+        {% if code >= 500 and g.request_id is defined %}
+        <p class="error-ref">Reference: <code>{{ g.request_id }}</code></p>
+        {% endif %}
+
+        <div class="error-actions">
+            {% if session.get('logged_in') %}
+            <a href="{{ url_for('blog.home') }}" class="error-btn error-btn-primary">
+                <span class="material-symbols-outlined">dashboard</span>
+                Back to dashboard
+            </a>
+            {% else %}
+            <a href="{{ url_for('auth_bp.login') }}" class="error-btn error-btn-primary">
+                <span class="material-symbols-outlined">arrow_forward</span>
+                Sign in
+            </a>
+            {% endif %}
+            <button type="button" class="error-btn error-btn-ghost" onclick="history.back()">
+                <span class="material-symbols-outlined">arrow_back</span>
+                Go back
+            </button>
+        </div>
+
+        {% if session.get('logged_in') %}
+        <div class="error-jump">
+            <p class="error-jump-label">Jump to</p>
+            <div class="error-jump-list">
+                <a href="{{ url_for('blog.create_page') }}">
+                    <span class="material-symbols-outlined">edit_square</span> Create blog
+                </a>
+                <a href="{{ url_for('blog.drafts_page') }}">
+                    <span class="material-symbols-outlined">draft</span> My drafts
+                </a>
+                <a href="{{ url_for('blogs_listing.all_blogs_page') }}">
+                    <span class="material-symbols-outlined">article</span> All blogs
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

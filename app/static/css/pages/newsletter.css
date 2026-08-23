@@ -16,67 +16,11 @@
    ========================================================================== */
 
 /* ==================== SETUP BANNER ====================
-   The "email isn't configured" state. --warning-soft on --warning-border, the
-   same treatment analytics uses for its reconnect prompt, so a blocked screen
-   looks the same wherever it happens.
+   Moved to dashboard.css §12. Analytics became its second user — the same
+   "blocked screen explaining itself" state — and the design system's component
+   table had always listed it as shared. Kept here as a pointer so the section
+   order still reads in template order.
    ==================================================================== */
-.setup-banner {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-4);
-    padding: var(--sp-4) var(--sp-5);
-    margin-bottom: var(--sp-6);
-    border: 1px solid var(--warning-border);
-    border-radius: var(--radius-md);
-    background: var(--warning-soft);
-}
-
-.setup-banner[hidden] {
-    display: none;
-}
-
-.setup-banner-icon {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--surface-1);
-    color: var(--warning);
-    font-size: 0.95rem;
-}
-
-.setup-banner-body {
-    min-width: 0;
-}
-
-.setup-banner-title {
-    margin: 0 0 2px;
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-medium);
-    color: var(--text-strong);
-}
-
-.setup-banner-text {
-    margin: 0;
-    font-size: var(--fs-xs);
-    line-height: var(--lh-body);
-    color: var(--text-2);
-}
-
-.setup-banner-text code {
-    padding: 1px 5px;
-    border-radius: var(--radius-xs);
-    background: var(--surface-1);
-    font-family: var(--font-mono);
-    font-size: 0.95em;
-    color: var(--text-strong);
-}
-
-.setup-banner-text a {
-    color: var(--accent);
-}
 
 /* ==================== STATS + TABS ==================== */
 .newsletter-stats {
