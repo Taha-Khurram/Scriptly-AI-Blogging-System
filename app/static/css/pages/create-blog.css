@@ -1,263 +1,849 @@
 /* ==========================================================================
-   Create Blog Page Styles
+   Create — the agent start state, and the run that replaces it
+
+   Two panels stacked in one stage under the shared page header:
+
+     ┌ .create-idle ─────────────────────────────────────────┐
+     │            ✦ Ready to create, name                    │
+     │        What's on your  mind today?   ← gradient       │
+     │            lede                                       │
+     │   ╭ .prompt-box ─────────────────────────────────╮    │
+     │   │ textarea                                     │    │
+     │   │ ( ⌸ Save to drafts ▾ )  note      12/2000 (↑)│    │
+     │   ╰──────────────────────────────────────────────╯    │
+     │   ( how-to ) ( comparison ) ( listicle ) ( explainer )│
+     └───────────────────────────────────────────────────────┘
+     ┌ .create-run ──────────────────────────────────────────┐
+     │ ✦ Writing the draft                     30%    0:42   │
+     │ ▓▓▓▓▓░░░░░░░░░░░░░░░░  ← brandShimmer while working   │
+     │ ✔ Warming up / ◌ Writing the draft / ○ … (5 steps)    │
+     │ Working from: "…"                                     │
+     └───────────────────────────────────────────────────────┘
+
+   Every colour is a token from dashboard.css. The gradient appears exactly
+   twice — the aura behind the composer and one clause in the headline — plus
+   the run bar, which is the agent-working signature and so is allowed a third
+   (see DESIGN_SYSTEM §4, "the gradient is rationed").
    ========================================================================== */
 
-/* Local Styles for Create Page */
-.blog-center-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 75vh;
-  position: relative;
-  text-align: center;
-  padding: 2rem;
+/* ==========================================================================
+   STAGE
+   ========================================================================== */
+
+/* [data-state] on the wrapper is the whole switch: one attribute decides which
+   panel exists, the same idiom as optimization.css's .opt-body[data-state]. */
+.create-stage[data-state="idle"] [data-create-panel="run"],
+.create-stage[data-state="working"] [data-create-panel="idle"] {
+    display: none;
 }
 
-/* Floating Gradient */
-.floating-gradient-circle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.10) 0%, rgba(217, 101, 112, 0.05) 50%, transparent 70%);
-  border-radius: 50%;
-  z-index: 0;
-  pointer-events: none;
-  animation: pulse-glow 8s ease-in-out infinite alternate;
+/* ==========================================================================
+   COMPOSER PANEL
+   ========================================================================== */
+
+/* Centred in what is left of the viewport after the header and the canvas
+   inset, rather than at a flat 75vh — which on a short laptop screen pushed
+   the starter chips below the fold and on a tall monitor left the composer
+   floating oddly high. */
+.create-idle {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 210px);
+    padding: var(--sp-6) 0 var(--sp-10);
+    text-align: center;
+    animation: fadeInUp var(--dur-slow) var(--ease-standard) backwards;
 }
 
-@keyframes pulse-glow {
-  0% {
-    transform: translate(-50%, -50%) scale(0.9);
-    opacity: 0.8;
-  }
+/* The aura. Three radial stops of the brand gradient at low alpha, sized off
+   the composer rather than the viewport so it stays centred on the field at
+   every width.
 
-  100% {
-    transform: translate(-50%, -50%) scale(1.1);
-    opacity: 1;
-  }
+   The stops are literals — the same three the --brand-gradient ramp is built
+   from, and the same exception home.css's .hero-aura takes. A gradient token is
+   one linear ramp; it cannot be decomposed into three separately-placed radial
+   stops, and there is no colour here that is not already in the brand. */
+.create-aura {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 0;
+    width: min(760px, 120%);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    background:
+        radial-gradient(38% 38% at 42% 40%, rgba(66, 133, 244, 0.16), transparent 70%),
+        radial-gradient(34% 34% at 62% 46%, rgba(155, 114, 203, 0.15), transparent 70%),
+        radial-gradient(40% 30% at 50% 64%, rgba(217, 101, 112, 0.12), transparent 72%);
+    animation: createBreathe 9s var(--ease-standard) infinite alternate;
 }
 
-/* Content Overlay */
-.welcome-user {
-  position: relative;
-  z-index: 1;
-  margin-bottom: 1.5rem;
+@keyframes createBreathe {
+    from {
+        transform: translate(-50%, -50%) scale(0.9);
+        opacity: 0.75;
+    }
+
+    to {
+        transform: translate(-50%, -50%) scale(1.08);
+        opacity: 1;
+    }
 }
 
-.welcome-text {
-  display: block;
-  font-size: 1.1rem;
-  color: var(--secondary-color);
-  margin-bottom: 0.25rem;
+/* Everything readable sits above the aura. */
+.create-lead,
+.create-composer,
+.create-starters {
+    position: relative;
+    z-index: 1;
+    width: 100%;
 }
 
-.welcome-name {
-  font-size: 2rem;
-  font-weight: 400;
-  color: var(--text-strong);
+/* The composer outranks its neighbours because it contains a popover. A
+   positioned element with a z-index is a stacking context, so the destination
+   menu's z-index: 70 only ever competes *inside* .create-composer — at the
+   panel level the composer is just "1", and .create-starters, being later in
+   the document at the same level, would paint the chips over the open menu. */
+.create-composer {
+    z-index: 2;
 }
 
-.blog-thought-heading {
-  position: relative;
-  z-index: 1;
-  font-size: clamp(2.25rem, 5vw, 3.25rem);
-  font-weight: 400;
-  line-height: 1.15;
-  margin-bottom: 3rem;
-  letter-spacing: 0;
-  color: var(--text-strong);
+.create-lead {
+    max-width: 44rem;
+    margin: 0 auto var(--sp-8);
 }
 
-.text-gradient {
-  background: var(--brand-gradient-diag);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.create-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-5);
+    padding: var(--sp-1) var(--sp-4) var(--sp-1) var(--sp-1);
+    border-radius: var(--radius-pill);
+    background: var(--surface-1);
+    box-shadow: var(--elev-1);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
 }
 
-/* Search/Prompt Box */
+.create-spark {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-tint);
+    color: var(--accent);
+}
+
+.create-spark .material-symbols-outlined {
+    font-size: 15px;
+}
+
+.create-headline {
+    margin: 0 0 var(--sp-4);
+    font-size: clamp(2rem, 1.1rem + 3vw, var(--fs-display));
+    font-weight: var(--fw-regular);
+    line-height: 1.12;
+    letter-spacing: -0.025em;
+    color: var(--text-strong);
+}
+
+/* inline-block so the ramp spans the glyphs, not the whole line box */
+.create-headline-gradient {
+    display: inline-block;
+    background: var(--brand-gradient-diag);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+}
+
+.create-lede {
+    max-width: 40rem;
+    margin: 0 auto;
+    font-size: var(--fs-body);
+    line-height: var(--lh-relaxed);
+    color: var(--text-2);
+}
+
+/* ==========================================================================
+   PROMPT ENTRY
+
+   The documented .prompt-box / .prompt-input / .prompt-submit component
+   (DESIGN_SYSTEM §3), restacked as a column: field on top, controls beneath.
+   Soft fill, no resting stroke, lifting to --surface-1 + --elev-2 on focus.
+   ========================================================================== */
+
+.create-composer {
+    max-width: 46rem;
+    margin: 0 auto;
+}
+
 .prompt-box {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 720px;
-  background: var(--surface-2);
-  padding: 0.6rem 0.6rem 0.6rem 1.5rem;
-  border-radius: var(--radius-xl);
-  box-shadow: var(--elev-1);
-  border: 1px solid transparent;
-  display: flex;
-  align-items: center;
-  transition: background-color var(--dur-base) var(--ease-standard),
-    box-shadow var(--dur-base) var(--ease-standard),
-    border-color var(--dur-base) var(--ease-standard);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: var(--sp-4) var(--sp-4) var(--sp-3);
+    border: 1px solid transparent;
+    border-radius: var(--radius-xl);
+    background: var(--surface-2);
+    box-shadow: var(--elev-1);
+    text-align: left;
+    transition: background-color var(--dur-base) var(--ease-standard),
+        box-shadow var(--dur-base) var(--ease-standard),
+        border-color var(--dur-base) var(--ease-standard);
 }
 
+/* Not `overflow: hidden` — the destination menu is a child popover and would
+   be clipped by it. The radius is carried by the box, and nothing inside
+   reaches the corners. */
 .prompt-box:focus-within {
-  background: var(--surface-1);
-  box-shadow: var(--elev-2);
-  border-color: var(--border);
+    background: var(--surface-1);
+    border-color: var(--border);
+    box-shadow: var(--elev-2);
 }
 
 .prompt-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 1.1rem;
-  color: var(--text-1);
-  resize: none;
-  max-height: 200px;
-  padding: 0.5rem 0;
-  background: transparent;
+    width: 100%;
+    min-height: 2.75rem;
+    max-height: 40vh;
+    padding: var(--sp-2) var(--sp-3) 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 1.0625rem;
+    line-height: var(--lh-body);
+    color: var(--text-1);
+    resize: none;
+    overflow-y: auto;
 }
 
 .prompt-input::placeholder {
-  color: var(--text-muted);
-  font-weight: 400;
+    color: var(--text-faint);
+}
+
+/* --- Footer ------------------------------------------------------------ */
+
+.prompt-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+}
+
+/* The note beside it takes `flex: 1`, so without this the pill is the thing
+   that gives when the row runs short — and a control that states a value has
+   to keep room for the value. */
+.prompt-dest {
+    flex-shrink: 0;
+}
+
+/* .filter-pill is --surface-3, which sits one step off the box in every state.
+   That reads clearly once the box lifts to --surface-1 on focus, but at rest in
+   light mode the box is --surface-2 — the canvas colour — and one step is thin.
+   A hairline carries it there without changing the pill anywhere else. */
+.prompt-foot .filter-pill {
+    border-color: var(--border-subtle);
+}
+
+/* The note explains the pill beside it, so it goes quiet the moment the row
+   runs out of room rather than wrapping the controls onto two lines. */
+.prompt-dest-note {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.prompt-foot-end {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-left: auto;
+}
+
+.prompt-count {
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+}
+
+/* Amber, not red: over the soft limit is a hint that the prompt has become an
+   essay, not an error — the field still accepts it up to maxlength. */
+.prompt-count.is-long {
+    color: var(--warning);
 }
 
 .prompt-submit {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--primary-color);
-  color: var(--text-on-accent);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease-standard);
-  margin-left: 0.75rem;
-  flex-shrink: 0;
-  box-shadow: none;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-size: 1.15rem;
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-standard),
+        transform var(--dur-fast) var(--ease-standard);
+}
+
+.prompt-submit>i {
+    color: inherit;
 }
 
 .prompt-submit:hover:not(:disabled) {
-  background: var(--accent-hover);
+    background: var(--accent-hover);
 }
 
+.prompt-submit:active:not(:disabled) {
+    transform: scale(0.94);
+}
+
+.prompt-submit:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Disabled while the field is empty, so the button states the requirement
+   instead of the reader pressing it and nothing happening. */
 .prompt-submit:disabled {
-  background: var(--surface-4);
-  color: var(--text-faint);
-  cursor: not-allowed;
+    background: var(--surface-4);
+    color: var(--text-faint);
+    cursor: not-allowed;
 }
 
-/* Locked/Disabled state for prompt input */
-.prompt-input:disabled {
-  cursor: not-allowed;
-  caret-color: transparent;
-  color: var(--secondary-color);
-  opacity: 0.7;
-  user-select: none;
-  -webkit-user-select: none;
+.prompt-hint {
+    margin: var(--sp-3) 0 0;
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    text-align: center;
 }
 
-.prompt-box.locked {
-  background: var(--surface-2);
-  border-color: var(--secondary-color);
-  opacity: 0.85;
-  pointer-events: none;
+.prompt-hint kbd {
+    padding: 1px var(--sp-2);
+    border-radius: var(--radius-xs);
+    background: var(--surface-3);
+    font-family: var(--font-sans);
+    font-size: var(--fs-2xs);
+    color: var(--text-muted);
 }
 
-/* Humanize Toggle */
-.generation-options {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  justify-content: center;
+/* ==========================================================================
+   STARTERS
+   ========================================================================== */
+
+.create-starters {
+    margin-top: var(--sp-8);
 }
 
-.humanize-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  cursor: pointer;
-  padding: 0.6rem 1.25rem;
-  border-radius: var(--radius-pill);
-  background: var(--surface-1);
-  border: 1.5px solid var(--border);
-  box-shadow: var(--elev-2);
-  transition: all 0.3s ease;
-  user-select: none;
+.starters-label {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
 }
 
-.humanize-toggle:hover {
-  border-color: var(--accent);
-  box-shadow: var(--elev-2);
-  transform: translateY(-1px);
+.starters-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--sp-2);
 }
 
-.humanize-toggle.active {
-  border-color: var(--accent);
-  background: var(--accent-tint);
-  box-shadow: var(--elev-2);
+.starter {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 38px;
+    padding: 0 var(--sp-4);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-pill);
+    background: var(--surface-1);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: var(--transition-base);
 }
 
-/* Toggle Track & Thumb */
-.toggle-track {
-  width: 44px;
-  height: 24px;
-  background: var(--surface-4);
-  border-radius: var(--radius-pill);
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  flex-shrink: 0;
+.starter>i {
+    font-size: 0.95em;
+    color: var(--accent);
 }
 
-.toggle-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 18px;
-  height: 18px;
-  background: var(--surface-1);
-  border-radius: 50%;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--elev-1);
+.starter:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-1);
+    color: var(--text-strong);
+    box-shadow: var(--elev-1);
+    transform: translateY(-1px);
 }
 
-.humanize-toggle.active .toggle-track {
-  background: var(--accent);
+.starter:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
-.humanize-toggle.active .toggle-thumb {
-  transform: translateX(20px);
-  box-shadow: var(--elev-1);
+/* ==========================================================================
+   RUN PANEL
+   ========================================================================== */
+
+.create-run {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 210px);
+    padding: var(--sp-6) 0 var(--sp-10);
 }
 
-/* Toggle Text */
-.toggle-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
+.run-card {
+    width: 100%;
+    max-width: 40rem;
+    padding: var(--sp-8);
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    box-shadow: var(--elev-1);
+    animation: fadeInUp var(--dur-slow) var(--ease-standard) backwards;
 }
 
-.toggle-label {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--info-color);
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  line-height: 1.2;
+/* --- Head -------------------------------------------------------------- */
+
+.run-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
 }
 
-.toggle-label i {
-  color: var(--accent);
-  font-size: 1rem;
+.run-spark {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--accent-tint);
+    color: var(--accent);
 }
 
-.humanize-toggle.active .toggle-label {
-  color: var(--accent-hover);
+.run-spark .material-symbols-outlined {
+    font-size: 22px;
 }
 
-.toggle-hint {
-  font-size: 0.7rem;
-  color: var(--secondary-color);
-  font-weight: 400;
-  line-height: 1.2;
+/* The mark spins gently only while there is something to wait for; the done
+   and failed states park it. */
+.create-stage[data-state="working"] .run-spark {
+    animation: runSparkTurn 3.2s linear infinite;
 }
+
+.run-card.is-settled .run-spark {
+    animation: none;
+}
+
+@keyframes runSparkTurn {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.run-head-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.run-title {
+    margin: 0 0 var(--sp-1);
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.run-sub {
+    margin: 0;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+}
+
+.run-metrics {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+/* Proportional figures on the percentage — it is a display-size value, not a
+   column — but tabular on the clock, which changes every second and would
+   otherwise jitter its own width. */
+.run-pct {
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.run-elapsed {
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+}
+
+/* --- Bar --------------------------------------------------------------- */
+
+.run-bar {
+    height: 6px;
+    margin: var(--sp-6) 0;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    overflow: hidden;
+}
+
+/* The agent-working signature: the brand gradient sweeping under brandShimmer,
+   the same animation #nav-progress uses, so "the system is thinking" looks the
+   same wherever it happens. The width is the server's real percentage — the
+   shimmer supplies the liveness so the bar never has to invent progress. */
+.run-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--brand-gradient);
+    background-size: 200% 100%;
+    transition: width var(--dur-slow) var(--ease-emphasized);
+    animation: brandShimmer 2.4s linear infinite;
+}
+
+.run-card.is-settled .run-bar-fill {
+    animation: none;
+}
+
+.run-card.is-failed .run-bar-fill {
+    background: var(--danger);
+}
+
+/* --- Steps ------------------------------------------------------------- */
+
+.run-steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.run-step {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) 0;
+}
+
+/* The rail between the marks, drawn on every step but the last, so the five
+   stages read as one sequence rather than five unrelated rows.
+
+   Anchored top-and-bottom rather than given a height, so it stays correct if
+   the row's padding or the gap changes: it starts at the bottom edge of this
+   step's mark (8px padding + 1px nudge + the 22px mark) and ends at the top
+   edge of the next one (down through the --sp-1 gap and the next row's --sp-2
+   padding). The mark is a later-painted positioned element, so it covers the
+   rail's ends rather than the rail cutting across it. */
+.run-step:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    top: 31px;
+    bottom: calc(-1 * (var(--sp-1) + var(--sp-2)));
+    left: 11px;
+    width: 2px;
+    transform: translateX(-50%);
+    border-radius: 1px;
+    background: var(--border-subtle);
+}
+
+.run-step.is-done:not(:last-child)::before {
+    background: var(--accent);
+    opacity: 0.35;
+}
+
+.run-step-mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    border-radius: 50%;
+    background: var(--surface-3);
+    color: var(--text-faint);
+    font-size: 12px;
+}
+
+/* Tick and dot both live in the mark and take turns, so a step changing state
+   never reflows the row beside it. */
+.run-step-tick {
+    display: none;
+}
+
+.run-step-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.run-step-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    text-align: left;
+}
+
+.run-step-label {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    transition: color var(--dur-base) var(--ease-standard);
+}
+
+.run-step-note {
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+/* Done. */
+.run-step.is-done .run-step-mark {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.run-step.is-done .run-step-tick {
+    display: block;
+}
+
+.run-step.is-done .run-step-dot {
+    display: none;
+}
+
+.run-step.is-done .run-step-label {
+    color: var(--text-2);
+}
+
+/* A finished step's note has served its purpose — it described a wait that is
+   over — so it stops competing with the step that is still running. */
+.run-step.is-done .run-step-note {
+    display: none;
+}
+
+/* Current. The pulsing halo is the second liveness cue after the shimmer, and
+   the one that says *which* stage is taking the time. */
+.run-step.is-current .run-step-mark {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.run-step.is-current .run-step-dot {
+    animation: runStepPulse 1.6s var(--ease-standard) infinite;
+}
+
+.run-step.is-current .run-step-label {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+@keyframes runStepPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.5);
+    }
+
+    60% {
+        box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0);
+    }
+}
+
+/* Failed. The status palette earns its place here because the mark rides a
+   label that says so — and the dot must not keep pulsing, since a "working"
+   animation over a stopped run is exactly the lie this card replaces. */
+.run-step.is-failed .run-step-mark {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.run-step.is-failed .run-step-dot {
+    animation: none;
+}
+
+.run-step.is-failed .run-step-label {
+    font-weight: var(--fw-medium);
+    color: var(--danger);
+}
+
+/* A step that never ran because the pipeline stopped first. */
+.run-step.is-skipped .run-step-label,
+.run-step.is-skipped .run-step-note {
+    opacity: 0.5;
+}
+
+/* --- Prompt echo ------------------------------------------------------- */
+
+/* Names what is actually being written, so a run is never orphaned from its
+   prompt — you can leave the tab, come back, and still know what you asked
+   for. Same job .opt-source does on the optimization screen. */
+.run-prompt {
+    margin-top: var(--sp-6);
+    padding: var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    text-align: left;
+}
+
+.run-prompt-label {
+    margin: 0 0 var(--sp-1);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+/* Clamped rather than scrolled: this is a reminder, not the field. */
+.run-prompt-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+    margin: 0;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+/* --- Failure ----------------------------------------------------------- */
+
+.run-fail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    margin-top: var(--sp-6);
+    padding: var(--sp-4);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius-sm);
+    background: var(--danger-soft);
+    text-align: left;
+}
+
+.run-fail-icon {
+    color: var(--danger);
+    font-size: var(--fs-body);
+    line-height: 1.4;
+}
+
+.run-fail-body {
+    flex: 1;
+    min-width: 12rem;
+}
+
+.run-fail-title {
+    margin: 0 0 2px;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.run-fail-text {
+    margin: 0;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.run-fail-actions {
+    display: flex;
+    gap: var(--sp-2);
+    margin-left: auto;
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 900px) {
+
+    .create-idle,
+    .create-run {
+        min-height: calc(100vh - 180px);
+    }
+
+    .run-card {
+        padding: var(--sp-6);
+    }
+}
+
+@media (max-width: 700px) {
+    .create-idle {
+        justify-content: flex-start;
+        padding-top: var(--sp-4);
+    }
+
+    .create-lead {
+        margin-bottom: var(--sp-6);
+    }
+
+    /* The note is the first thing to go: the pill states the destination on its
+       own, and keeping the explanation would push the submit button onto a
+       second line. */
+    .prompt-dest-note {
+        display: none;
+    }
+
+    .starters-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .starter {
+        justify-content: flex-start;
+    }
+
+    .run-head {
+        flex-wrap: wrap;
+    }
+
+    .run-metrics {
+        flex-direction: row;
+        align-items: baseline;
+        gap: var(--sp-3);
+        width: 100%;
+        padding-left: calc(40px + var(--sp-4));
+    }
+
+    .run-fail-actions {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .run-fail-actions .app-btn {
+        flex: 1;
+    }
+}
+
+/* The aura's breathing and the mark's rotation are decoration; the shimmer and
+   the step pulse are the only signal that the agent is alive, and the global
+   reduced-motion block in dashboard.css already collapses all of them. Nothing
+   here depends on motion to be readable — every state is also a colour, a
+   glyph and a word. */

@@ -147,7 +147,15 @@ def home():
         
 @blog_bp.route('/create')
 def create_page():
-    return render_template('create_blog.html', username=session.get('user_name', 'User'))
+    # The role decides which destination the composer can offer: auto_submit
+    # publishes outright for an admin and routes to the approval queue for
+    # everyone else (see _run_generation_task), so the screen has to know which
+    # outcome it is naming.
+    return render_template(
+        'create_blog.html',
+        username=session.get('user_name', 'User'),
+        user_role=session.get('user_role', 'USER')
+    )
 
 
 @blog_bp.route('/drafts')

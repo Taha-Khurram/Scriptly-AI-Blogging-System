@@ -288,26 +288,105 @@ collection rather than the five rows on screen.
 
 ### Agent start state — `create_blog.html`
 
+Two panels in one stage under the shared page header, switched by one attribute
+(`.create-stage[data-state]`) exactly as the optimization panels switch: the
+composer you arrive at, and the run card that replaces it in place. They are
+siblings rather than a navigation, because the run outlives the screen — the
+task keeps going server-side, and a failed run has to be able to hand the
+prompt back.
+
 ```
-              eyebrow: "Ready to create,"
-                  name (400 weight, 2rem)
-        What's on your  ·  mind today?  ← brand-gradient text
-   ╭──────────────────────────────────────────────╮
-   │  Describe your blog topic in detail…      (↑)│  ← --surface-2, 28px
-   ╰──────────────────────────────────────────────╯
-         ( ◌ Starting generation… )   ▓▓▓░░░░░░░
+╔ page header ═══════════════════════════════════════════════════╗
+║ Blog studio                                                    ║
+║ H1 Create                          ( ☾ )      ( ✎ Drafts )     ║
+╚════════════════════════════════════════════════════════════════╝
+                 ( ✦ Ready to create, name )
+          What's on your  ·  mind today?   ← brand-gradient text
+                 lede: what the agent will actually do
+   ╭ .prompt-box ─────────────────────────────────────────────╮
+   │  A step-by-step guide to…                                │  ← --surface-2, 28px
+   │  ( ⌸ Save to drafts ▾ )  Lands in Drafts…   412/2000 (↑) │
+   ╰──────────────────────────────────────────────────────────╯
+          Enter to generate · Shift + Enter for a new line
+   Not sure where to start?
+   ( How-to guide ) ( Comparison ) ( Listicle ) ( Explainer )
 ```
 
-The centred prompt entry mirrors Gemini's empty state: soft-filled input with no
-hard stroke, lifting to `--surface-1` + `--elev-2` on focus, circular accent
-submit. A radial accent glow sits behind at very low opacity.
+The centred prompt entry still mirrors Gemini's empty state — soft-filled input
+with no hard stroke, lifting to `--surface-1` + `--elev-2` on focus, circular
+accent submit — but it is a **column** now, field over a control footer, because
+a single-line box with one round button could not say where the finished blog
+was going to land. `/api/generate` has always taken `auto_submit`; nothing on
+screen could set it, so every generation silently became a draft.
+
+**Destination.** A `.select-pill` wrapped around a real `<select>` (§13), with
+the explanatory note carried on the `<option>` rather than in the page script —
+the role check that decides which outcome is even on offer already lives in the
+template, and two places deciding the same thing is how one of them ends up
+wrong. Admins are offered *Publish when done*, everyone else *Send for review*,
+because that is what the server does with the flag.
+
+**Starters.** Four chips that drop a shaped prompt in and select its first
+`[bracketed]` slot, so the reader types over the part that is theirs. The blank
+page was the screen's real problem: it asked for a topic "in detail" and gave no
+sense of what detail buys you.
+
+**The counter** appears at 200 characters and turns `--warning` past 1200 — a
+hint that the prompt has become an essay, not an error. The field accepts up to
+`maxlength`; nothing is blocked.
 
 ### Working session — `create_blog.html` → `drafts.html`
 
-Generation progress is the agent-working surface: a pill status card with a
-spinner, and an indeterminate `.progress-bar` running `brandShimmer`. The top
-`#nav-progress` bar uses the same gradient so "the system is thinking" always
-looks the same, wherever it happens.
+```
+   ┌ .run-card ───────────────────────────────────────────────┐
+   │ ✦  Writing the draft                       30%    0:42   │
+   │    runs on the server — you can leave and come back      │
+   │ ▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░  ← brand gradient + shimmer    │
+   │ ✔ Warming up                                             │
+   │ ◌ Writing the draft   ← pulsing, the long one             │
+   │ ○ Formatting and styling                                 │
+   │ ○ Assigning a category                                   │
+   │ ○ Saving to your library                                 │
+   │ ┌ Working from ────────────────────────────────────────┐ │
+   │ │ "A step-by-step how-to guide on composting…"         │ │
+   │ └──────────────────────────────────────────────────────┘ │
+   └──────────────────────────────────────────────────────────┘
+```
+
+Generation progress is the agent-working surface: the brand gradient under
+`brandShimmer`, the same signature `#nav-progress` uses, so "the system is
+thinking" always looks the same wherever it happens.
+
+What it is *not* any more is one line of text and a 6px bar. The pipeline
+reports five named stages, so the card names all five and marks where it is —
+"Writing blog content" used to sit alone for a minute with nothing to say how
+far in it was or that three more steps were still to come. The five are the
+stages `_run_generation_task` actually emits; the old client had `outline` and
+`humanizing` in its message table and neither ever fired (the outline is derived
+from the generated headings with no model call, and humanization is a separate
+on-demand action from the drafts screen).
+
+**The bar is the server's real percentage and nothing else.** It does not creep
+between stages. A bar that invents progress can strand a wrong value, and there
+are already three honest liveness cues — the shimmer, the pulsing step dot, and
+the elapsed clock — so it never has to lie about how much is left. Every state
+is also a colour, a glyph and a word, so reduced-motion loses nothing.
+
+**A run survives the screen.** The task id is parked in `sessionStorage`, so
+navigating away and back re-attaches to a generation in flight, painting the
+stored stage before the first poll answers rather than sitting at 5%. A stale
+entry (older than the task manager's 600s) is discarded, not resumed. The
+half-typed prompt is parked the same way, because PJAX rebuilds
+`.dashboard-main` from scratch.
+
+**Failure lands on the card**, not only in a toast that has faded by the time
+the reader looks back: the stage it stopped on goes `--danger` and stops
+pulsing, the steps after it are dimmed as never-ran, and two buttons offer the
+only two useful next moves — *Edit prompt* (returns to the composer with the
+text intact) and *Try again*. A network blip is not a failure: three consecutive
+misses are tolerated, since the generation is server-side and does not care that
+one poll missed. `404`/`403` from the status endpoint are terminal — the old
+poller checked only `data.status`, so an expired task meant polling forever.
 
 ### Content editor — `drafts.html`, `approval_queue.html`
 
@@ -1287,7 +1366,8 @@ Reusable pieces, all token-driven:
 | Calendar | `.cal` / `.cal-head` / `.cal-nav` / `.cal-dow` / `.cal-cell` / `.cal-day` | six full weeks, always; `.is-outside` / `.is-today` / `.is-selected`, and `:disabled` for out of bounds. In dashboard.css §12 since the schedule's publish-time picker became its second user |
 | Range band | `.cal-cell.is-start` / `.is-end` / `.is-in-range` / `.is-preview` / `.cal.is-picking` | all_blogs.css only — band on the cell, endpoints on the button |
 | Time column | `.sched-times` / `.sched-time` | scrolling quarter-hours beside a calendar; passed slots greyed, not removed |
-| Prompt entry | `.prompt-box` / `.prompt-submit` | soft-filled, 28px |
+| Prompt entry | `.prompt-box` / `.prompt-input` / `.prompt-foot` / `.prompt-submit` | soft-filled, 28px; a column — field over a control footer |
+| Run card | `.run-card` / `-head` / `-bar` / `-steps` / `-step` / `-prompt` / `-fail` | named stages with the server's real percentage; see §2 |
 | Toast | `.custom-toast` | `--elev-3`, gradient progress line |
 | Skeleton | `.skeleton*` | accent-tinted shimmer |
 | Loaders | `#page-loader`, `#nav-progress`, `#action-loader` | brand gradient = working |

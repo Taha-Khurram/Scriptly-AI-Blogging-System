@@ -1,54 +1,281 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Generate Blog | ScriptlyAI{% endblock %}
+{% block title %}Create | {{ app_config.app_name if app_config else 'ScriptlyAI' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/create-blog.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/create-blog.css') }}?v=3">
 {% endblock %}
 
+{#
+  Create — the agent start state.
+
+  Two panels in one stage, switched by [data-state] on the wrapper: the composer
+  you arrive at, and the run card that replaces it in place while the pipeline
+  works. They are siblings rather than a page that navigates away, because the
+  run outlives this screen — the task keeps going server-side, and the composer
+  has to be able to come back with its prompt intact when a run fails.
+
+  Everything lives inside .dashboard-main. PJAX swaps only that element's
+  innerHTML, so the page header has to be its first child and nothing may sit
+  outside it.
+#}
+
 {% block content %}
+{% set is_admin = user_role == 'ADMIN' %}
+
 <div class="dashboard-layout">
 
   {% include 'partials/sidebar.html' %}
 
-  <main class="dashboard-main d-flex flex-column">
-    <!-- Center Content -->
-    <div class="blog-center-wrapper flex-grow-1 animate-fade-up">
+  <main class="dashboard-main">
 
-      <div class="floating-gradient-circle"></div>
+    {% call page_header(title='Create', eyebrow='Blog studio') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    <a href="{{ url_for('blog.drafts_page') }}" class="page-header-action is-ghost">
+      <i class="bi bi-pencil-square" aria-hidden="true"></i>
+      <span class="page-header-label">Drafts</span>
+    </a>
+    {% endcall %}
 
-      <div class="welcome-user">
-        <span class="welcome-text">Ready to create,</span>
-        <span class="welcome-name">{{ username }}?</span>
-      </div>
+    <div class="create-stage" data-create-stage data-state="idle">
 
-      <div class="blog-thought-heading">
-        <span class="d-block">What's on your</span>
-        <span class="text-gradient">mind today?</span>
-      </div>
+      <!-- ===================== COMPOSER ===================== -->
+      <section class="create-idle" data-create-panel="idle" aria-label="Describe your blog">
 
-      <div class="prompt-box">
-        <textarea id="prompt" class="prompt-input" placeholder="Describe your blog topic in detail..." rows="1"
-          oninput="autoResize(this)" onkeydown="handleKeyPress(event)" autofocus></textarea>
+        {# The screen's whole gradient budget: one radial aura behind the
+           composer and one clause in the headline. Purely decorative, so it is
+           an empty element rather than a background on a content box — a
+           pointer-events-free layer that cannot swallow a click on the field. #}
+        <div class="create-aura" aria-hidden="true"></div>
 
-        <button onclick="handleGeneration()" id="genBtn" class="prompt-submit" type="button">
-          <i class="bi bi-arrow-up fs-5"></i>
-        </button>
-      </div>
+        <div class="create-lead">
+          <p class="create-eyebrow">
+            <span class="create-spark" aria-hidden="true">
+              <span class="material-symbols-outlined">auto_awesome</span>
+            </span>
+            Ready to create, {{ username }}
+          </p>
 
-      <div id="loader" class="mt-4 d-none">
-        <div class="d-flex flex-column align-items-center gap-2">
-          <div class="d-flex align-items-center gap-3 bg-white px-4 py-3 rounded-pill shadow-card border border-light">
-            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-            <span class="text-secondary small fw-bold">Starting generation...</span>
-          </div>
-          <div class="w-100" style="max-width: 300px;">
-            <div class="progress" style="height: 6px; border-radius: 3px;">
-              <div id="genProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%; transition: width 0.5s ease;"></div>
+          <h2 class="create-headline">
+            What&rsquo;s on your
+            <span class="create-headline-gradient">mind today?</span>
+          </h2>
+
+          <p class="create-lede">
+            Describe a topic and Scriptly researches it, writes the piece, formats it with a
+            table of contents and files it under a category. You review everything before it ships.
+          </p>
+        </div>
+
+        <form class="create-composer" data-create-form novalidate>
+          {#
+            The prompt entry is a column now, not a row: the field on top, a
+            footer of controls beneath it. The old single-line box with one
+            round button gave the reader no way to see where the finished blog
+            was going to land — /api/generate has always taken `auto_submit`
+            and nothing on screen could set it.
+          #}
+          <div class="prompt-box" data-prompt-box>
+            <label class="visually-hidden" for="prompt">Blog topic</label>
+            <textarea id="prompt" class="prompt-input" data-prompt rows="1" maxlength="2000"
+              placeholder="A step-by-step guide to&hellip;" autocomplete="off" spellcheck="true"></textarea>
+
+            <div class="prompt-foot">
+              {#
+                Destination. A listbox we own wrapped around a real select
+                (dashboard.css §13) — the native popup is drawn by the browser
+                and takes none of our surfaces or radius. The select stays the
+                value holder, so the submit handler just reads `.value`.
+
+                The options differ by role because the server does: auto_submit
+                publishes outright for an admin and routes to the approval queue
+                for everyone else, so offering "Send for review" to an admin
+                would name an outcome they cannot get.
+              #}
+              <div class="select-pill prompt-dest" data-select-pill>
+                <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
+                  aria-expanded="false" aria-labelledby="destLabel destValue">
+                  <i class="bi bi-inbox" aria-hidden="true"></i>
+                  <span class="visually-hidden" id="destLabel">Where it lands</span>
+                  <span class="filter-pill-value" id="destValue">Save to drafts</span>
+                  <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+                </button>
+
+                <div class="menu" role="listbox" aria-labelledby="destLabel" hidden>
+                  <button type="button" class="menu-item" role="option" data-value="draft">
+                    <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                    <span class="menu-label">Save to drafts</span>
+                  </button>
+                  <button type="button" class="menu-item" role="option" data-value="submit">
+                    <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                    <span class="menu-label">{{ 'Publish when done' if is_admin else 'Send for review' }}</span>
+                  </button>
+                </div>
+
+                {# The note lives on the option, not in the script, because the
+                   role check that decides which outcome is on offer is already
+                   here — two places deciding the same thing is how one of them
+                   ends up wrong. #}
+                <select id="promptDest" tabindex="-1" aria-hidden="true">
+                  <option value="draft" selected data-note="Lands in Drafts for you to edit.">
+                    Save to drafts
+                  </option>
+                  {% if is_admin %}
+                  <option value="submit" data-note="Goes live on your site as soon as it is written.">
+                    Publish when done
+                  </option>
+                  {% else %}
+                  <option value="submit" data-note="Goes straight to the approval queue for an admin.">
+                    Send for review
+                  </option>
+                  {% endif %}
+                </select>
+              </div>
+
+              <p class="prompt-dest-note" data-dest-note>Lands in Drafts for you to edit.</p>
+
+              <div class="prompt-foot-end">
+                {# Hidden until it is worth knowing. A counter on an empty field
+                   is noise; one that appears as the prompt gets long is a hint. #}
+                <span class="prompt-count" data-prompt-count aria-hidden="true" hidden></span>
+
+                <button type="submit" class="prompt-submit" data-submit disabled aria-label="Generate blog">
+                  <i class="bi bi-arrow-up" aria-hidden="true"></i>
+                </button>
+              </div>
             </div>
           </div>
+
+          <p class="prompt-hint">
+            <kbd>Enter</kbd> to generate · <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line
+          </p>
+        </form>
+
+        {#
+          Starters. The blank page was the screen's real problem — it asked for
+          "a blog topic in detail" and gave no sense of what detail buys you.
+          Each chip drops a shaped prompt in and selects its first [bracketed]
+          slot, so the reader types over the part that is theirs.
+        #}
+        <div class="create-starters">
+          <p class="starters-label">Not sure where to start?</p>
+          <div class="starters-row">
+            <button type="button" class="starter" data-starter
+              data-prompt-text="A step-by-step how-to guide on [your topic], written for a beginner: a short intro, numbered steps with the reasoning behind each, and the common mistakes to avoid.">
+              <i class="bi bi-signpost-2" aria-hidden="true"></i>
+              <span>How-to guide</span>
+            </button>
+            <button type="button" class="starter" data-starter
+              data-prompt-text="A comparison of [option A] and [option B]: what each is genuinely good at, where each falls short, what they cost in money and effort, and a clear recommendation for who should pick which.">
+              <i class="bi bi-columns-gap" aria-hidden="true"></i>
+              <span>Comparison</span>
+            </button>
+            <button type="button" class="starter" data-starter
+              data-prompt-text="Ten practical ideas for [your topic], each with a paragraph of explanation and one concrete example a reader could copy today.">
+              <i class="bi bi-list-ol" aria-hidden="true"></i>
+              <span>Listicle</span>
+            </button>
+            <button type="button" class="starter" data-starter
+              data-prompt-text="An explainer on [your topic] for a non-technical reader: what it actually is, why it matters right now, the two or three things people get wrong about it, and what to do next.">
+              <i class="bi bi-lightbulb" aria-hidden="true"></i>
+              <span>Explainer</span>
+            </button>
+          </div>
         </div>
-      </div>
+
+      </section>
+
+      <!-- ===================== RUN ===================== -->
+      {#
+        The working session. The old wait was one line of text and a 6px bar for
+        a pipeline that reports five named stages — so "Writing blog content"
+        sat there for a minute with nothing to say how far in it was, or that
+        three more steps were still to come.
+
+        The bar shows the server's real percentage and nothing else. It does not
+        creep between stages: a bar that invents progress can strand a wrong
+        value, and the shimmer, the pulsing step dot and the elapsed clock
+        already carry "still working" without lying about how much is left.
+      #}
+      {# No `hidden` attribute: the [data-state] switch above is the single
+         source of truth for which panel exists. A `hidden` here would be
+         overridden by .create-run's own `display: flex` anyway — author rules
+         beat the UA sheet — leaving two mechanisms where one of them lies. #}
+      <section class="create-run" data-create-panel="run" aria-label="Generation progress">
+        <div class="run-card">
+
+          <div class="run-head">
+            <span class="run-spark" aria-hidden="true">
+              <span class="material-symbols-outlined">auto_awesome</span>
+            </span>
+            <div class="run-head-body">
+              <p class="run-title" data-run-title>Warming up</p>
+              <p class="run-sub" data-run-sub>
+                This runs on the server — you can move around the app and come back.
+              </p>
+            </div>
+            <div class="run-metrics">
+              <span class="run-pct" data-run-pct>5%</span>
+              <span class="run-elapsed" data-run-elapsed>0:00</span>
+            </div>
+          </div>
+
+          {# aria-live sits on a dedicated status line rather than on the whole
+             card, so a screen reader hears the stage change and not the clock. #}
+          <p class="visually-hidden" role="status" aria-live="polite" data-run-live></p>
+
+          <div class="run-bar">
+            <span class="run-bar-fill" data-run-bar style="width: 5%"></span>
+          </div>
+
+          <ol class="run-steps" data-run-steps>
+            {% for key, label, note in [
+              ('starting',     'Warming up',             'Handing your prompt to the writing agent.'),
+              ('content',      'Writing the draft',      'The long one — usually 30 to 60 seconds.'),
+              ('formatting',   'Formatting and styling', 'Headings, table of contents, internal links.'),
+              ('categorizing', 'Assigning a category',   'Matched against the categories you already use.'),
+              ('saving',       'Saving to your library', '')
+            ] %}
+            <li class="run-step" data-step="{{ key }}">
+              <span class="run-step-mark" aria-hidden="true">
+                <i class="bi bi-check2 run-step-tick"></i>
+                <span class="run-step-dot"></span>
+              </span>
+              <span class="run-step-body">
+                <span class="run-step-label">{{ label }}</span>
+                {% if note %}<span class="run-step-note">{{ note }}</span>{% endif %}
+              </span>
+            </li>
+            {% endfor %}
+          </ol>
+
+          <div class="run-prompt">
+            <p class="run-prompt-label">Working from</p>
+            <p class="run-prompt-text" data-run-prompt></p>
+          </div>
+
+          {# Failure lands here rather than only in a toast that has already
+             faded by the time the reader looks back at the screen. #}
+          <div class="run-fail" data-run-fail hidden>
+            <span class="run-fail-icon" aria-hidden="true">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+            </span>
+            <div class="run-fail-body">
+              <p class="run-fail-title">Generation stopped</p>
+              <p class="run-fail-text" data-run-fail-text></p>
+            </div>
+            <div class="run-fail-actions">
+              <button type="button" class="app-btn is-ghost" data-action="edit-prompt">Edit prompt</button>
+              <button type="button" class="app-btn is-primary" data-action="retry">Try again</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
 
     </div>
   </main>
@@ -56,5 +283,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/create-blog.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/pages/create-blog.js') }}?v=3"></script>
 {% endblock %}
