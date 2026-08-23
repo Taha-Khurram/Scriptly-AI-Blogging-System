@@ -24,7 +24,7 @@ from app.firebase.firestore_service import FirestoreService
 import re
 import logging
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any
+from typing import List, Dict
 from enum import Enum
 
 # Configure agent logger

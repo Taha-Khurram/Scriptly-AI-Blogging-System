@@ -40,7 +40,7 @@ class EmbeddingService:
                 task_type="retrieval_document"
             )
             return result['embedding']
-        except Exception as e:
+        except Exception:
             logger.exception("Error generating embedding")
             return None
 
@@ -60,7 +60,7 @@ class EmbeddingService:
                 task_type="retrieval_query"
             )
             return result['embedding']
-        except Exception as e:
+        except Exception:
             logger.exception("Error generating query embedding")
             return None
 

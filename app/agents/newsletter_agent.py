@@ -128,7 +128,7 @@ Respond ONLY with valid JSON in this exact format:
             json_str = text[start:end]
             return json.loads(json_str)
 
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             logger.exception("JSON parse error")
             # Try to extract key fields manually
             return {
@@ -184,7 +184,7 @@ Respond with JSON array only:
             start = text.find('[')
             end = text.rfind(']') + 1
             return json.loads(text[start:end])
-        except Exception as e:
+        except Exception:
             logger.exception("Subject variation error")
             return [main_subject]
 

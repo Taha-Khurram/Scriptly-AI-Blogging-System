@@ -91,7 +91,7 @@ def invite_user():
         )
         send_result = email_service.send_single(email, "You're invited to join Scriptly", html_content)
         email_sent = send_result.get('success', False)
-    except Exception as e:
+    except Exception:
         logger.exception("Email send attempt failed")
 
     db_service.log_activity(

@@ -117,7 +117,7 @@ def home():
             published_blogs=published_blogs[:5]
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error in home route")
         return render_template(
             'home.html',
@@ -269,7 +269,7 @@ def get_blog(blog_id):
                     'toc': result.get('toc', []),
                     'toc_html': result.get('toc_html', '')
                 }
-            except Exception as e:
+            except Exception:
                 logger.exception("Markdown conversion error")
                 # Fallback: basic conversion using markdown library
                 html = markdown.markdown(markdown_text, extensions=['extra', 'tables', 'toc'])
@@ -1512,7 +1512,7 @@ def track_activity():
 
         return jsonify({"success": True, "tracked": len(enriched_events)})
 
-    except Exception as e:
+    except Exception:
         logger.exception("Track activity error")
         return jsonify({"success": True, "tracked": 0})
 
@@ -1528,7 +1528,7 @@ def get_sheets_recent_activity():
         spreadsheet_id = GoogleSheetsService.get_spreadsheet_id_for_user(user_id)
         recent = sheets.get_recent_activities(spreadsheet_id=spreadsheet_id, limit=10)
         return jsonify({"success": True, "activities": recent})
-    except Exception as e:
+    except Exception:
         return jsonify({"success": True, "activities": []})
 
 

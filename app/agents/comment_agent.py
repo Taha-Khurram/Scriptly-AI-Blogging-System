@@ -48,7 +48,7 @@ class CommentAgent:
                 result['reason'] = None
             return result
 
-        except Exception as e:
+        except Exception:
             logger.exception("CommentAgent Error")
             # Fail-open: approve as-is if AI fails
             return {

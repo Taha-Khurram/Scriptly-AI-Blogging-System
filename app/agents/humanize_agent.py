@@ -300,7 +300,7 @@ class HumanizeAgent:
                 "humanization_applied": True
             }
 
-        except Exception as e:
+        except Exception:
             logger.exception("HumanizeAgent Error")
             return {
                 "markdown": original_markdown,

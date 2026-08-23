@@ -20,6 +20,7 @@ the original code: it stops a signed-in non-admin from mapping which admin
 routes exist. API calls still get a true 403 because the frontend needs to
 distinguish "not allowed" from "gone".
 """
+
 from __future__ import annotations
 
 import hmac
@@ -269,36 +270,75 @@ def enforce_session_timeout(app):
         endpoint = request.endpoint
         if not endpoint:
             return None
-        if endpoint in PUBLIC_ENDPOINTS:
-            return None
         if endpoint.split('.', 1)[0] in PUBLIC_BLUEPRINTS:
             return None
         if not session.get('logged_in'):
             return None
 
+        if endpoint in PUBLIC_ENDPOINTS:
+            # Exempt from being *blocked*, but not from being evaluated. The
+            # login page redirects a signed-in visitor to the dashboard, so a
+            # session that is stale-but-still-marked-logged-in would bounce the
+            # user login -> dashboard -> (expire) -> login. Clearing it here
+            # means the login page they asked for is the page they get.
+            if _is_stale(session.get('last_activity'),
+                         current_app.config['PERMANENT_SESSION_LIFETIME']):
+                session.clear()
+            return None
+
         timeout = current_app.config['PERMANENT_SESSION_LIFETIME']
-        last_activity = session.get('last_activity')
+        raw_last_activity = session.get('last_activity')
 
-        if last_activity is not None:
-            if isinstance(last_activity, str):
-                try:
-                    last_activity = datetime.fromisoformat(last_activity)
-                except ValueError:
-                    # Unparsable timestamp means we cannot prove the session is
-                    # fresh, so treat it as stale rather than trusting it.
-                    last_activity = None
-
-            if last_activity is not None:
-                if last_activity.tzinfo is None:
-                    last_activity = last_activity.replace(tzinfo=timezone.utc)
-                if datetime.now(timezone.utc) - last_activity > timeout:
-                    user_id = session.get('user_id')
-                    session.clear()
-                    logger.info('Session expired', extra={'user_id': user_id})
-                    raise SessionExpiredError()
+        # An absent timestamp is the first request of a new session and is
+        # fine. A *present but unusable* one is not: it means the session
+        # cannot be shown to be fresh, and the only safe reading of "cannot
+        # prove" is "expired". Trusting it instead would make a session with a
+        # corrupted or tampered timestamp immortal.
+        if raw_last_activity is not None:
+            last_activity = _parse_last_activity(raw_last_activity)
+            if last_activity is None:
+                return _expire_session('unparsable last_activity')
+            if datetime.now(timezone.utc) - last_activity > timeout:
+                return _expire_session('inactivity timeout')
 
         session['last_activity'] = datetime.now(timezone.utc).isoformat()
         return None
+
+
+def _is_stale(raw_last_activity, timeout):
+    """Whether a session's last activity is outside ``timeout``.
+
+    An absent timestamp is not stale -- that is a session's first request. An
+    unparsable one is, because freshness cannot be established.
+    """
+    if raw_last_activity is None:
+        return False
+    last_activity = _parse_last_activity(raw_last_activity)
+    if last_activity is None:
+        return True
+    return datetime.now(timezone.utc) - last_activity > timeout
+
+
+def _parse_last_activity(value):
+    """The session's last-activity time as an aware datetime, or ``None``."""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except (ValueError, TypeError):
+            return None
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def _expire_session(reason):
+    """Clear the session and raise, so the caller gets a structured response."""
+    user_id = session.get('user_id')
+    session.clear()
+    logger.info('Session expired', extra={'user_id': user_id, 'reason': reason})
+    raise SessionExpiredError()
 
 
 # Content-Security-Policy. Built as a dict so a directive can be adjusted in

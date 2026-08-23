@@ -732,7 +732,7 @@ class SEOAgent:
                 logger.info(f"Ahrefs rate limited for keyword: {keyword}")
             else:
                 logger.info(f"Ahrefs API returned {resp.status_code} for: {keyword}")
-        except Exception as e:
+        except Exception:
             logger.exception(f"Ahrefs keyword fetch error for '{keyword}'")
         return None
 
@@ -944,7 +944,7 @@ OUTPUT FORMAT - respond with ONLY this JSON structure, nothing else:
                     response = self.model.generate_content(prompt, **self._gen_kwargs)
                     if response and response.text:
                         break
-                except Exception as retry_err:
+                except Exception:
                     logger.exception(f"Gemini attempt {attempt+1} failed")
                     if attempt < 2:
                         _time.sleep(2)

@@ -40,6 +40,6 @@ class CategoryAgent:
         try:
             response = self.model.generate_content(prompt)
             return response.text.strip()
-        except Exception as e:
+        except Exception:
             logger.exception("CategoryAgent Error")
             return "General"

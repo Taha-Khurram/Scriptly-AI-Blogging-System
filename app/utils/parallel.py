@@ -67,7 +67,7 @@ def run_parallel_simple(funcs_with_args: List[Tuple[Callable, tuple]], max_worke
             index = future_to_index[future]
             try:
                 results[index] = future.result()
-            except Exception as e:
+            except Exception:
                 logger.exception(f"Parallel task {index} failed")
                 results[index] = None
 

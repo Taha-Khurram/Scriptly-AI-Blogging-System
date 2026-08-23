@@ -28,7 +28,7 @@ def app_settings_page():
     try:
         settings = db_service.get_app_settings()
         return render_template('app_settings.html', settings=settings)
-    except Exception as e:
+    except Exception:
         logger.exception("Error loading app settings page")
         return render_template('app_settings.html', settings={
             'app_name': 'Scriptly',
@@ -143,7 +143,7 @@ def get_public_settings():
             "success": True,
             "data": public_settings
         })
-    except Exception as e:
+    except Exception:
         return jsonify({
             "success": True,
             "data": {

@@ -24,6 +24,7 @@ the extension is attacker-chosen -- so the *content* is inspected: the magic
 bytes must match a known image format, and the stored content type comes from
 that inspection rather than from the client's ``Content-Type`` header.
 """
+
 from __future__ import annotations
 
 import io

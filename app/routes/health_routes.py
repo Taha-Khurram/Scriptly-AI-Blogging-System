@@ -23,6 +23,7 @@ health check would make it declare the instance dead -- and every check is
 individually time-boxed so one slow dependency cannot make the probe itself
 time out and be read as a total failure.
 """
+
 from __future__ import annotations
 
 import logging

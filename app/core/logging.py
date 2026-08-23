@@ -18,6 +18,7 @@ other or to the error the user saw. This module replaces that with:
 Nothing here depends on Flask's own logger configuration, so library logs
 (werkzeug, gunicorn, google-*) end up in the same stream and the same format.
 """
+
 from __future__ import annotations
 
 import json

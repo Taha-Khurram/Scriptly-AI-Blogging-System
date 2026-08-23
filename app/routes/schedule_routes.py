@@ -1,6 +1,5 @@
 from flask import Blueprint, render_template, request, session, jsonify, redirect, url_for
 from app.firebase.firestore_service import FirestoreService
-from datetime import datetime
 from app.utils.date_utils import to_utc, utcnow
 from app.core.logging import get_logger
 
@@ -55,7 +54,7 @@ def schedule_list():
                     author_names[author_id] = (
                         u.get("name") or (u.get("email") or "").split("@")[0] or ""
                     )
-            except Exception as e:
+            except Exception:
                 logger.exception(f"[Schedule List] Could not resolve author {author_id}")
 
         result = []
@@ -297,7 +296,7 @@ def schedule_blog(blog_id):
                 if author_doc.exists:
                     a = author_doc.to_dict()
                     author_name = a.get('name') or (a.get('email') or '').split('@')[0] or ''
-            except Exception as e:
+            except Exception:
                 logger.exception("Could not resolve author name for schedule entry")
 
             db_service.save_schedule_entry(

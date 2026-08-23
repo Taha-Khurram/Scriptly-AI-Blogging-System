@@ -17,6 +17,7 @@ the network when ``TESTING`` is set. That is what lets the test suite build the
 real application instead of the hand-rolled partial app it needed before, where
 the thing under test was not the thing that ships.
 """
+
 from __future__ import annotations
 
 import logging

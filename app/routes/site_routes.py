@@ -160,7 +160,7 @@ def site_home(site_identifier):
             user_id=user_id
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Site Home Error")
         abort(404)
 
@@ -232,7 +232,7 @@ def site_post(site_identifier, slug_or_id):
             user_id=user_id
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Site Post Error")
         abort(404)
 
@@ -260,7 +260,7 @@ def site_about(site_identifier):
             user_id=user_id
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Site About Error")
         abort(404)
 
@@ -295,7 +295,7 @@ def site_category(site_identifier, category_name):
             current_category=category_name
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Site Category Error")
         abort(404)
 
@@ -362,7 +362,7 @@ def site_blog(site_identifier):
             user_id=user_id
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Site Blog Error")
         abort(404)
 
@@ -381,7 +381,7 @@ def site_contact(site_identifier):
             user_id=user_id
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Site Contact Error")
         abort(404)
 
@@ -550,7 +550,7 @@ Disallow: /
 
         return Response(robots_content, mimetype='text/plain')
 
-    except Exception as e:
+    except Exception:
         logger.exception("Robots.txt Error")
         # Default permissive robots.txt on error
         return Response("User-agent: *\nAllow: /\n", mimetype='text/plain')
@@ -639,7 +639,7 @@ def site_sitemap(site_identifier):
 
         return Response('\n'.join(xml_parts), mimetype='application/xml')
 
-    except Exception as e:
+    except Exception:
         logger.exception("Sitemap Error")
         return Response(
             '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>',
@@ -770,7 +770,7 @@ def site_rss_feed(site_identifier):
 
         return Response('\n'.join(rss_parts), mimetype='application/rss+xml')
 
-    except Exception as e:
+    except Exception:
         logger.exception("RSS Feed Error")
         return Response(
             '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Error</title></channel></rss>',
@@ -815,7 +815,7 @@ def site_privacy_policy(site_identifier):
             user_id=user_id
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Privacy Policy Error")
         abort(404)
 
@@ -857,7 +857,7 @@ def site_terms_of_service(site_identifier):
             user_id=user_id
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Terms of Service Error")
         abort(404)
 
@@ -1017,7 +1017,7 @@ def site_get_comments(site_identifier, slug_or_id):
 
         return jsonify({"success": True, "comments": public_comments})
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error fetching comments")
         return jsonify({"success": True, "comments": []})
 
@@ -1044,7 +1044,7 @@ def site_catch_all(site_identifier, undefined_path):
             user_id=user_id
         ), 404
 
-    except Exception as e:
+    except Exception:
         logger.exception("Catch-all 404 Error")
         # If site doesn't exist, return generic 404
         abort(404)

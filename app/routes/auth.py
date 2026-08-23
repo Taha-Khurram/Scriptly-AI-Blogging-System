@@ -26,6 +26,7 @@ uid as the Firestore lookup key and the cache key. Now the unverified payload
 is used solely to probe the session cache, and every value written to the
 session comes from the verified token.
 """
+
 from __future__ import annotations
 
 import base64

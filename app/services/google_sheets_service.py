@@ -1,7 +1,6 @@
 import os
 import threading
 import queue
-from datetime import datetime
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -69,7 +68,7 @@ class GoogleSheetsService:
                 ws = self._get_worksheet(spreadsheet_id)
                 if ws and rows:
                     ws.append_rows(rows, value_input_option='USER_ENTERED')
-            except Exception as e:
+            except Exception:
                 logger.exception("Google Sheets write error")
                 self._worksheet_cache = {}
 
@@ -103,7 +102,7 @@ class GoogleSheetsService:
 
             self._worksheet_cache[cache_key] = ws
             return ws
-        except Exception as e:
+        except Exception:
             logger.exception("Google Sheets worksheet error")
             return None
 
@@ -151,7 +150,7 @@ class GoogleSheetsService:
                 }
                 for r in recent
             ]
-        except Exception as e:
+        except Exception:
             logger.exception("Google Sheets read error")
             return []
 

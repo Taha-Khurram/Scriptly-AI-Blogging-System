@@ -5,7 +5,7 @@ Handles markdown processing, TOC generation, reading time, and HTML conversion
 
 import re
 import markdown
-from typing import Dict, List, Optional
+from typing import Dict, List
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -237,7 +237,7 @@ class FormattingAgent:
 
             return html
 
-        except Exception as e:
+        except Exception:
             logger.exception("Markdown conversion error")
             # Fallback: basic conversion
             return f'<article class="blog-content">{content.replace(chr(10), "<br>")}</article>'

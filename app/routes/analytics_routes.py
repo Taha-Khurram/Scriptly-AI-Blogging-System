@@ -96,7 +96,7 @@ def _fetch_measurement_id(creds, property_id):
                     stream.web_stream_data.measurement_id,
                     stream.web_stream_data.default_uri or ''
                 )
-    except Exception as e:
+    except Exception:
         logger.exception("Error fetching measurement ID")
     return (None, None)
 
@@ -236,7 +236,7 @@ def analytics_page():
         site_settings = db_service.get_site_settings(user_id) if connected else {}
         custom_domain = site_settings.get('custom_domain', '') if site_settings else ''
         site_analytics_id = site_settings.get('analytics_id', '') if site_settings else ''
-    except Exception as e:
+    except Exception:
         # Never let a transient backend error turn navigation into a hard error
         # page — render a safe (disconnected) state instead of a 500.
         logger.exception("Analytics page load error")
@@ -347,7 +347,7 @@ def callback():
             code=code,
             code_verifier=session.get('code_verifier')
         )
-    except Exception as e:
+    except Exception:
         logger.exception("OAuth token exchange failed")
         return redirect(url_for('analytics_bp.analytics_page', error='oauth'))
     finally:
@@ -589,7 +589,7 @@ def overview_data():
         previous = None
         try:
             previous = _overview_totals(client, property_id, prev_start, prev_end)
-        except Exception as e:
+        except Exception:
             logger.exception("Overview comparison unavailable")
 
         return jsonify({

@@ -28,10 +28,10 @@ class PublishTimeAgent:
                 "suggestions": suggestions,
                 "data_period": "Last 28 days"
             }
-        except ImportError as e:
+        except ImportError:
             logger.exception("Analytics error")
             return {"success": False, "suggestions": [], "reason": "module_not_installed"}
-        except Exception as e:
+        except Exception:
             logger.exception("PublishTimeAgent error")
             return {"success": False, "suggestions": [], "reason": "error"}
 

@@ -25,6 +25,7 @@ Task state is still per-process, which is correct only while the AI work itself
 runs in-process. The trade-off, and the migration path to a shared broker, is
 documented in :meth:`TaskManager.stats` and in the deployment notes.
 """
+
 from __future__ import annotations
 
 import logging

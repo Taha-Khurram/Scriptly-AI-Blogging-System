@@ -3,7 +3,7 @@ import re
 from app.agents.content_agent import ContentAgent
 from app.agents.formatting_agent import FormattingAgent
 from app.agents.seo_agent import SEOAgent
-from app.utils.parallel import run_parallel_simple, TimedExecution
+from app.utils.parallel import TimedExecution
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -106,7 +106,7 @@ class BlogAgent:
                 "status": "failed",
                 "partial_outline": outline if 'outline' in locals() else None
             }
-        except Exception as e:
+        except Exception:
             logger.exception("Unexpected Error")
             return {"error": "An unexpected system error occurred.", "status": "failed"}
 
