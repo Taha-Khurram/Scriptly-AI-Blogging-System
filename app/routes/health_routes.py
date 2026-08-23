@@ -110,6 +110,26 @@ def _check_ai():
     return {'status': 'ok', 'model': gemini.default_model}
 
 
+def _check_storage():
+    """Whether uploads land somewhere that survives a restart.
+
+    Reported as *degraded* rather than failed when it is local disk: the app
+    serves fine, but every upload is one deploy away from becoming a broken
+    image link, and that must be visible on a dashboard rather than discovered
+    by a user.
+    """
+    from app.services.storage_service import storage
+
+    if not storage.healthy():
+        return {'status': 'fail', 'backend': storage.backend_name,
+                'error': 'storage backend is not writable'}
+    return {
+        'status': 'ok' if storage.is_durable else 'degraded',
+        'backend': storage.backend_name,
+        'durable': storage.is_durable,
+    }
+
+
 def _check_tasks():
     """Background worker pool depth -- the AI throughput ceiling."""
     from app.utils.task_manager import task_manager
@@ -132,6 +152,7 @@ _CHECKS = {
     'cache': _check_cache,
     'ai': _check_ai,
     'tasks': _check_tasks,
+    'storage': _check_storage,
 }
 
 

@@ -7,6 +7,7 @@ from app.utils.retry import retry_on_unavailable
 from app.utils.date_utils import ensure_aware, utcnow
 
 from app.core.logging import get_logger
+from app.core.sanitize import sanitize_basic_html
 
 logger = get_logger(__name__)
 
@@ -26,6 +27,62 @@ def _parse_filter_date(value, end_of_day=False):
     if end_of_day:
         parsed = parsed.replace(hour=23, minute=59, second=59, microsecond=999999)
     return parsed.replace(tzinfo=timezone.utc)
+
+
+def _safe_asset_url(url):
+    """Accept only an https URL, a same-origin path, or a data: image.
+
+    These values are written straight into ``src``/``href`` attributes on
+    public pages. ``javascript:`` there is a stored XSS; plain ``http:`` is
+    blocked as mixed content on an https site and simply renders as a broken
+    image, which is worth rejecting at input rather than debugging later.
+    An empty string is valid -- it means "no image set".
+    """
+    if not url:
+        return ''
+    lowered = url.strip().lower()
+    if lowered.startswith(('https://', '/')):
+        return url.strip()
+    # data:image is how an inline favicon or small logo is legitimately stored.
+    if lowered.startswith('data:image/'):
+        return url.strip()
+    logger.warning('Rejected unsafe asset URL in site settings: %s', url[:80])
+    return ''
+
+
+def _sanitize_blog_content(content):
+    """Clean the HTML in a blog ``content`` map before it is stored.
+
+    Blog bodies are rendered on the public site with Jinja autoescaping
+    disabled, so whatever is stored here executes in every visitor's browser.
+    Authors include ``USER``-role accounts whose posts an admin later
+    publishes, which makes an unsanitised body a privilege-escalation path:
+    inject a script into a draft, wait for it to be approved, and it runs on
+    the owner's domain against every reader -- including the admin session
+    that reviews it.
+
+    Sanitising here rather than at render time means the stored value is
+    already safe, so a template that forgets ``|safe`` handling, an API
+    response, or an RSS feed all serve the same clean HTML. The Markdown
+    ``body`` is left untouched: it is the author's source text, is never
+    rendered unescaped, and is re-converted to HTML through this same path.
+    """
+    from app.core.sanitize import sanitize_post_html
+
+    if not content:
+        return content
+
+    if isinstance(content, str):
+        return sanitize_post_html(content)
+
+    if not isinstance(content, dict):
+        return content
+
+    cleaned = dict(content)
+    for key in ('html', 'toc_html'):
+        if cleaned.get(key):
+            cleaned[key] = sanitize_post_html(cleaned[key])
+    return cleaned
 
 
 class FirestoreService:
@@ -73,6 +130,9 @@ class FirestoreService:
             blog_data['created_at'] = firestore.SERVER_TIMESTAMP
             blog_data['updated_at'] = utcnow()
             blog_data['author_id'] = user_id
+            # Sanitised on the way in, so nothing downstream has to remember to.
+            if 'content' in blog_data:
+                blog_data['content'] = _sanitize_blog_content(blog_data['content'])
             blog_data['site_owner_id'] = self.get_site_owner_for_user(user_id)
             blog_data['status'] = blog_data.get('status', 'DRAFT').upper()
 
@@ -130,7 +190,7 @@ class FirestoreService:
 
             update_data = {
                 'title': title,
-                'content': content,
+                'content': _sanitize_blog_content(content),
                 'updated_at': utcnow()
             }
 
@@ -1982,10 +2042,25 @@ For questions about these Terms, contact us at {contact_email}.
             'locale': 10,
         }
 
+        # about_content is rendered with |safe on the public About page, so it
+        # gets the markup allowlist rather than the plain length trim.
+        html_fields = {'about_content'}
+        # Fields that end up in an href/src attribute. A javascript: value in
+        # logo_url or og_image_url is a stored injection on every page of the
+        # site, and these are set by the site owner but rendered to the public.
+        url_fields = {
+            'logo_url', 'favicon_url', 'cover_image_url', 'og_image_url',
+        }
+
         for field, max_len in string_fields.items():
-            if field in settings:
-                val = str(settings[field]).strip()[:max_len]
-                validated[field] = val
+            if field not in settings:
+                continue
+            val = str(settings[field]).strip()[:max_len]
+            if field in html_fields:
+                val = sanitize_basic_html(val)
+            elif field in url_fields:
+                val = _safe_asset_url(val)
+            validated[field] = val
 
         # Primary color validation (hex format)
         if 'primary_color' in settings:

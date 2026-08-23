@@ -135,6 +135,13 @@ def _init_infrastructure(app):
         from app.firebase.firebase_admin import FirebaseLoader
         FirebaseLoader.get_instance(app.config['FIREBASE_SERVICE_ACCOUNT'])
 
+    # After Firebase, which the Firebase storage backend depends on.
+    from app.services.storage_service import storage
+    storage.configure(
+        backend=app.config.get('UPLOAD_BACKEND', 'firebase'),
+        max_bytes=app.config.get('UPLOAD_MAX_BYTES', 5 * 1024 * 1024),
+    )
+
 
 def _init_middleware(app):
     """WSGI middleware, outermost first."""

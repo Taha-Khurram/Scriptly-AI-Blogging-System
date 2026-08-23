@@ -1,29 +1,57 @@
 # Pinned to the versions in the working local .venv (Python 3.11).
+#
 # Fully unpinned deps caused pip's resolver to backtrack through hundreds of
 # transitive versions on Render and fail with "resolution-too-deep". Pinning
 # both the direct deps and the shared Google/gRPC/HTTP transitive packages
 # keeps the resolver's search space small and the build fast + reproducible.
 
-# --- Direct dependencies ---
+# --- Web framework ---
 flask==3.1.2
-python-dotenv==1.2.1
-firebase-admin==7.1.0
-google-generativeai==0.8.6
-google-analytics-data==0.21.0
-google-analytics-admin==0.28.0
-google-auth-oauthlib==1.3.1
-google-auth==2.48.0
-requests==2.32.5
 gunicorn==25.1.0
 waitress==3.0.2
 whitenoise==6.11.0
 flask-compress==1.23
-pytrends==4.9.2
-markdown==3.10.2
+python-dotenv==1.2.1
+
+# --- Security ---
+# CSRF tokens for every state-changing request. SameSite=Lax covers the common
+# cross-site form POST, but it is one browser-dependent control and does not
+# cover same-site subdomain attacks.
+flask-wtf==1.2.2
+# Per-IP / per-user rate limiting. The public site exposes endpoints that spend
+# a Gemini call each with no authentication in front of them.
+flask-limiter==4.1.1
+# HTML sanitisation for stored content rendered with autoescaping disabled.
+# The [css] extra pulls tinycss2, needed to allowlist inline style properties
+# rather than dropping the style attribute wholesale.
+bleach[css]==6.2.0
+
+# --- Data / infrastructure ---
+firebase-admin==7.1.0
+# Shared cache, rate-limit counters and the scheduler's single-runner lease.
+# Optional at runtime: without REDIS_URL the app falls back to per-process
+# state, which is correct for one worker only.
+redis==6.4.0
+
+# --- AI ---
+# NOTE: google-generativeai is end-of-life and emits a FutureWarning on import.
+# Migrating to the `google-genai` package is tracked separately; it is an API
+# change, not a version bump, so it does not belong in a hardening pass.
+google-generativeai==0.8.6
 numpy==2.4.4
-APScheduler==3.11.2
+
+# --- Google integrations ---
+google-analytics-data==0.21.0
+google-analytics-admin==0.28.0
+google-auth-oauthlib==1.3.1
+google-auth==2.48.0
 gspread==6.2.1
-pytest==9.1.1
+
+# --- Utilities ---
+requests==2.32.5
+markdown==3.10.2
+APScheduler==3.11.2
+pytrends==4.9.2
 
 # --- Shared transitive deps pinned to stop resolver backtracking ---
 google-api-core==2.29.0
