@@ -1,5 +1,63 @@
+# --- Secrets: never commit these ---
 .env
+.env.*
+!.env.example
 serviceAccountKey.json
+*-service-account*.json
+
+# --- Python ---
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Test and coverage artefacts ---
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.cache/
+
+# --- Type checkers and linters ---
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# --- Local uploads ---
+# The local storage backend writes here during development. Production uses
+# object storage, and committing a developer's test images would put unrelated
+# binaries in the history.
+app/static/uploads/
+
+# --- Editors and OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Firebase tooling ---
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# --- Runtime ---
+*.log
+*.pid
