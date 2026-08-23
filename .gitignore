@@ -41,6 +41,13 @@ htmlcov/
 # The local storage backend writes here during development. Production uses
 # object storage, and committing a developer's test images would put unrelated
 # binaries in the history.
+#
+# NOTE: 17 files already tracked here predate the move to object storage, and
+# Firestore rows still point at their /static/uploads/... URLs. They stay
+# tracked deliberately -- untracking them would 404 those users' galleries.
+# Remove them in a separate commit once
+# `scripts/migrate_uploads_to_storage.py --delete-local` has run and been
+# verified.
 app/static/uploads/
 
 # --- Editors and OS ---
