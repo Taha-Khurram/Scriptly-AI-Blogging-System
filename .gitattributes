@@ -1,0 +1,51 @@
+# Line-ending policy.
+#
+# The repository held a mix of CRLF and LF in the same source tree (66 files
+# CRLF, 118 LF), so any tool that rewrote a file also flipped its endings and
+# produced a whole-file diff -- which buries a three-line change in a thousand
+# lines of noise and makes review impossible. Declaring the policy here makes
+# it deterministic for every contributor and platform instead of depending on
+# each developer's core.autocrlf setting.
+#
+# LF in the repository for everything text: it is what the deployment target
+# (Linux containers) runs, and what shell scripts require to be executable.
+# Editors on Windows all handle LF transparently.
+
+* text=auto eol=lf
+
+# --- Explicit, for anything the heuristic could misread -------------------
+*.py    text eol=lf diff=python
+*.js    text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf diff=html
+*.md    text eol=lf
+*.json  text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.txt   text eol=lf
+*.cfg   text eol=lf
+*.ini   text eol=lf
+*.toml  text eol=lf
+*.sh    text eol=lf
+.env*   text eol=lf
+
+# --- Binary: never touched, never diffed as text -------------------------
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
+*.pdf   binary
+*.zip   binary
+
+# --- Excluded from source archives / release tarballs --------------------
+.gitattributes  export-ignore
+.gitignore      export-ignore
+tests/          export-ignore
+docs/           export-ignore
