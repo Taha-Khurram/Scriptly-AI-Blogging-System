@@ -4,6 +4,9 @@ import os
 import time
 import uuid
 from app.core.security import login_required
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 gallery_bp = Blueprint('gallery', __name__)
 db_service = FirestoreService()
@@ -81,7 +84,7 @@ def remove_image_file(url):
     except OSError as e:
         # The metadata is already gone, so the image has left the library
         # either way; a stranded file is a cleanup problem, not a failed delete.
-        print(f"File delete error (metadata already removed): {e}")
+        logger.exception("File delete error (metadata already removed)")
 
 
 @gallery_bp.route('/gallery')
@@ -157,8 +160,6 @@ def upload_image():
             }
         })
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return jsonify({'success': False, 'error': 'Upload failed'}), 500
 
 

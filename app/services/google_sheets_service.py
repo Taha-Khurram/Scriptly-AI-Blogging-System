@@ -6,6 +6,9 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 from app.utils.date_utils import utcnow
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class GoogleSheetsService:
@@ -67,7 +70,7 @@ class GoogleSheetsService:
                 if ws and rows:
                     ws.append_rows(rows, value_input_option='USER_ENTERED')
             except Exception as e:
-                print(f"Google Sheets write error: {e}")
+                logger.exception("Google Sheets write error")
                 self._worksheet_cache = {}
 
     def _get_client(self):
@@ -101,7 +104,7 @@ class GoogleSheetsService:
             self._worksheet_cache[cache_key] = ws
             return ws
         except Exception as e:
-            print(f"Google Sheets worksheet error: {e}")
+            logger.exception("Google Sheets worksheet error")
             return None
 
     def _append(self, row, spreadsheet_id=None):
@@ -149,7 +152,7 @@ class GoogleSheetsService:
                 for r in recent
             ]
         except Exception as e:
-            print(f"Google Sheets read error: {e}")
+            logger.exception("Google Sheets read error")
             return []
 
     def log_activity(self, user_name, action_type, action_text, blog_title="", details="", spreadsheet_id=None):

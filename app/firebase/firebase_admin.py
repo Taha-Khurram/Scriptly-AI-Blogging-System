@@ -2,6 +2,9 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage
 import json
 import os
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 class FirebaseLoader:
     _instance = None
@@ -13,14 +16,14 @@ class FirebaseLoader:
             firebase_creds = cert_path_or_json or os.getenv('FIREBASE_SERVICE_ACCOUNT')
 
             if not firebase_creds:
-                print("ERROR: No Firebase credentials found!")
-                print(f"FIREBASE_SERVICE_ACCOUNT env: {os.getenv('FIREBASE_SERVICE_ACCOUNT', 'NOT SET')[:50] if os.getenv('FIREBASE_SERVICE_ACCOUNT') else 'NOT SET'}")
+                logger.error("ERROR: No Firebase credentials found!")
+                logger.info(f"FIREBASE_SERVICE_ACCOUNT env: {os.getenv('FIREBASE_SERVICE_ACCOUNT', 'NOT SET')[:50] if os.getenv('FIREBASE_SERVICE_ACCOUNT') else 'NOT SET'}")
                 raise ValueError("Firebase credentials not found. Set FIREBASE_SERVICE_ACCOUNT environment variable.")
 
             cred = None
 
             if isinstance(firebase_creds, str) and os.path.exists(firebase_creds):
-                print(f"Loading Firebase from file: {firebase_creds}")
+                logger.info(f"Loading Firebase from file: {firebase_creds}")
                 cred = credentials.Certificate(firebase_creds)
             else:
                 try:
@@ -29,15 +32,15 @@ class FirebaseLoader:
                     else:
                         json_str = firebase_creds.strip()
                         cert_dict = json.loads(json_str)
-                    print(f"Loading Firebase from JSON (project: {cert_dict.get('project_id', 'unknown')})")
+                    logger.info(f"Loading Firebase from JSON (project: {cert_dict.get('project_id', 'unknown')})")
                     cred = credentials.Certificate(cert_dict)
                 except json.JSONDecodeError as e:
-                    print(f"JSON Parse Error: {e}")
-                    print(f"Value type: {type(firebase_creds)}")
-                    print(f"First 100 chars: {str(firebase_creds)[:100]}")
+                    logger.exception("JSON Parse Error")
+                    logger.exception(f"Value type: {type(firebase_creds)}")
+                    logger.exception(f"First 100 chars: {str(firebase_creds)[:100]}")
                     raise ValueError(f"Invalid Firebase JSON: {e}")
                 except Exception as e:
-                    print(f"Firebase Error: {e}")
+                    logger.exception("Firebase Error")
                     raise ValueError(f"Invalid Firebase certificate: {e}")
 
             storage_bucket = os.getenv('FB_STORAGE_BUCKET')
@@ -45,8 +48,8 @@ class FirebaseLoader:
             cls._instance = firestore.client()
             if storage_bucket:
                 cls._bucket = storage.bucket()
-                print(f"--- Firebase Storage bucket: {storage_bucket} ---")
-            print("--- Firebase Admin SDK Initialized Successfully ---")
+                logger.info(f"Firebase Storage bucket: {storage_bucket} ---")
+            logger.info("Firebase Admin SDK Initialized Successfully ---")
 
         return cls._instance
 

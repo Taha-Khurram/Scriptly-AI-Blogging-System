@@ -24,6 +24,9 @@ import inspect
 from typing import Dict, List, Optional
 from collections import Counter
 from app.utils.cache import cache
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 # Raise the client deadline well above the default ~60s gRPC timeout. Full-blog
@@ -674,11 +677,11 @@ class SEOAgent:
         cache_key = f"keywords:{region}:{':'.join(sorted(keywords[:5]))}"
         cached_result = cache.get(cache_key)
         if cached_result is not None:
-            print("Using cached keyword data")
+            logger.info("Using cached keyword data")
             return cached_result
 
         if not self.ahrefs_key:
-            print("ERROR: AHREFS_RAPIDAPI_KEY not configured")
+            logger.error("ERROR: AHREFS_RAPIDAPI_KEY not configured")
             return []
 
         country = region.lower() if region else "us"
@@ -690,7 +693,7 @@ class SEOAgent:
                 results.append(data)
 
         if results:
-            print(f"Using Ahrefs keyword data ({len(results)} keywords)")
+            logger.info(f"Using Ahrefs keyword data ({len(results)} keywords)")
             cache.set(cache_key, results, ttl=900)
 
         return results
@@ -726,11 +729,11 @@ class SEOAgent:
                     "source": "ahrefs"
                 }
             elif resp.status_code == 429:
-                print(f"Ahrefs rate limited for keyword: {keyword}")
+                logger.info(f"Ahrefs rate limited for keyword: {keyword}")
             else:
-                print(f"Ahrefs API returned {resp.status_code} for: {keyword}")
+                logger.info(f"Ahrefs API returned {resp.status_code} for: {keyword}")
         except Exception as e:
-            print(f"Ahrefs keyword fetch error for '{keyword}': {e}")
+            logger.exception(f"Ahrefs keyword fetch error for '{keyword}'")
         return None
 
     def _map_competition(self, value) -> str:
@@ -757,7 +760,7 @@ class SEOAgent:
                                       max_difficulty: int = 40, min_volume: int = 100) -> Dict:
         """Find low-competition keywords"""
         seed_keywords = self.extract_seed_keywords(topic, content)
-        print(f"Seed keywords: {seed_keywords}")
+        logger.info(f"Seed keywords: {seed_keywords}")
 
         all_keywords = self.get_keyword_data(seed_keywords, region)
 
@@ -942,13 +945,13 @@ OUTPUT FORMAT - respond with ONLY this JSON structure, nothing else:
                     if response and response.text:
                         break
                 except Exception as retry_err:
-                    print(f"Gemini attempt {attempt+1} failed: {retry_err}")
+                    logger.exception(f"Gemini attempt {attempt+1} failed")
                     if attempt < 2:
                         _time.sleep(2)
             if not response or not response.text:
                 raise ValueError("Gemini failed to generate content after 3 attempts")
         except Exception as e:
-            print(f"Gemini API error in auto_implement_seo: {e}")
+            logger.exception("Gemini API error in auto_implement_seo")
             analysis = self.analyze_content(content, title, primary_keyword)
             return {
                 "optimized_title": title,
@@ -1047,7 +1050,7 @@ OUTPUT FORMAT - respond with ONLY this JSON structure, nothing else:
             return result
 
         except Exception as e:
-            print(f"Error parsing SEO response: {e}")
+            logger.exception("Error parsing SEO response")
             # Return basic analysis of original content
             analysis = self.analyze_content(content, title, primary_keyword)
             return {
@@ -1068,7 +1071,7 @@ OUTPUT FORMAT - respond with ONLY this JSON structure, nothing else:
         Analyze content without optimization - Step 1 of two-step workflow
         Returns detailed analysis of current SEO status
         """
-        print(f"Analyzing content SEO (no optimization)...")
+        logger.info("Analyzing content SEO (no optimization)...")
 
         # Run comprehensive analysis
         analysis = self.analyze_content(content, title, target_keyword)
@@ -1192,17 +1195,17 @@ OUTPUT FORMAT - respond with ONLY this JSON structure, nothing else:
             return result
 
         except Exception as e:
-            print(f"Ahrefs URL analysis error: {e}")
+            logger.exception("Ahrefs URL analysis error")
             return {"success": False, "error": str(e)}
 
 
     def optimize_blog(self, title: str, content: str, region: str = "US") -> Dict:
         """Complete SEO optimization pipeline"""
-        print(f"Starting SEO optimization for region: {region}")
+        logger.info(f"Starting SEO optimization for region: {region}")
 
         # Analyze original content first
         original_analysis = self.analyze_content(content, title)
-        print(f"Original SEO Score: {original_analysis['seo_score']['total']}/100")
+        logger.info(f"Original SEO Score: {original_analysis['seo_score']['total']}/100")
 
         # Find keywords
         keyword_data = self.find_low_competition_keywords(
@@ -1221,7 +1224,7 @@ OUTPUT FORMAT - respond with ONLY this JSON structure, nothing else:
                 "recommendations": self._generate_recommendations_from_analysis(original_analysis)
             }
 
-        print(f"Found {len(keyword_data.get('all_opportunities', []))} keyword opportunities")
+        logger.info(f"Found {len(keyword_data.get('all_opportunities', []))} keyword opportunities")
 
         # Optimize content
         optimized = self.auto_implement_seo(title, content, keyword_data)
@@ -1438,13 +1441,13 @@ if __name__ == "__main__":
 
     result = agent.optimize_blog(title=title, content=content, region="PK")
 
-    print("\n=== ORIGINAL SCORE ===")
-    print(f"{result['original_analysis']['seo_score']['total']}/100")
+    logger.info("n=== ORIGINAL SCORE ===")
+    logger.info(f"{result['original_analysis']['seo_score']['total']}/100")
 
-    print("\n=== OPTIMIZED SCORE ===")
+    logger.info("n=== OPTIMIZED SCORE ===")
     if result.get('optimized'):
-        print(f"{result['optimized']['seo_score']}/100 ({result['optimized']['seo_grade']})")
+        logger.info(f"{result['optimized']['seo_score']}/100 ({result['optimized']['seo_grade']})")
 
-    print("\n=== RECOMMENDATIONS ===")
+    logger.info("n=== RECOMMENDATIONS ===")
     for rec in result['recommendations']:
-        print(f"• {rec}")
+        logger.info(f"{rec}")

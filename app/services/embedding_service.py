@@ -1,6 +1,9 @@
 import google.generativeai as genai
 from flask import current_app
 import re
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class EmbeddingService:
@@ -38,7 +41,7 @@ class EmbeddingService:
             )
             return result['embedding']
         except Exception as e:
-            print(f"❌ Error generating embedding: {e}")
+            logger.exception("Error generating embedding")
             return None
 
     def generate_query_embedding(self, query):
@@ -58,7 +61,7 @@ class EmbeddingService:
             )
             return result['embedding']
         except Exception as e:
-            print(f"❌ Error generating query embedding: {e}")
+            logger.exception("Error generating query embedding")
             return None
 
     def generate_blog_embedding(self, blog):

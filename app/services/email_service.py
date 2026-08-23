@@ -2,6 +2,9 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class EmailService:
@@ -49,7 +52,7 @@ class EmailService:
             self._send_email(to_email, subject, html_content)
             return {"success": True, "id": f"sent-to-{to_email}"}
         except Exception as e:
-            print(f"Email send error: {e}")
+            logger.exception("Email send error")
             return {"success": False, "error": str(e)}
 
     def send_newsletter(self, to_emails: list, subject: str, html_content: str):

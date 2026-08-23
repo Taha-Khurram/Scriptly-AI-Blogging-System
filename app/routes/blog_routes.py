@@ -15,6 +15,9 @@ from datetime import datetime
 import math
 import markdown
 from app.core.security import admin_required
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 blog_bp = Blueprint('blog', __name__)
 db_service = FirestoreService()
@@ -115,7 +118,7 @@ def home():
         )
 
     except Exception as e:
-        print(f"Error in home route: {e}")
+        logger.exception("Error in home route")
         return render_template(
             'home.html',
             greeting="Welcome",
@@ -267,7 +270,7 @@ def get_blog(blog_id):
                     'toc_html': result.get('toc_html', '')
                 }
             except Exception as e:
-                print(f"Markdown conversion error: {e}")
+                logger.exception("Markdown conversion error")
                 # Fallback: basic conversion using markdown library
                 html = markdown.markdown(markdown_text, extensions=['extra', 'tables', 'toc'])
                 return {'html': html, 'toc': [], 'toc_html': ''}
@@ -395,7 +398,7 @@ def generate_and_submit():
         return jsonify({"success": True, "task_id": task_id}), 202
 
     except Exception as e:
-        print(f"❌ Route Error in Generate: {e}")
+        logger.exception("Route Error in Generate")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -496,7 +499,7 @@ def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, au
             task_manager.complete_task(task_id, {"redirect": redirect_url})
 
         except Exception as e:
-            print(f"❌ Background Task Error: {e}")
+            logger.exception("Background Task Error")
             task_manager.fail_task(task_id, str(e))
 
 
@@ -562,7 +565,7 @@ def humanize_draft(blog_id):
         return jsonify({"success": True, "task_id": task_id}), 202
 
     except Exception as e:
-        print(f"❌ Humanize Route Error: {e}")
+        logger.exception("Humanize Route Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -613,7 +616,7 @@ def _run_humanize_task(task_id, app, blog_id, markdown_text, title):
             task_manager.complete_task(task_id, {"humanized": True})
 
         except Exception as e:
-            print(f"❌ Background Humanize Task Error: {e}")
+            logger.exception("Background Humanize Task Error")
             task_manager.fail_task(task_id, str(e))
 
 
@@ -705,19 +708,19 @@ def update_status(blog_id):
 
                 # Update blog content with formatting
                 db_service.update_blog_content(blog_id, title, formatted_content)
-                print(f"✓ Formatting applied to blog: {title}")
+                logger.info(f"Formatting applied to blog: {title}")
 
                 # Generate embedding for semantic search
                 try:
                     from app.agents.semantic_search_agent import SemanticSearchAgent
                     search_agent = SemanticSearchAgent()
                     if search_agent.generate_and_store_embedding(blog_id):
-                        print(f"✓ Embedding generated for blog: {title}")
+                        logger.info(f"Embedding generated for blog: {title}")
                 except Exception as embed_error:
-                    print(f"⚠ Embedding generation warning (continuing): {embed_error}")
+                    logger.warning(f"Embedding generation warning (continuing): {embed_error}")
 
             except Exception as format_error:
-                print(f"⚠ Formatting warning (continuing): {format_error}")
+                logger.warning(f"Formatting warning (continuing): {format_error}")
                 # Continue with publish even if formatting fails
 
         success = db_service.update_blog_status(blog_id, new_status)
@@ -751,7 +754,7 @@ def update_status(blog_id):
         return jsonify({"success": True})
 
     except Exception as e:
-        print("❌ Status Update Error:", str(e))
+        logger.exception("Status Update Error:", str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -855,7 +858,7 @@ def edit_category(category_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print("❌ Edit Category Error:", e)
+        logger.exception("Edit Category Error:", e)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -890,7 +893,7 @@ def delete_category(category_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print("Delete Category Error:", e)
+        logger.exception("Delete Category Error:", e)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -941,7 +944,7 @@ def analyze_seo():
         })
 
     except Exception as e:
-        print(f"SEO Analysis Error: {e}")
+        logger.exception("SEO Analysis Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -990,7 +993,7 @@ def research_keywords():
         })
 
     except Exception as e:
-        print(f"Keyword Research Error: {e}")
+        logger.exception("Keyword Research Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1017,7 +1020,7 @@ def analyze_url_seo():
         return jsonify(result)
 
     except Exception as e:
-        print(f"URL SEO Analysis Error: {e}")
+        logger.exception("URL SEO Analysis Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1133,7 +1136,7 @@ def optimize_existing_blog(blog_id):
         }), 400
 
     except Exception as e:
-        print(f"Blog SEO Optimization Error: {e}")
+        logger.exception("Blog SEO Optimization Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1171,7 +1174,7 @@ def format_content():
         })
 
     except Exception as e:
-        print(f"Formatting Error: {e}")
+        logger.exception("Formatting Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1206,7 +1209,7 @@ def get_drafts_for_seo():
         })
 
     except Exception as e:
-        print(f"Get Drafts Error: {e}")
+        logger.exception("Get Drafts Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1249,7 +1252,7 @@ def analyze_draft_seo(blog_id):
         })
 
     except Exception as e:
-        print(f"Draft SEO Analysis Error: {e}")
+        logger.exception("Draft SEO Analysis Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1448,7 +1451,7 @@ def update_site_settings():
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Site Settings Error: {e}")
+        logger.exception("Site Settings Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1510,7 +1513,7 @@ def track_activity():
         return jsonify({"success": True, "tracked": len(enriched_events)})
 
     except Exception as e:
-        print(f"Track activity error: {e}")
+        logger.exception("Track activity error")
         return jsonify({"success": True, "tracked": 0})
 
 
@@ -1623,7 +1626,7 @@ def unpublish_blog(blog_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Unpublish Error: {e}")
+        logger.exception("Unpublish Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1665,7 +1668,7 @@ def api_get_comments():
         return jsonify({"success": True, **result})
 
     except Exception as e:
-        print(f"Error fetching comments: {e}")
+        logger.exception("Error fetching comments")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1703,7 +1706,7 @@ def api_get_comment(comment_id):
         return jsonify({"success": True, "comment": comment})
 
     except Exception as e:
-        print(f"Error fetching comment: {e}")
+        logger.exception("Error fetching comment")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1739,7 +1742,7 @@ def api_edit_comment(comment_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Error editing comment: {e}")
+        logger.exception("Error editing comment")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1769,7 +1772,7 @@ def api_remove_comment(comment_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Error removing comment: {e}")
+        logger.exception("Error removing comment")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1794,7 +1797,7 @@ def api_restore_comment(comment_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Error restoring comment: {e}")
+        logger.exception("Error restoring comment")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1822,6 +1825,6 @@ def api_delete_comment(comment_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Error deleting comment: {e}")
+        logger.exception("Error deleting comment")
         return jsonify({"success": False, "error": str(e)}), 500
 

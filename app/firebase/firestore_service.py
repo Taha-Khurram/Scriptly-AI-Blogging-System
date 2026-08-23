@@ -6,6 +6,10 @@ from app.utils.cache import cache
 from app.utils.retry import retry_on_unavailable
 from app.utils.date_utils import ensure_aware, utcnow
 
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def _parse_filter_date(value, end_of_day=False):
     """Parse a ``YYYY-MM-DD`` filter bound into an aware UTC datetime.
@@ -58,7 +62,7 @@ class FirestoreService:
                 return data
             return None
         except Exception as e:
-            print(f"❌ Error fetching blog {blog_id}: {e}")
+            logger.exception(f"Error fetching blog {blog_id}")
             return None
 
     def create_draft(self, blog_data, user_id):
@@ -101,7 +105,7 @@ class FirestoreService:
 
             return blog_id
         except Exception as e:
-            print(f"❌ Firestore Error creating draft: {e}")
+            logger.exception("Firestore Error creating draft")
             return None
 
     def update_blog_content(self, blog_id, title, content, new_slug=None, seo_title=None, seo_description=None, cover_image=None):
@@ -166,7 +170,7 @@ class FirestoreService:
             doc_ref.update(update_data)
             return True
         except Exception as e:
-            print(f"❌ Error updating blog content: {e}")
+            logger.exception("Error updating blog content")
             return False
 
     # def update_blog_status(self, blog_id, status):
@@ -197,7 +201,7 @@ class FirestoreService:
                 blogs.append(data)
             return blogs
         except Exception as e:
-            print(f"❌ Error fetching blogs by status {status}: {e}")
+            logger.exception(f"Error fetching blogs by status {status}")
             return []
 
     # def get_approval_queue(self, admin_id):
@@ -279,7 +283,7 @@ class FirestoreService:
             return pending_blogs
 
         except Exception as e:
-            print("Approval Queue Error:", e)
+            logger.exception("Approval Queue Error:", e)
             return []
     def get_total_blogs_count(self, user_id):
         try:
@@ -288,7 +292,7 @@ class FirestoreService:
             count_result = count_query.get()
             return count_result[0][0].value
         except Exception as e:
-            print(f"❌ Error getting total blogs count: {e}")
+            logger.exception("Error getting total blogs count")
             return 0
 
     def get_paginated_drafts(self, user_id, page=1, per_page=10):
@@ -315,7 +319,7 @@ class FirestoreService:
 
             return drafts, total_count
         except Exception as e:
-            print(f"❌ Error fetching paginated drafts: {e}")
+            logger.exception("Error fetching paginated drafts")
             return [], 0
 
     def get_all_blogs_filtered(self, user_ids, status_filter='all', category_filter='all',
@@ -402,7 +406,7 @@ class FirestoreService:
                 "total_pages": total_pages
             }
         except Exception as e:
-            print(f"❌ Error fetching filtered blogs: {e}")
+            logger.exception("Error fetching filtered blogs")
             return {"blogs": [], "total": 0, "page": 1, "per_page": per_page, "total_pages": 1}
 
     def delete_blog(self, blog_id):
@@ -431,7 +435,7 @@ class FirestoreService:
             transaction = self.db.transaction()
             return delete_in_transaction(transaction)
         except Exception as e:
-            print(f"❌ Error deleting blog: {e}")
+            logger.exception("Error deleting blog")
             return False
 
     # ---------------- CATEGORY METHODS ----------------
@@ -460,7 +464,7 @@ class FirestoreService:
             docs = self.db.collection("categories").select(["name"]).stream()
             return [doc.to_dict()["name"] for doc in docs]
         except Exception as e:
-            print(f"❌ FirestoreService.get_category_names Error: {e}")
+            logger.exception("FirestoreService.get_category_names Error")
             return []
         
     # def get_all_categories(self, user_id=None):
@@ -516,7 +520,7 @@ class FirestoreService:
 
             return categories
         except Exception as e:
-            print(f"FirestoreService.get_all_categories Error: {e}")
+            logger.exception("FirestoreService.get_all_categories Error")
             return []
 
     def get_team_categories(self, admin_id):
@@ -545,7 +549,7 @@ class FirestoreService:
 
             return list(merged.values())
         except Exception as e:
-            print(f"Error fetching team categories: {e}")
+            logger.exception("Error fetching team categories")
             return []
 
     def get_user_blog_categories(self, user_id):
@@ -574,7 +578,7 @@ class FirestoreService:
                 })
             return categories
         except Exception as e:
-            print(f"Error fetching user blog categories: {e}")
+            logger.exception("Error fetching user blog categories")
             return []
 
     def update_category_count(self, category_name, increment_by, user_id):
@@ -596,7 +600,7 @@ class FirestoreService:
                 })
                 cache.clear_prefix(f"categories:{site_owner_id}")
         except Exception as e:
-            print(f"Error updating category count: {e}")
+            logger.exception("Error updating category count")
 
     def delete_category(self, category_id, user_id):
         """
@@ -616,7 +620,7 @@ class FirestoreService:
 
             return True
         except Exception as e:
-            print(f"Error deleting category: {e}")
+            logger.exception("Error deleting category")
             return False
 
     def update_category(self, category_id, update_data):
@@ -625,7 +629,7 @@ class FirestoreService:
             doc_ref.update(update_data)
             return True
         except Exception as e:
-            print(f"❌ Error updating category: {e}")
+            logger.exception("Error updating category")
             return False
 
     # ---------------- ACTIVITY METHODS ----------------
@@ -666,7 +670,7 @@ class FirestoreService:
 
             return True
         except Exception as e:
-            print(f"❌ Error logging activity: {e}")
+            logger.exception("Error logging activity")
             return False
 
     def get_recent_activity(self, user_id, limit=10):
@@ -694,7 +698,7 @@ class FirestoreService:
                 activities.append(data)
             return activities
         except Exception as e:
-            print(f"❌ Error fetching activities: {e}")
+            logger.exception("Error fetching activities")
             return []
 
     def get_all_activity_for_admin(self, admin_id, type_filter='all', user_filter='all',
@@ -793,7 +797,7 @@ class FirestoreService:
                 "total_pages": total_pages
             }
         except Exception as e:
-            print(f"❌ Error fetching admin activities: {e}")
+            logger.exception("Error fetching admin activities")
             return {"activities": [], "total": 0, "page": 1, "per_page": per_page, "total_pages": 1}
 
     def get_activity_stats(self, admin_id):
@@ -830,7 +834,7 @@ class FirestoreService:
 
             return stats
         except Exception as e:
-            print(f"❌ Error fetching activity stats: {e}")
+            logger.exception("Error fetching activity stats")
             return {"total": 0, "blog": 0, "user": 0, "comment": 0, "settings": 0, "newsletter": 0, "category": 0}
 
     def _normalize_activity(self, data):
@@ -881,7 +885,7 @@ class FirestoreService:
                 user_ref.update({"last_login": firestore.SERVER_TIMESTAMP})
                 return existing_user.to_dict()
         except Exception as e:
-            print(f"❌ Error saving user: {e}")
+            logger.exception("Error saving user")
             return None
 
     def update_last_login(self, user_id):
@@ -904,7 +908,7 @@ class FirestoreService:
                 return doc.to_dict()
             return None
         except Exception as e:
-            print(f"❌ Error getting user: {e}")
+            logger.exception("Error getting user")
             return None
 
     def update_user_profile(self, user_id, profile_data):
@@ -915,7 +919,7 @@ class FirestoreService:
             user_ref.update(profile_data)
             return self.get_user_by_id(user_id)
         except Exception as e:
-            print(f"❌ Error updating user profile: {e}")
+            logger.exception("Error updating user profile")
             return None
 
     def get_my_sub_users(self, admin_id):
@@ -924,7 +928,7 @@ class FirestoreService:
                 .where(filter=FieldFilter('created_by', '==', admin_id)).stream()
             return [{**doc.to_dict(), 'uid': doc.id} for doc in docs]
         except Exception as e:
-            print(f"❌ Error fetching sub-users: {e}")
+            logger.exception("Error fetching sub-users")
             return []
 
     def get_site_owner_for_user(self, user_id):
@@ -945,7 +949,7 @@ class FirestoreService:
             # Return the admin who created this user
             return user.get('created_by')
         except Exception as e:
-            print(f"❌ Error getting site owner: {e}")
+            logger.exception("Error getting site owner")
             return user_id  # Fallback to self
 
     # ---------------- INVITATION METHODS ----------------
@@ -978,7 +982,7 @@ class FirestoreService:
             inv_data['id'] = doc_ref[1].id
             return {"success": True, "invitation": inv_data}
         except Exception as e:
-            print(f"❌ Error creating invitation: {e}")
+            logger.exception("Error creating invitation")
             return {"success": False, "error": str(e)}
 
     def get_pending_invitation_by_email(self, email):
@@ -997,7 +1001,7 @@ class FirestoreService:
             invitations.sort(key=lambda x: x.get('invited_at') or datetime.min, reverse=True)
             return invitations[0]
         except Exception as e:
-            print(f"❌ Error checking invitation: {e}")
+            logger.exception("Error checking invitation")
             return None
 
     def accept_invitation(self, invitation_id):
@@ -1008,7 +1012,7 @@ class FirestoreService:
             })
             return True
         except Exception as e:
-            print(f"❌ Error accepting invitation: {e}")
+            logger.exception("Error accepting invitation")
             return False
 
     def get_invitations_by_admin(self, admin_id):
@@ -1027,7 +1031,7 @@ class FirestoreService:
             invitations.sort(key=lambda x: x.get('invited_at') or '', reverse=True)
             return invitations
         except Exception as e:
-            print(f"❌ Error fetching invitations: {e}")
+            logger.exception("Error fetching invitations")
             return []
 
     @retry_on_unavailable
@@ -1059,7 +1063,7 @@ class FirestoreService:
             author_count = results[1] or 0
             return max(site_owner_count, author_count)
         except Exception as e:
-            print(f"Error getting published blogs count: {e}")
+            logger.exception("Error getting published blogs count")
             return 0
 
     def get_user_published_count(self, user_id):
@@ -1072,7 +1076,7 @@ class FirestoreService:
             count_result = count_query.get()
             return count_result[0][0].value
         except Exception as e:
-            print(f"Error getting user published count: {e}")
+            logger.exception("Error getting user published count")
             return 0
         
         
@@ -1123,7 +1127,7 @@ class FirestoreService:
 
             return True
         except Exception as e:
-            print("Firestore Status Error:", e)
+            logger.exception("Firestore Status Error:", e)
             return False
 
     def get_scheduled_blogs(self, site_owner_id):
@@ -1145,7 +1149,7 @@ class FirestoreService:
             results.sort(key=lambda x: x.get("scheduled_at") or datetime.min)
             return results
         except Exception as e:
-            print(f"Error fetching scheduled blogs: {e}")
+            logger.exception("Error fetching scheduled blogs")
             return []
 
     def get_due_scheduled_blogs(self):
@@ -1172,7 +1176,7 @@ class FirestoreService:
                         results.append(data)
             return results
         except Exception as e:
-            print(f"Error fetching due scheduled blogs: {e}")
+            logger.exception("Error fetching due scheduled blogs")
             return []
 
     def get_all_scheduled_for_calendar(self, site_owner_id):
@@ -1191,7 +1195,7 @@ class FirestoreService:
             except Exception:
                 pass
 
-            print(f"[Calendar] Querying for user_ids: {user_ids}")
+            logger.info(f"[Calendar] Querying for user_ids: {user_ids}")
 
             # Query by author_id only (avoids composite index requirement), filter status in Python
             batch_size = 10
@@ -1214,7 +1218,7 @@ class FirestoreService:
                         data["id"] = doc.id
                         results.append(data)
 
-            print(f"[Calendar] Found {len(results)} blogs (scheduled + published with scheduled_at)")
+            logger.info(f"[Calendar] Found {len(results)} blogs (scheduled + published with scheduled_at)")
 
             def sort_key(x):
                 dt = x.get("scheduled_at")
@@ -1227,9 +1231,7 @@ class FirestoreService:
             results.sort(key=sort_key)
             return results
         except Exception as e:
-            print(f"Error fetching calendar blogs: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("Error fetching calendar blogs")
             return []
 
     # ==================== SCHEDULE ENTRIES ====================
@@ -1259,7 +1261,7 @@ class FirestoreService:
             })
             return True
         except Exception as e:
-            print(f"Error saving schedule entry: {e}")
+            logger.exception("Error saving schedule entry")
             return False
 
     def update_schedule_entry_status(self, blog_id, new_status):
@@ -1269,7 +1271,7 @@ class FirestoreService:
             doc_ref.update({"status": new_status, "updated_at": utcnow()})
             return True
         except Exception as e:
-            print(f"Error updating schedule entry: {e}")
+            logger.exception("Error updating schedule entry")
             return False
 
     def delete_schedule_entry(self, blog_id):
@@ -1278,7 +1280,7 @@ class FirestoreService:
             self.db.collection("schedule_entries").document(blog_id).delete()
             return True
         except Exception as e:
-            print(f"Error deleting schedule entry: {e}")
+            logger.exception("Error deleting schedule entry")
             return False
 
     def get_schedule_entries_for_calendar(self, site_owner_id):
@@ -1293,7 +1295,7 @@ class FirestoreService:
                 results.append(data)
             return results
         except Exception as e:
-            print(f"Error fetching schedule entries: {e}")
+            logger.exception("Error fetching schedule entries")
             return []
         
 # Categories functions
@@ -1311,7 +1313,7 @@ class FirestoreService:
             data["id"] = doc.id
             return data
         except Exception as e:
-            print(f"Error fetching category {category_id}: {e}")
+            logger.exception(f"Error fetching category {category_id}")
             return None
         
         
@@ -1330,7 +1332,7 @@ class FirestoreService:
 
             return [doc.to_dict() for doc in docs]
         except Exception as e:
-            print(f"❌ Error fetching blogs by category {category_id}: {e}")
+            logger.exception(f"Error fetching blogs by category {category_id}")
             return []
         
         
@@ -1350,7 +1352,7 @@ class FirestoreService:
 
             return True
         except Exception as e:
-            print(f"Error updating category name: {e}")
+            logger.exception("Error updating category name")
             return False
 
     def create_category(self, name, user_id):
@@ -1375,7 +1377,7 @@ class FirestoreService:
 
             return True, doc_ref[1].id
         except Exception as e:
-            print(f"Error creating category: {e}")
+            logger.exception("Error creating category")
             return False, str(e)
 
     # ---------------- OPTIMIZED BATCH METHODS ----------------
@@ -1417,7 +1419,7 @@ class FirestoreService:
             cache.set(cache_key, data, ttl=180)
             return data
         except Exception as e:
-            print(f"Error fetching dashboard data: {e}")
+            logger.exception("Error fetching dashboard data")
             return {
                 "published_count": 0,
                 "drafts": [],
@@ -1519,7 +1521,7 @@ class FirestoreService:
             cache.set(cache_key, data, ttl=180)
             return data
         except Exception as e:
-            print(f"Error fetching admin dashboard data: {e}")
+            logger.exception("Error fetching admin dashboard data")
             return {
                 "published_count": 0,
                 "drafts": [],
@@ -1567,7 +1569,7 @@ class FirestoreService:
             return defaults
 
         except Exception as e:
-            print(f"❌ Error fetching app settings: {e}")
+            logger.exception("Error fetching app settings")
             return self._get_app_settings_defaults()
 
     def update_app_settings(self, settings_data):
@@ -1585,7 +1587,7 @@ class FirestoreService:
 
             return True
         except Exception as e:
-            print(f"❌ Error updating app settings: {e}")
+            logger.exception("Error updating app settings")
             return False
 
     # ---------------- SITE SETTINGS METHODS ----------------
@@ -1850,7 +1852,7 @@ For questions about these Terms, contact us at {contact_email}.
             cache.set(cache_key, defaults, ttl=120)
             return defaults
         except Exception as e:
-            print(f"❌ Error fetching site settings: {e}")
+            logger.exception("Error fetching site settings")
             return self._get_site_settings_defaults(user_id)
 
     def resolve_site_identifier(self, identifier):
@@ -1893,7 +1895,7 @@ For questions about these Terms, contact us at {contact_email}.
             return None, None
 
         except Exception as e:
-            print(f"❌ Error resolving site identifier: {e}")
+            logger.exception("Error resolving site identifier")
             return None, None
 
     def is_slug_available(self, slug, exclude_user_id=None):
@@ -1920,7 +1922,7 @@ For questions about these Terms, contact us at {contact_email}.
             return False
 
         except Exception as e:
-            print(f"❌ Error checking slug availability: {e}")
+            logger.exception("Error checking slug availability")
             return False
 
     def generate_unique_site_slug(self, base_slug, exclude_user_id=None):
@@ -2119,7 +2121,7 @@ For questions about these Terms, contact us at {contact_email}.
                 cache.delete(f"slug_resolve:{new_slug}")
             return True
         except Exception as e:
-            print(f"❌ Error updating site settings: {e}")
+            logger.exception("Error updating site settings")
             return False
 
     @retry_on_unavailable
@@ -2200,9 +2202,7 @@ For questions about these Terms, contact us at {contact_email}.
             cache.set(cache_key, result, ttl=120)
             return result
         except Exception as e:
-            print(f"❌ Error fetching published blogs: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("Error fetching published blogs")
             return []
 
     def get_published_blog_by_id(self, blog_id):
@@ -2230,7 +2230,7 @@ For questions about these Terms, contact us at {contact_email}.
                 return data
             return None
         except Exception as e:
-            print(f"❌ Error fetching published blog {blog_id}: {e}")
+            logger.exception(f"Error fetching published blog {blog_id}")
             return None
 
     def get_published_blog_by_slug(self, user_id, slug):
@@ -2278,7 +2278,7 @@ For questions about these Terms, contact us at {contact_email}.
 
             return None
         except Exception as e:
-            print(f"❌ Error fetching blog by slug {slug}: {e}")
+            logger.exception(f"Error fetching blog by slug {slug}")
             return None
 
     def _get_user_slugs(self, user_id):
@@ -2297,7 +2297,7 @@ For questions about these Terms, contact us at {contact_email}.
                     slugs.add(data['slug'])
             return slugs
         except Exception as e:
-            print(f"❌ Error fetching user slugs: {e}")
+            logger.exception("Error fetching user slugs")
             return set()
 
     def _get_next_numeric_id(self, user_id):
@@ -2358,7 +2358,7 @@ For questions about these Terms, contact us at {contact_email}.
             blog_data['old_slugs'] = []
 
         except Exception as e:
-            print(f"❌ Error ensuring blog slug for {blog_id}: {e}")
+            logger.exception(f"Error ensuring blog slug for {blog_id}")
             # Fallback: use the document ID as slug
             blog_data['slug'] = blog_id
 
@@ -2384,7 +2384,7 @@ For questions about these Terms, contact us at {contact_email}.
             doc_ref = self.db.collection('contact_submissions').add(submission)
             return doc_ref[1].id
         except Exception as e:
-            print(f"❌ Error saving contact submission: {e}")
+            logger.exception("Error saving contact submission")
             return None
 
     def get_contact_submissions(self, user_id, page=1, per_page=10, status_filter='all', search=''):
@@ -2432,7 +2432,7 @@ For questions about these Terms, contact us at {contact_email}.
                 'total_pages': (total + per_page - 1) // per_page
             }
         except Exception as e:
-            print(f"Error fetching contact submissions: {e}")
+            logger.exception("Error fetching contact submissions")
             return {'submissions': [], 'total': 0, 'page': 1, 'per_page': per_page, 'total_pages': 0}
 
     def get_contact_stats(self, user_id):
@@ -2447,7 +2447,7 @@ For questions about these Terms, contact us at {contact_email}.
             unread = sum(1 for d in docs if not d.to_dict().get('read', False))
             return {'total': total, 'unread': unread, 'read': total - unread}
         except Exception as e:
-            print(f"Error fetching contact stats: {e}")
+            logger.exception("Error fetching contact stats")
             return {'total': 0, 'unread': 0, 'read': 0}
 
     def mark_contact_read(self, submission_id):
@@ -2456,7 +2456,7 @@ For questions about these Terms, contact us at {contact_email}.
             self.db.collection('contact_submissions').document(submission_id).update({'read': True})
             return True
         except Exception as e:
-            print(f"Error marking contact read: {e}")
+            logger.exception("Error marking contact read")
             return False
 
     def delete_contact_submission(self, submission_id):
@@ -2465,7 +2465,7 @@ For questions about these Terms, contact us at {contact_email}.
             self.db.collection('contact_submissions').document(submission_id).delete()
             return True
         except Exception as e:
-            print(f"Error deleting contact submission: {e}")
+            logger.exception("Error deleting contact submission")
             return False
 
     # ---------------- COMMENT METHODS ----------------
@@ -2496,7 +2496,7 @@ For questions about these Terms, contact us at {contact_email}.
             doc_ref = self.db.collection('comments').add(comment)
             return doc_ref[1].id
         except Exception as e:
-            print(f"❌ Error creating comment: {e}")
+            logger.exception("Error creating comment")
             return None
 
     def get_comments_for_blog(self, blog_id):
@@ -2524,7 +2524,7 @@ For questions about these Terms, contact us at {contact_email}.
                 comments.append(data)
             return comments
         except Exception as e:
-            print(f"❌ Error fetching blog comments: {e}")
+            logger.exception("Error fetching blog comments")
             return []
 
     def get_comments_for_dashboard(self, site_owner_id, status_filter=None, ai_filter=None, page=1, per_page=20):
@@ -2573,7 +2573,7 @@ For questions about these Terms, contact us at {contact_email}.
                 'total_pages': (total + per_page - 1) // per_page
             }
         except Exception as e:
-            print(f"❌ Error fetching dashboard comments: {e}")
+            logger.exception("Error fetching dashboard comments")
             return {'comments': [], 'total': 0, 'page': 1, 'per_page': per_page, 'total_pages': 0}
 
     def get_comment_by_id(self, comment_id):
@@ -2586,7 +2586,7 @@ For questions about these Terms, contact us at {contact_email}.
                 return data
             return None
         except Exception as e:
-            print(f"❌ Error fetching comment: {e}")
+            logger.exception("Error fetching comment")
             return None
 
     def update_comment_display_text(self, comment_id, new_text, admin_id, admin_name, reason=""):
@@ -2614,7 +2614,7 @@ For questions about these Terms, contact us at {contact_email}.
             })
             return True
         except Exception as e:
-            print(f"❌ Error updating comment: {e}")
+            logger.exception("Error updating comment")
             return False
 
     def update_comment_status(self, comment_id, new_status, removed_by=None, reason=None):
@@ -2637,7 +2637,7 @@ For questions about these Terms, contact us at {contact_email}.
             self.db.collection('comments').document(comment_id).update(update_data)
             return True
         except Exception as e:
-            print(f"❌ Error updating comment status: {e}")
+            logger.exception("Error updating comment status")
             return False
 
     def delete_comment_permanently(self, comment_id):
@@ -2646,7 +2646,7 @@ For questions about these Terms, contact us at {contact_email}.
             self.db.collection('comments').document(comment_id).delete()
             return True
         except Exception as e:
-            print(f"❌ Error deleting comment: {e}")
+            logger.exception("Error deleting comment")
             return False
 
     def get_comment_stats(self, site_owner_id):
@@ -2679,7 +2679,7 @@ For questions about these Terms, contact us at {contact_email}.
                 'removed': removed
             }
         except Exception as e:
-            print(f"❌ Error fetching comment stats: {e}")
+            logger.exception("Error fetching comment stats")
             return {'total': 0, 'published': 0, 'ai_edited': 0, 'removed': 0}
 
     def save_newsletter_subscriber(self, user_id, email):
@@ -2719,7 +2719,7 @@ For questions about these Terms, contact us at {contact_email}.
             doc_ref.set(subscriber)
             return (doc_id, True)  # New subscriber
         except Exception as e:
-            print(f"❌ Error saving newsletter subscriber: {e}")
+            logger.exception("Error saving newsletter subscriber")
             return (None, False)
 
     def get_newsletter_subscribers(self, user_id, limit=100):
@@ -2750,7 +2750,7 @@ For questions about these Terms, contact us at {contact_email}.
             )
             return subscribers
         except Exception as e:
-            print(f"❌ Error fetching newsletter subscribers: {e}")
+            logger.exception("Error fetching newsletter subscribers")
             return []
 
     def get_subscriber_count(self, user_id):
@@ -2763,7 +2763,7 @@ For questions about these Terms, contact us at {contact_email}.
             result = count_query.get()
             return result[0][0].value
         except Exception as e:
-            print(f"❌ Error counting subscribers: {e}")
+            logger.exception("Error counting subscribers")
             return 0
 
     def unsubscribe_newsletter(self, user_id, email):
@@ -2783,7 +2783,7 @@ For questions about these Terms, contact us at {contact_email}.
             })
             return True
         except Exception as e:
-            print(f"❌ Error unsubscribing: {e}")
+            logger.exception("Error unsubscribing")
             return False
 
     def resubscribe_newsletter(self, user_id, email):
@@ -2803,7 +2803,7 @@ For questions about these Terms, contact us at {contact_email}.
             })
             return True
         except Exception as e:
-            print(f"❌ Error resubscribing: {e}")
+            logger.exception("Error resubscribing")
             return False
 
     def log_newsletter_send(self, user_id, recipient_count, subject, content_preview="", html_content=""):
@@ -2820,7 +2820,7 @@ For questions about these Terms, contact us at {contact_email}.
             })
             return True
         except Exception as e:
-            print(f"❌ Error logging newsletter: {e}")
+            logger.exception("Error logging newsletter")
             return False
 
     def get_newsletter_history(self, user_id, limit=20):
@@ -2848,7 +2848,7 @@ For questions about these Terms, contact us at {contact_email}.
             )
             return history
         except Exception as e:
-            print(f"❌ Error fetching newsletter history: {e}")
+            logger.exception("Error fetching newsletter history")
             return []
 
     def get_newsletter_by_id(self, newsletter_id, user_id):
@@ -2867,7 +2867,7 @@ For questions about these Terms, contact us at {contact_email}.
                 data['sent_at'] = data['sent_at'].isoformat()
             return data
         except Exception as e:
-            print(f"❌ Error fetching newsletter by ID: {e}")
+            logger.exception("Error fetching newsletter by ID")
             return None
 
     def delete_newsletter(self, newsletter_id, user_id):
@@ -2883,7 +2883,7 @@ For questions about these Terms, contact us at {contact_email}.
             doc_ref.delete()
             return True
         except Exception as e:
-            print(f"❌ Error deleting newsletter: {e}")
+            logger.exception("Error deleting newsletter")
             return False
 
     def save_newsletter_draft(self, user_id, draft_data):
@@ -2904,7 +2904,7 @@ For questions about these Terms, contact us at {contact_email}.
             doc_ref = self.db.collection('newsletter_drafts').add(draft)
             return doc_ref[1].id
         except Exception as e:
-            print(f"❌ Error saving newsletter draft: {e}")
+            logger.exception("Error saving newsletter draft")
             return None
 
     def get_newsletter_drafts(self, user_id, limit=10):
@@ -2930,7 +2930,7 @@ For questions about these Terms, contact us at {contact_email}.
             )
             return drafts
         except Exception as e:
-            print(f"❌ Error fetching newsletter drafts: {e}")
+            logger.exception("Error fetching newsletter drafts")
             return []
 
     def delete_newsletter_draft(self, draft_id, user_id):
@@ -2945,7 +2945,7 @@ For questions about these Terms, contact us at {contact_email}.
             doc_ref.delete()
             return True
         except Exception as e:
-            print(f"❌ Error deleting newsletter draft: {e}")
+            logger.exception("Error deleting newsletter draft")
             return False
 
     # ---------------- EMBEDDING METHODS ----------------
@@ -2963,7 +2963,7 @@ For questions about these Terms, contact us at {contact_email}.
             })
             return True
         except Exception as e:
-            print(f"❌ Error storing embedding: {e}")
+            logger.exception("Error storing embedding")
             return False
 
     def get_blogs_with_embeddings(self, user_id, limit=100):
@@ -3002,7 +3002,7 @@ For questions about these Terms, contact us at {contact_email}.
 
             return blogs[:limit]
         except Exception as e:
-            print(f"❌ Error fetching blogs with embeddings: {e}")
+            logger.exception("Error fetching blogs with embeddings")
             return []
 
     def get_blogs_without_embeddings(self, user_id=None, limit=100):
@@ -3032,7 +3032,7 @@ For questions about these Terms, contact us at {contact_email}.
 
             return blogs[:limit]
         except Exception as e:
-            print(f"❌ Error fetching blogs without embeddings: {e}")
+            logger.exception("Error fetching blogs without embeddings")
             return []
 
     # ---------------- GALLERY METHODS ----------------
@@ -3050,7 +3050,7 @@ For questions about these Terms, contact us at {contact_email}.
             doc_ref = self.db.collection('gallery_images').add(doc_data)
             return doc_ref[1].id
         except Exception as e:
-            print(f"❌ Error saving gallery image: {e}")
+            logger.exception("Error saving gallery image")
             return None
 
     # Search / facet / sort all run in Python rather than in Firestore. That is
@@ -3143,7 +3143,7 @@ For questions about these Terms, contact us at {contact_email}.
                 'total_pages': total_pages,
             }
         except Exception as e:
-            print(f"❌ Error fetching gallery images: {e}")
+            logger.exception("Error fetching gallery images")
             return {
                 'images': [], 'total': 0, 'library_total': 0, 'matched_size': 0,
                 'type_counts': {}, 'page': 1, 'per_page': per_page, 'total_pages': 0,
@@ -3164,7 +3164,7 @@ For questions about these Terms, contact us at {contact_email}.
             data['id'] = doc.id
             return data
         except Exception as e:
-            print(f"❌ Error fetching gallery image: {e}")
+            logger.exception("Error fetching gallery image")
             return None
 
     def delete_gallery_image(self, image_id):
@@ -3177,7 +3177,7 @@ For questions about these Terms, contact us at {contact_email}.
                 return data
             return None
         except Exception as e:
-            print(f"❌ Error deleting gallery image: {e}")
+            logger.exception("Error deleting gallery image")
             return None
 
     # ---------------- SEO REPORTS ----------------
@@ -3203,7 +3203,7 @@ For questions about these Terms, contact us at {contact_email}.
             })
             return doc_ref.id
         except Exception as e:
-            print(f"❌ Error saving SEO report: {e}")
+            logger.exception("Error saving SEO report")
             return None
 
     def get_user_seo_reports(self, user_id, limit=50):
@@ -3224,7 +3224,7 @@ For questions about these Terms, contact us at {contact_email}.
                 reports.append(data)
             return reports
         except Exception as e:
-            print(f"❌ Error fetching SEO reports: {e}")
+            logger.exception("Error fetching SEO reports")
             return []
 
     def delete_seo_report(self, report_id, user_id):
@@ -3238,5 +3238,5 @@ For questions about these Terms, contact us at {contact_email}.
             doc_ref.delete()
             return True
         except Exception as e:
-            print(f"❌ Error deleting SEO report: {e}")
+            logger.exception("Error deleting SEO report")
             return False

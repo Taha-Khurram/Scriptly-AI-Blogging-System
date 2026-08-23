@@ -2,6 +2,9 @@ import json
 import re
 from google import generativeai as genai
 from flask import current_app
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class CommentAgent:
@@ -46,7 +49,7 @@ class CommentAgent:
             return result
 
         except Exception as e:
-            print(f"CommentAgent Error: {e}")
+            logger.exception("CommentAgent Error")
             # Fail-open: approve as-is if AI fails
             return {
                 "action": "approve",
@@ -118,7 +121,7 @@ Respond with ONLY valid JSON, no other text:
                 pass
 
         # If all parsing fails, approve as-is
-        print(f"CommentAgent: Failed to parse response: {text[:200]}")
+        logger.error(f"CommentAgent: Failed to parse response: {text[:200]}")
         return {
             "action": "approve",
             "moderated_text": original_text,

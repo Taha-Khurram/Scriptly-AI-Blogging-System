@@ -11,6 +11,10 @@ from app.firebase.firestore_service import FirestoreService
 from app.core.security import admin_required
 from app.utils.date_utils import utcnow
 
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 analytics_bp = Blueprint('analytics_bp', __name__)
 db_service = FirestoreService()
 
@@ -68,7 +72,7 @@ def _get_credentials(user_id):
             })
         except Exception as e:
             error_str = str(e).lower()
-            print(f"Token refresh failed: {e}")
+            logger.exception("Token refresh failed")
             if 'invalid_grant' in error_str or 'token has been expired or revoked' in error_str:
                 db_service.db.collection("analytics_config").document(user_id).update({
                     'connected': False,
@@ -93,7 +97,7 @@ def _fetch_measurement_id(creds, property_id):
                     stream.web_stream_data.default_uri or ''
                 )
     except Exception as e:
-        print(f"Error fetching measurement ID: {e}")
+        logger.exception("Error fetching measurement ID")
     return (None, None)
 
 
@@ -235,7 +239,7 @@ def analytics_page():
     except Exception as e:
         # Never let a transient backend error turn navigation into a hard error
         # page — render a safe (disconnected) state instead of a 500.
-        print(f"Analytics page load error: {e}")
+        logger.exception("Analytics page load error")
         connected = False
         property_id = property_name = measurement_id = stream_url = ''
         custom_domain = site_analytics_id = ''
@@ -344,7 +348,7 @@ def callback():
             code_verifier=session.get('code_verifier')
         )
     except Exception as e:
-        print(f"OAuth token exchange failed: {e}")
+        logger.exception("OAuth token exchange failed")
         return redirect(url_for('analytics_bp.analytics_page', error='oauth'))
     finally:
         # One-time values — don't leave them lying around in the session.
@@ -428,7 +432,7 @@ def list_properties():
 
         return jsonify({"success": True, "properties": properties})
     except Exception as e:
-        print(f"Error listing properties: {e}")
+        logger.exception("Error listing properties")
         return jsonify({"error": str(e)}), 500
 
 
@@ -512,7 +516,7 @@ def realtime_data():
 
         return jsonify({"success": True, "active_users": active_users})
     except Exception as e:
-        print(f"Realtime error: {e}")
+        logger.exception("Realtime error")
         return jsonify({"error": str(e)}), 500
 
 
@@ -586,7 +590,7 @@ def overview_data():
         try:
             previous = _overview_totals(client, property_id, prev_start, prev_end)
         except Exception as e:
-            print(f"Overview comparison unavailable: {e}")
+            logger.exception("Overview comparison unavailable")
 
         return jsonify({
             "success": True,
@@ -595,7 +599,7 @@ def overview_data():
             "period": period,
         })
     except Exception as e:
-        print(f"Overview error: {e}")
+        logger.exception("Overview error")
         return jsonify({"error": str(e)}), 500
 
 
@@ -672,7 +676,7 @@ def timeseries_data():
             "period": period,
         })
     except Exception as e:
-        print(f"Timeseries error: {e}")
+        logger.exception("Timeseries error")
         return jsonify({"error": str(e)}), 500
 
 
@@ -724,7 +728,7 @@ def top_pages():
 
         return jsonify({"success": True, "pages": pages})
     except Exception as e:
-        print(f"Top pages error: {e}")
+        logger.exception("Top pages error")
         return jsonify({"error": str(e)}), 500
 
 
@@ -785,5 +789,5 @@ def traffic_sources():
             "total_sessions": sum(src['sessions'] for src in sources),
         })
     except Exception as e:
-        print(f"Traffic sources error: {e}")
+        logger.exception("Traffic sources error")
         return jsonify({"error": str(e)}), 500

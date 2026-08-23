@@ -2,6 +2,9 @@ import time
 import inspect
 import google.generativeai as genai
 from flask import current_app
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Raise the client deadline well above the default 60s gRPC timeout.
 # A ~1200-word generation routinely takes longer than 60s and was
@@ -122,7 +125,7 @@ class ContentAgent:
                     or '504' in error_str
                 )
                 if attempt == 0 and is_timeout:
-                    print("⚠️ Content generation timed out, retrying once...")
+                    logger.warning("Content generation timed out, retrying once...")
                     time.sleep(2)
                     continue
                 raise

@@ -6,6 +6,9 @@ Handles general application settings like app name, tagline, etc.
 from flask import Blueprint, jsonify, request, session, render_template
 from app.firebase.firestore_service import FirestoreService
 from app import admin_required
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 settings_bp = Blueprint('settings', __name__)
 db_service = FirestoreService()
@@ -26,7 +29,7 @@ def app_settings_page():
         settings = db_service.get_app_settings()
         return render_template('app_settings.html', settings=settings)
     except Exception as e:
-        print(f"Error loading app settings page: {e}")
+        logger.exception("Error loading app settings page")
         return render_template('app_settings.html', settings={
             'app_name': 'Scriptly',
             'tagline': '',
@@ -49,7 +52,7 @@ def get_general_settings():
             "data": settings
         })
     except Exception as e:
-        print(f"Error fetching general settings: {e}")
+        logger.exception("Error fetching general settings")
         return jsonify({
             "success": False,
             "error": str(e)
@@ -114,7 +117,7 @@ def update_general_settings():
             }), 500
 
     except Exception as e:
-        print(f"Error updating general settings: {e}")
+        logger.exception("Error updating general settings")
         return jsonify({
             "success": False,
             "error": str(e)

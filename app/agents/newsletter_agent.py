@@ -1,6 +1,9 @@
 import json
 import google.generativeai as genai
 from config import Config
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class NewsletterAgent:
@@ -60,7 +63,7 @@ class NewsletterAgent:
             result["success"] = True
             return result
         except Exception as e:
-            print(f"Newsletter generation error: {e}")
+            logger.exception("Newsletter generation error")
             return {
                 "success": False,
                 "error": str(e),
@@ -126,7 +129,7 @@ Respond ONLY with valid JSON in this exact format:
             return json.loads(json_str)
 
         except json.JSONDecodeError as e:
-            print(f"JSON parse error: {e}")
+            logger.exception("JSON parse error")
             # Try to extract key fields manually
             return {
                 "subject": "Weekly Newsletter Update",
@@ -182,7 +185,7 @@ Respond with JSON array only:
             end = text.rfind(']') + 1
             return json.loads(text[start:end])
         except Exception as e:
-            print(f"Subject variation error: {e}")
+            logger.exception("Subject variation error")
             return [main_subject]
 
     def improve_content(self, content: str, instruction: str = "Make it more engaging"):

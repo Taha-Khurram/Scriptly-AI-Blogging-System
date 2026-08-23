@@ -1,10 +1,50 @@
-from flask import Blueprint, render_template, abort, request, redirect, url_for, jsonify
+"""Public, visitor-facing site routes.
+
+Everything here is served to anonymous traffic, which makes it the part of the
+application most exposed to both load and abuse. Two properties matter more
+here than anywhere else.
+
+**Cost control.** ``/semantic-search`` spends a Gemini embedding call plus an
+LLM call per request, and ``/comment`` spends a moderation call per submission.
+Both were unauthenticated and unthrottled, so a trivial loop drained the API
+quota -- not hypothetical for this project, which already had to change models
+over rate-limit errors under single-developer load. Every endpoint that costs
+money or writes data now carries an explicit per-IP limit.
+
+**Read amplification.** These pages are identical for every visitor, so each
+uncached view spent Firestore reads against a hard daily quota. The data layer
+caches, and these responses carry ``Cache-Control`` so a repeat visitor and any
+CDN in front of the app can skip the round trip entirely.
+"""
+from flask import Blueprint, current_app, render_template, abort, request, redirect, url_for, jsonify
+from app.core.extensions import limiter
+from app.core.logging import get_logger
+from app.core.sanitize import strip_all_html
 from app.firebase.firestore_service import FirestoreService
 from app.utils.parallel import run_parallel_simple
+from app.utils.date_utils import utcnow
 import markdown
 import math
 import re as _re
-from app.utils.date_utils import utcnow
+
+logger = get_logger(__name__)
+
+# Ceilings on visitor-submitted text. Applied before the value reaches the data
+# layer or an AI call: an unbounded field is both a storage problem and, on the
+# AI paths, a way to inflate token spend per request.
+MAX_NAME_LENGTH = 100
+MAX_EMAIL_LENGTH = 254        # RFC 5321 maximum
+MAX_SUBJECT_LENGTH = 200
+MAX_MESSAGE_LENGTH = 5000
+MAX_COMMENT_LENGTH = 5000
+MAX_SEARCH_QUERY_LENGTH = 200
+
+_EMAIL_RE = _re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$')
+
+
+def _clean_field(value, max_length):
+    """Trim, bound and strip markup from one visitor-supplied field."""
+    return strip_all_html((value or '').strip())[:max_length]
 
 site_bp = Blueprint('site_bp', __name__, url_prefix='/site')
 db_service = FirestoreService()
@@ -121,7 +161,7 @@ def site_home(site_identifier):
         )
 
     except Exception as e:
-        print(f"Site Home Error: {e}")
+        logger.exception("Site Home Error")
         abort(404)
 
 
@@ -193,7 +233,7 @@ def site_post(site_identifier, slug_or_id):
         )
 
     except Exception as e:
-        print(f"Site Post Error: {e}")
+        logger.exception("Site Post Error")
         abort(404)
 
 
@@ -221,7 +261,7 @@ def site_about(site_identifier):
         )
 
     except Exception as e:
-        print(f"Site About Error: {e}")
+        logger.exception("Site About Error")
         abort(404)
 
 
@@ -256,7 +296,7 @@ def site_category(site_identifier, category_name):
         )
 
     except Exception as e:
-        print(f"Site Category Error: {e}")
+        logger.exception("Site Category Error")
         abort(404)
 
 
@@ -323,7 +363,7 @@ def site_blog(site_identifier):
         )
 
     except Exception as e:
-        print(f"Site Blog Error: {e}")
+        logger.exception("Site Blog Error")
         abort(404)
 
 
@@ -342,50 +382,85 @@ def site_contact(site_identifier):
         )
 
     except Exception as e:
-        print(f"Site Contact Error: {e}")
+        logger.exception("Site Contact Error")
         abort(404)
 
 
 @site_bp.route('/<site_identifier>/contact', methods=['POST'])
+@limiter.limit('5 per minute; 20 per hour')
 def site_contact_submit(site_identifier):
-    """Handle contact form submission"""
+    """Handle a contact form submission from an anonymous visitor.
+
+    Fields are stripped of markup before storage: they are rendered back to the
+    site owner in the leads dashboard, so an unsanitised message body is a
+    stored-XSS route from an anonymous visitor straight into an admin session.
+    """
+    user_id, _ = _resolve_site(site_identifier)
+
+    name = _clean_field(request.form.get('name'), MAX_NAME_LENGTH)
+    email = _clean_field(request.form.get('email'), MAX_EMAIL_LENGTH)
+    subject = _clean_field(request.form.get('subject'), MAX_SUBJECT_LENGTH)
+    message = _clean_field(request.form.get('message'), MAX_MESSAGE_LENGTH)
+
+    if not name or not message or not _EMAIL_RE.match(email):
+        return redirect(url_for(
+            'site_bp.site_contact', site_identifier=site_identifier, error=1
+        ))
+
     try:
-        user_id, _ = _resolve_site(site_identifier)
-        data = request.form
         db_service.save_contact_submission(user_id, {
-            'name': data.get('name'),
-            'email': data.get('email'),
-            'subject': data.get('subject'),
-            'message': data.get('message')
+            'name': name, 'email': email, 'subject': subject, 'message': message,
         })
-        # Redirect back with success message
-        return redirect(url_for('site_bp.site_contact', site_identifier=site_identifier, success=1))
-    except Exception as e:
-        print(f"Contact Submit Error: {e}")
-        return redirect(url_for('site_bp.site_contact', site_identifier=site_identifier, error=1))
+    except Exception:
+        logger.exception('Contact submission failed', extra={'site': user_id})
+        return redirect(url_for(
+            'site_bp.site_contact', site_identifier=site_identifier, error=1
+        ))
+
+    logger.info('Contact submission received', extra={'site': user_id})
+    return redirect(url_for(
+        'site_bp.site_contact', site_identifier=site_identifier, success=1
+    ))
 
 
 @site_bp.route('/<site_identifier>/subscribe', methods=['POST'])
+@limiter.limit('5 per minute; 20 per hour')
 def site_subscribe(site_identifier):
-    """Handle newsletter subscription"""
+    """Subscribe an anonymous visitor to the site's newsletter.
+
+    Throttled because each accepted address is a write, and an unthrottled
+    subscribe endpoint is a way to fill another site's list with addresses its
+    owner never consented to mail -- which is how a sending domain earns a spam
+    reputation.
+    """
+    user_id, _ = _resolve_site(site_identifier)
+    email = _clean_field(request.form.get('email'), MAX_EMAIL_LENGTH)
+
+    # A real format check, not `'@' in email`: the address is later used as a
+    # mail recipient, and `a@b` passed the old test.
+    if not _EMAIL_RE.match(email):
+        return jsonify({
+            'success': False, 'message': 'Please enter a valid email address'
+        }), 400
+
     try:
-        user_id, _ = _resolve_site(site_identifier)
-        email = request.form.get('email', '').strip()
-        if email and '@' in email:
-            doc_id, is_new = db_service.save_newsletter_subscriber(user_id, email)
-            if doc_id:
-                if is_new:
-                    return jsonify({'success': True, 'is_new': True, 'message': 'Subscribed successfully!'})
-                else:
-                    return jsonify({'success': True, 'is_new': False, 'message': 'Already subscribed!'})
-            return jsonify({'success': False, 'message': 'Subscription failed'}), 500
-        return jsonify({'success': False, 'message': 'Invalid email'}), 400
-    except Exception as e:
-        print(f"Subscribe Error: {e}")
+        doc_id, is_new = db_service.save_newsletter_subscriber(user_id, email)
+    except Exception:
+        logger.exception('Newsletter subscribe failed', extra={'site': user_id})
         return jsonify({'success': False, 'message': 'Subscription failed'}), 500
+
+    if not doc_id:
+        return jsonify({'success': False, 'message': 'Subscription failed'}), 500
+
+    return jsonify({
+        'success': True,
+        'is_new': is_new,
+        'message': 'Subscribed successfully!' if is_new else 'Already subscribed!',
+    })
 
 
 @site_bp.route('/<site_identifier>/semantic-search', methods=['POST'])
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_PUBLIC_AI', '10 per minute'))
 def site_semantic_search(site_identifier):
     """
     Semantic search API endpoint.
@@ -393,8 +468,10 @@ def site_semantic_search(site_identifier):
     """
     try:
         user_id, _ = _resolve_site(site_identifier)
-        data = request.get_json()
-        query = data.get('query', '').strip() if data else ''
+        data = request.get_json(silent=True) or {}
+        # Bounded before it reaches an embedding call: query length drives
+        # token spend, and the field was previously unbounded.
+        query = _clean_field(data.get('query'), MAX_SEARCH_QUERY_LENGTH)
 
         if not query:
             return jsonify({'success': False, 'message': 'Query is required', 'results': []}), 400
@@ -430,8 +507,8 @@ def site_semantic_search(site_identifier):
             'insights': insights
         })
 
-    except Exception as e:
-        print(f"Semantic Search Error: {e}")
+    except Exception:
+        logger.exception('Semantic search failed', extra={'site': site_identifier})
         return jsonify({'success': False, 'message': 'Search failed', 'results': []}), 500
 
 
@@ -474,7 +551,7 @@ Disallow: /
         return Response(robots_content, mimetype='text/plain')
 
     except Exception as e:
-        print(f"Robots.txt Error: {e}")
+        logger.exception("Robots.txt Error")
         # Default permissive robots.txt on error
         return Response("User-agent: *\nAllow: /\n", mimetype='text/plain')
 
@@ -563,7 +640,7 @@ def site_sitemap(site_identifier):
         return Response('\n'.join(xml_parts), mimetype='application/xml')
 
     except Exception as e:
-        print(f"Sitemap Error: {e}")
+        logger.exception("Sitemap Error")
         return Response(
             '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>',
             mimetype='application/xml'
@@ -694,7 +771,7 @@ def site_rss_feed(site_identifier):
         return Response('\n'.join(rss_parts), mimetype='application/rss+xml')
 
     except Exception as e:
-        print(f"RSS Feed Error: {e}")
+        logger.exception("RSS Feed Error")
         return Response(
             '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Error</title></channel></rss>',
             mimetype='application/rss+xml'
@@ -739,7 +816,7 @@ def site_privacy_policy(site_identifier):
         )
 
     except Exception as e:
-        print(f"Privacy Policy Error: {e}")
+        logger.exception("Privacy Policy Error")
         abort(404)
 
 
@@ -781,7 +858,7 @@ def site_terms_of_service(site_identifier):
         )
 
     except Exception as e:
-        print(f"Terms of Service Error: {e}")
+        logger.exception("Terms of Service Error")
         abort(404)
 
 
@@ -790,11 +867,15 @@ def site_terms_of_service(site_identifier):
 # ---------------------------------------------------
 
 @site_bp.route('/<site_identifier>/post/<slug_or_id>/comment', methods=['POST'])
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_PUBLIC_WRITE', '5 per minute'))
 def site_submit_comment(site_identifier, slug_or_id):
-    """Handle public comment submission with AI moderation."""
-    import re as _re
-    from datetime import datetime
+    """Accept an anonymous comment, moderated by the AI before publication.
 
+    Rate-limited per IP because each submission spends a Gemini moderation call.
+    Unthrottled, this was the cheapest way for anyone to drain the project's AI
+    quota -- and the most expensive endpoint to leave open, since a rejected
+    comment still costs a full model call.
+    """
     try:
         user_id, settings = _resolve_site(site_identifier)
 
@@ -814,20 +895,20 @@ def site_submit_comment(site_identifier, slug_or_id):
         if not data:
             return jsonify({"success": False, "error": "Invalid request"}), 400
 
-        name = (data.get('name', '') or '').strip()[:100]
-        email = (data.get('email', '') or '').strip()[:100]
-        comment_text = (data.get('comment', '') or '').strip()[:5000]
+        # strip_all_html parses the markup rather than pattern-matching it.
+        # The previous `re.sub(r'<[^>]+>', '', ...)` left several vectors
+        # intact -- an unclosed `<img src=x onerror=alert(1)` has no closing
+        # `>` for that pattern to match, and the browser closes it happily.
+        name = _clean_field(data.get('name'), MAX_NAME_LENGTH)
+        email = _clean_field(data.get('email'), MAX_EMAIL_LENGTH)
+        comment_text = _clean_field(data.get('comment'), MAX_COMMENT_LENGTH)
 
-        # Validate
-        if not name or len(name) < 1:
+        if not name:
             return jsonify({"success": False, "error": "Name is required"}), 400
-        if not email or not _re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+        if not _EMAIL_RE.match(email):
             return jsonify({"success": False, "error": "Valid email is required"}), 400
-        if not comment_text or len(comment_text) < 1:
+        if not comment_text:
             return jsonify({"success": False, "error": "Comment is required"}), 400
-
-        # Sanitize: strip HTML tags
-        comment_text = _re.sub(r'<[^>]+>', '', comment_text)
 
         # AI Moderation (single API call)
         from app.agents.comment_agent import CommentAgent
@@ -888,8 +969,11 @@ def site_submit_comment(site_identifier, slug_or_id):
                 }
             })
 
-    except Exception as e:
-        print(f"Comment submission error: {e}")
+    except Exception:
+        logger.exception(
+            'Comment submission failed',
+            extra={'site': site_identifier, 'post': slug_or_id},
+        )
         return jsonify({"success": False, "error": "Something went wrong"}), 500
 
 
@@ -934,7 +1018,7 @@ def site_get_comments(site_identifier, slug_or_id):
         return jsonify({"success": True, "comments": public_comments})
 
     except Exception as e:
-        print(f"Error fetching comments: {e}")
+        logger.exception("Error fetching comments")
         return jsonify({"success": True, "comments": []})
 
 
@@ -961,6 +1045,6 @@ def site_catch_all(site_identifier, undefined_path):
         ), 404
 
     except Exception as e:
-        print(f"Catch-all 404 Error: {e}")
+        logger.exception("Catch-all 404 Error")
         # If site doesn't exist, return generic 404
         abort(404)

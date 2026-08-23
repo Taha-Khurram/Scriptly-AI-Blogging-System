@@ -5,6 +5,9 @@ from google import generativeai as genai
 from flask import current_app
 
 from app.utils.parallel import run_parallel_simple
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 # Raise the client deadline well above the default ~60s gRPC timeout.
@@ -226,20 +229,20 @@ class HumanizeAgent:
         """
         original_markdown = markdown
         orig_words = len(markdown.split())
-        print(f"\n{'='*60}")
-        print(f"🔄 HumanizeAgent — Starting humanization")
-        print(f"   Topic: {topic or '(none)'}")
-        print(f"   Input: {orig_words} words")
-        print(f"{'='*60}")
+        logger.info(f"{'='*60}")
+        logger.info("HumanizeAgent Starting humanization")
+        logger.info(f"Topic: {topic or '(none)'}")
+        logger.info(f"Input: {orig_words} words")
+        logger.info(f"{'='*60}")
 
         try:
             # Step 1: Split blog into 2 halves at a ## boundary
             chunks = self._split_into_halves(markdown)
-            print(f"\n📂 Step 1: Split into {len(chunks)} chunk(s)")
+            logger.info(f"Step 1: Split into {len(chunks)} chunk(s)")
             for i, chunk in enumerate(chunks):
                 chunk_words = len(chunk.split())
                 chunk_headings = len(re.findall(r'^#{1,3}\s', chunk, re.MULTILINE))
-                print(f"   Chunk {i+1}: {chunk_words} words, {chunk_headings} headings")
+                logger.info(f"Chunk {i+1}: {chunk_words} words, {chunk_headings} headings")
 
             # Step 2: Rewrite each half with a different prompt variant.
             # Chunks are independent, so run them concurrently — this halves
@@ -252,8 +255,8 @@ class HumanizeAgent:
                 for c in chunks
             ]
 
-            print(f"\n🤖 Step 2: Rewriting {len(chunks)} chunk(s) via Gemini API (parallel)")
-            print(f"   Target: {target_words} words total → per-chunk {chunk_targets}")
+            logger.info(f"Step 2: Rewriting {len(chunks)} chunk(s) via Gemini API (parallel)")
+            logger.info(f"Target: {target_words} words total -> per-chunk {chunk_targets}")
             if len(chunks) == 1:
                 rewritten = [self._rewrite_chunk(chunks[0], topic, 0, chunk_targets[0])]
             else:
@@ -272,24 +275,24 @@ class HumanizeAgent:
             # Step 3: Reassemble
             humanized = '\n\n'.join(c.strip() for c in rewritten if c.strip())
             reassembled_words = len(humanized.split())
-            print(f"\n🔗 Step 3: Reassembled — {reassembled_words} words")
+            logger.info(f"Step 3: Reassembled {reassembled_words} words")
 
             # Step 4: 5-pass deterministic post-processing
-            print(f"\n⚙️  Step 4: Post-processing (5 passes)")
+            logger.info("Step 4: Post-processing (5 passes)")
             humanized = self._post_process(humanized)
             post_words = len(humanized.split())
-            print(f"   Post-processing complete — {post_words} words")
+            logger.info(f"Post-processing complete {post_words} words")
 
             # Step 5: Validate structure preserved
-            print(f"\n✅ Step 5: Validating structure")
+            logger.info("Step 5: Validating structure")
             humanized = self._validate(original_markdown, humanized)
             final_words = len(humanized.split())
             ratio = final_words / orig_words if orig_words > 0 else 1.0
 
-            print(f"\n{'='*60}")
-            print(f"✅ Humanization complete!")
-            print(f"   {orig_words} → {final_words} words (ratio: {ratio:.2f})")
-            print(f"{'='*60}\n")
+            logger.info(f"{'='*60}")
+            logger.info("Humanization complete!")
+            logger.info(f"{orig_words} -> {final_words} words (ratio: {ratio:.2f})")
+            logger.info(f"{'='*60}\n")
 
             return {
                 "markdown": humanized,
@@ -298,7 +301,7 @@ class HumanizeAgent:
             }
 
         except Exception as e:
-            print(f"\n❌ HumanizeAgent Error: {e}")
+            logger.exception("HumanizeAgent Error")
             return {
                 "markdown": original_markdown,
                 "original_markdown": original_markdown,
@@ -311,16 +314,16 @@ class HumanizeAgent:
         """Split markdown into 2 roughly equal halves at a ## heading boundary."""
         sections = re.split(r'(?=^## )', markdown, flags=re.MULTILINE)
         sections = [s for s in sections if s.strip()]
-        print(f"   Found {len(sections)} sections (## headings)")
+        logger.info(f"Found {len(sections)} sections (## headings)")
 
         if len(sections) <= 2:
-            print(f"   → Too few sections, using 1 chunk (single API call)")
+            logger.info("-> Too few sections, using 1 chunk (single API call)")
             return [markdown]
 
         mid = len(sections) // 2
         first_half = '\n\n'.join(sections[:mid])
         second_half = '\n\n'.join(sections[mid:])
-        print(f"   → Split at section {mid}: chunk 1 = sections 1-{mid}, chunk 2 = sections {mid+1}-{len(sections)}")
+        logger.info(f"-> Split at section {mid}: chunk 1 = sections 1-{mid}, chunk 2 = sections {mid+1}-{len(sections)}")
         return [first_half, second_half]
 
     def _rewrite_chunk(self, chunk, topic, index, target_words=None):
@@ -336,10 +339,15 @@ class HumanizeAgent:
         variant_num = index % len(PROMPT_VARIANTS)
 
         if chunk_words < 30:
-            print(f"   Chunk {index+1}: ⏭️  Skipped (only {chunk_words} words)")
+            logger.warning(f"Chunk {index+1}: Skipped (only {chunk_words} words)")
             return chunk
 
-        print(f"   Chunk {index+1}: 🔄 Rewriting with variant {variant_num} ({chunk_words} words → target {target_words})...", end=" ", flush=True)
+        # end=" " previously kept the outcome on the same terminal line. A log
+        # record is a whole event, so progress and outcome are two records now.
+        logger.info(
+            'Rewriting chunk %s with variant %s (%s words -> target %s)',
+            index + 1, variant_num, chunk_words, target_words,
+        )
 
         variant = PROMPT_VARIANTS[variant_num]
         prompt = variant.format(topic=topic or "this topic", section=chunk)
@@ -370,7 +378,7 @@ class HumanizeAgent:
                 orig_headings = re.findall(r'^#{1,3}\s', chunk, re.MULTILINE)
                 new_headings = re.findall(r'^#{1,3}\s', result, re.MULTILINE)
                 if len(orig_headings) > 0 and len(new_headings) == 0:
-                    print(f"⚠️ Lost all headings, keeping original")
+                    logger.warning("Lost all headings, keeping original")
                     return chunk
 
                 # Truncation guard: if the rewrite came back far shorter than
@@ -381,10 +389,10 @@ class HumanizeAgent:
                 # back to the source length when no target is set).
                 floor = (target_words or chunk_words) * 0.4
                 if result_words < floor:
-                    print(f"⚠️ Rewrite truncated (target {target_words or chunk_words} → {result_words} words), keeping original")
+                    logger.warning(f"Rewrite truncated (target {target_words or chunk_words} -> {result_words} words), keeping original")
                     return chunk
 
-                print(f"✅ Done ({chunk_words} → {result_words} words)")
+                logger.info(f"Done ({chunk_words} -> {result_words} words)")
                 return result
 
             except Exception as e:
@@ -398,14 +406,13 @@ class HumanizeAgent:
                 )
                 if attempt < HUMANIZE_MAX_RETRIES - 1 and is_transient:
                     backoff = 2 * (attempt + 1)  # 2s, 4s
-                    print(
-                        f"⚠️ Transient error, retrying "
-                        f"({attempt + 1}/{HUMANIZE_MAX_RETRIES - 1}) in {backoff}s...",
-                        end=" ", flush=True,
+                    logger.warning(
+                        'Transient error, retrying (%s/%s) in %ss',
+                        attempt + 1, HUMANIZE_MAX_RETRIES - 1, backoff,
                     )
                     time.sleep(backoff)
                     continue
-                print(f"❌ Failed: {e}")
+                logger.exception("Failed")
                 return chunk
 
     def _stream_text(self, prompt, kwargs):
@@ -450,19 +457,19 @@ class HumanizeAgent:
         before = len(text.split())
 
         text = self._replace_ai_words(text)
-        print(f"   Pass 1/5: AI word replacement — {len(text.split())} words")
+        logger.info(f"Pass 1/5: AI word replacement {len(text.split())} words")
 
         text = self._split_long_sentences(text)
-        print(f"   Pass 2/5: Long sentence splitting — {len(text.split())} words")
+        logger.info(f"Pass 2/5: Long sentence splitting {len(text.split())} words")
 
         text = self._mix_contractions(text)
-        print(f"   Pass 3/5: Contraction mixing — {len(text.split())} words")
+        logger.info(f"Pass 3/5: Contraction mixing {len(text.split())} words")
 
         text = self._vary_paragraph_lengths(text)
-        print(f"   Pass 4/5: Paragraph length variation — {len(text.split())} words")
+        logger.info(f"Pass 4/5: Paragraph length variation {len(text.split())} words")
 
         text = self._inject_imperfections(text)
-        print(f"   Pass 5/5: Imperfection injection — {len(text.split())} words")
+        logger.info(f"Pass 5/5: Imperfection injection {len(text.split())} words")
 
         return text
 
@@ -670,7 +677,7 @@ class HumanizeAgent:
         rewrite, where there is simply nothing to save.
         """
         if not humanized or not humanized.strip():
-            print("⚠️ Humanization returned empty — using original")
+            logger.warning("Humanization returned empty using original")
             return original
 
         return humanized

@@ -5,6 +5,10 @@ from app.services.email_service import EmailService
 from app.utils.validators import is_valid_gmail
 from app.core.security import admin_required
 
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 # We define the blueprint. The 'url_prefix' will be handled in the app factory.
 user_bp = Blueprint('user_bp', __name__)
 db_service = FirestoreService()
@@ -46,9 +50,7 @@ def list_sub_users():
         response.headers['Cache-Control'] = 'no-cache, no-store'
         return response
     except Exception as e:
-        print(f"❌ Error in /users/list: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error in /users/list")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -90,7 +92,7 @@ def invite_user():
         send_result = email_service.send_single(email, "You're invited to join Scriptly", html_content)
         email_sent = send_result.get('success', False)
     except Exception as e:
-        print(f"⚠️ Email send attempt failed: {e}")
+        logger.exception("Email send attempt failed")
 
     db_service.log_activity(
         user_id=admin_id,

@@ -1,3 +1,8 @@
+"""Publish-time recommendations derived from Google Analytics hourly traffic."""
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
 
@@ -24,10 +29,10 @@ class PublishTimeAgent:
                 "data_period": "Last 28 days"
             }
         except ImportError as e:
-            print(f"Analytics error: {e}")
+            logger.exception("Analytics error")
             return {"success": False, "suggestions": [], "reason": "module_not_installed"}
         except Exception as e:
-            print(f"PublishTimeAgent error: {e}")
+            logger.exception("PublishTimeAgent error")
             return {"success": False, "suggestions": [], "reason": "error"}
 
     def _fetch_hourly_traffic(self, creds, property_id):

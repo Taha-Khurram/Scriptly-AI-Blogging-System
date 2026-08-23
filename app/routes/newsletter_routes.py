@@ -2,6 +2,9 @@ from flask import Blueprint, request, jsonify, session
 from app.agents.newsletter_agent import NewsletterAgent
 from app.services.email_service import EmailService
 from app.firebase.firestore_service import FirestoreService
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 newsletter_bp = Blueprint('newsletter', __name__)
 
@@ -127,7 +130,7 @@ def generate_newsletter():
             return jsonify(result), 500
 
     except Exception as e:
-        print(f"Newsletter generation error: {e}")
+        logger.exception("Newsletter generation error")
         return jsonify({"error": str(e)}), 500
 
 
@@ -240,7 +243,7 @@ def send_newsletter():
         })
 
     except Exception as e:
-        print(f"Newsletter send error: {e}")
+        logger.exception("Newsletter send error")
         return jsonify({"error": str(e)}), 500
 
 
@@ -566,7 +569,7 @@ def render_newsletter_html():
         })
 
     except Exception as e:
-        print(f"Newsletter render error: {e}")
+        logger.exception("Newsletter render error")
         return jsonify({"error": str(e)}), 500
 
 

@@ -1,6 +1,9 @@
 import google.generativeai as genai
 import os
 from app.firebase.firestore_service import FirestoreService
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 class CategoryAgent:
     def __init__(self):
@@ -38,5 +41,5 @@ class CategoryAgent:
             response = self.model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
-            print(f"❌ CategoryAgent Error: {e}")
+            logger.exception("CategoryAgent Error")
             return "General"
