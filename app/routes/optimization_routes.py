@@ -1,5 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, abort, current_app
-from functools import wraps
+from flask import Blueprint, render_template, request, jsonify, session, current_app
 from urllib.parse import urlparse
 import requests
 import google.generativeai as genai
@@ -7,6 +6,7 @@ import os
 
 from app.utils.cache import SimpleCache
 from app.firebase.firestore_service import FirestoreService
+from app.core.security import admin_required
 
 optimization_bp = Blueprint('optimization', __name__)
 _cache = SimpleCache()
@@ -21,18 +21,6 @@ VALID_COUNTRIES = {
     'us', 'uk', 'ca', 'au', 'de', 'fr', 'es', 'it', 'br', 'in',
     'jp', 'nl', 'se', 'no', 'dk', 'fi', 'pl', 'ru', 'mx', 'ar'
 }
-
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('auth_bp.login'))
-        if session.get('user_role') != 'ADMIN':
-            abort(404)
-        return f(*args, **kwargs)
-    return decorated_function
-
 
 def _validate_url(url):
     if not url or not url.strip():

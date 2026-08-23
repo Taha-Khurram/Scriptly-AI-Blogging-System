@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, url_for, session, redirect, abort, current_app
+from flask import Blueprint, render_template, request, jsonify, url_for, session, redirect, current_app
 from app.agents.blog_agent import BlogAgent
 from app.agents.category_agent import CategoryAgent
 from app.agents.seo_agent import SEOAgent
@@ -7,33 +7,17 @@ from app.agents.humanize_agent import HumanizeAgent
 from app.firebase.firestore_service import FirestoreService
 from app.utils.date_utils import (
     COMMON_TIMEZONES, DATE_FORMATS, TIME_FORMATS, LOCALES,
-    get_current_time_preview
+    get_current_time_preview, utcnow
 )
 from app.utils.slug_utils import PERMALINK_STRUCTURES
 from app.utils.task_manager import task_manager
 from datetime import datetime
 import math
 import markdown
-from functools import wraps
+from app.core.security import admin_required
 
 blog_bp = Blueprint('blog', __name__)
 db_service = FirestoreService()
-
-
-# ---------------------------------------------------
-# SECURITY DECORATORS
-# ---------------------------------------------------
-
-def admin_required(f):
-    """Decorator to restrict routes to admin users only"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('auth_bp.login'))
-        if session.get('user_role') != 'ADMIN':
-            abort(404)  # Show 404 instead of 403 to hide the existence of the page
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 # ---------------------------------------------------
@@ -623,7 +607,7 @@ def _run_humanize_task(task_id, app, blog_id, markdown_text, title):
             doc_ref.update({
                 'content': updated_content,
                 'metadata.humanized': True,
-                'updated_at': datetime.utcnow()
+                'updated_at': utcnow()
             })
 
             task_manager.complete_task(task_id, {"humanized": True})

@@ -7,6 +7,7 @@ based on configurable permalink structures.
 
 import re
 from datetime import datetime
+from app.utils.date_utils import utcnow
 
 # Available permalink structures with display pattern and example
 PERMALINK_STRUCTURES = [
@@ -94,12 +95,12 @@ def build_permalink(blog, structure='post-name', category_base='category'):
     if structure == 'date-post-name':
         created = blog.get('created_at')
         if created is None:
-            created = datetime.utcnow()
+            created = utcnow()
         elif isinstance(created, str):
             try:
                 created = datetime.fromisoformat(created.replace('Z', '+00:00'))
             except:
-                created = datetime.utcnow()
+                created = utcnow()
         return f"/post/{created.year}/{created.month:02d}/{created.day:02d}/{slug}"
 
     elif structure == 'category-post-name':

@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, session, render_template
+from flask import Blueprint, request, jsonify, session
 from app.agents.newsletter_agent import NewsletterAgent
 from app.services.email_service import EmailService
 from app.firebase.firestore_service import FirestoreService

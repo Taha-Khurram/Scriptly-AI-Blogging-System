@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, redirect, request, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 from whitenoise import WhiteNoise
 

@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, abort, request, redirect, url_for, jsonify, make_response
+from flask import Blueprint, render_template, abort, request, redirect, url_for, jsonify
 from app.firebase.firestore_service import FirestoreService
 from app.utils.parallel import run_parallel_simple
 import markdown
 import math
 import re as _re
+from app.utils.date_utils import utcnow
 
 site_bp = Blueprint('site_bp', __name__, url_prefix='/site')
 db_service = FirestoreService()
@@ -534,9 +535,9 @@ def site_sitemap(site_identifier):
                 if hasattr(updated, 'strftime'):
                     lastmod = updated.strftime('%Y-%m-%d')
                 else:
-                    lastmod = datetime.utcnow().strftime('%Y-%m-%d')
+                    lastmod = utcnow().strftime('%Y-%m-%d')
             else:
-                lastmod = datetime.utcnow().strftime('%Y-%m-%d')
+                lastmod = utcnow().strftime('%Y-%m-%d')
 
             xml_parts.append(f'''  <url>
     <loc>{post_url}</loc>
@@ -661,9 +662,9 @@ def site_rss_feed(site_identifier):
                 if hasattr(pub_date, 'strftime'):
                     pub_date_str = pub_date.strftime('%a, %d %b %Y %H:%M:%S +0000')
                 else:
-                    pub_date_str = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')
+                    pub_date_str = utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')
             else:
-                pub_date_str = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')
+                pub_date_str = utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')
 
             # Build item
             rss_parts.append('  <item>')
@@ -719,7 +720,7 @@ def site_privacy_policy(site_identifier):
         # Use legal contact email if set, otherwise fall back to main contact email
         contact_email = legal_settings.get('contact_email', '') or settings.get('contact_email', '')
         content = content.replace('{contact_email}', contact_email)
-        content = content.replace('{date}', datetime.utcnow().strftime('%B %d, %Y'))
+        content = content.replace('{date}', utcnow().strftime('%B %d, %Y'))
 
         # Convert markdown to HTML
         html_content = markdown.markdown(content, extensions=['extra', 'tables'])
@@ -732,7 +733,7 @@ def site_privacy_policy(site_identifier):
             settings=settings,
             page_title='Privacy Policy',
             page_content=html_content,
-            last_updated=datetime.utcnow().strftime('%B %d, %Y'),
+            last_updated=utcnow().strftime('%B %d, %Y'),
             categories=categories,
             user_id=user_id
         )
@@ -761,7 +762,7 @@ def site_terms_of_service(site_identifier):
         # Use legal contact email if set, otherwise fall back to main contact email
         contact_email = legal_settings.get('contact_email', '') or settings.get('contact_email', '')
         content = content.replace('{contact_email}', contact_email)
-        content = content.replace('{date}', datetime.utcnow().strftime('%B %d, %Y'))
+        content = content.replace('{date}', utcnow().strftime('%B %d, %Y'))
 
         # Convert markdown to HTML
         html_content = markdown.markdown(content, extensions=['extra', 'tables'])
@@ -774,7 +775,7 @@ def site_terms_of_service(site_identifier):
             settings=settings,
             page_title='Terms of Service',
             page_content=html_content,
-            last_updated=datetime.utcnow().strftime('%B %d, %Y'),
+            last_updated=utcnow().strftime('%B %d, %Y'),
             categories=categories,
             user_id=user_id
         )
@@ -835,7 +836,7 @@ def site_submit_comment(site_identifier, slug_or_id):
 
         # Build comment document
         ai_action = moderation['action']
-        now = datetime.utcnow()
+        now = utcnow()
 
         comment_data = {
             'site_owner_id': user_id,

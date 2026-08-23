@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, session, jsonify, redirect, url_for
 from app.firebase.firestore_service import FirestoreService
 from datetime import datetime
+from app.utils.date_utils import to_utc, utcnow
 
 schedule_bp = Blueprint('schedule', __name__)
 db_service = FirestoreService()
@@ -232,13 +233,14 @@ def schedule_blog(blog_id):
     if not scheduled_at_str:
         return jsonify({"success": False, "error": "scheduled_at is required"}), 400
 
-    try:
-        scheduled_at = datetime.fromisoformat(scheduled_at_str.replace('Z', '+00:00'))
-        scheduled_at = scheduled_at.replace(tzinfo=None)
-    except (ValueError, TypeError):
+    # to_utc converts the instant; the previous .replace(tzinfo=None) discarded
+    # the offset instead, so a request for 10:00+05:00 was stored as 10:00 UTC
+    # and published five hours late.
+    scheduled_at = to_utc(scheduled_at_str)
+    if scheduled_at is None:
         return jsonify({"success": False, "error": "Invalid date format"}), 400
 
-    if scheduled_at <= datetime.utcnow():
+    if scheduled_at <= utcnow():
         return jsonify({"success": False, "error": "Scheduled time must be in the future"}), 400
 
     blog_data = db_service.get_blog_by_id(blog_id)
@@ -325,7 +327,7 @@ def schedule_blog(blog_id):
         doc_ref.update({
             "requested_schedule_at": scheduled_at,
             "status": "UNDER_REVIEW",
-            "updated_at": datetime.utcnow()
+            "updated_at": utcnow()
         })
 
         db_service.log_activity(
@@ -356,13 +358,14 @@ def reschedule_blog(blog_id):
     if not scheduled_at_str:
         return jsonify({"success": False, "error": "scheduled_at is required"}), 400
 
-    try:
-        scheduled_at = datetime.fromisoformat(scheduled_at_str.replace('Z', '+00:00'))
-        scheduled_at = scheduled_at.replace(tzinfo=None)
-    except (ValueError, TypeError):
+    # to_utc converts the instant; the previous .replace(tzinfo=None) discarded
+    # the offset instead, so a request for 10:00+05:00 was stored as 10:00 UTC
+    # and published five hours late.
+    scheduled_at = to_utc(scheduled_at_str)
+    if scheduled_at is None:
         return jsonify({"success": False, "error": "Invalid date format"}), 400
 
-    if scheduled_at <= datetime.utcnow():
+    if scheduled_at <= utcnow():
         return jsonify({"success": False, "error": "Scheduled time must be in the future"}), 400
 
     blog_data = db_service.get_blog_by_id(blog_id)
@@ -376,7 +379,7 @@ def reschedule_blog(blog_id):
 
     if success:
         doc_ref = db_service.db.collection("schedule_entries").document(blog_id)
-        doc_ref.update({"scheduled_at": scheduled_at, "status": "SCHEDULED", "updated_at": datetime.utcnow()})
+        doc_ref.update({"scheduled_at": scheduled_at, "status": "SCHEDULED", "updated_at": utcnow()})
 
         db_service.log_activity(
             user_id=user_id,

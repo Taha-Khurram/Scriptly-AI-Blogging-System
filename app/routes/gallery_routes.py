@@ -1,9 +1,9 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
+from flask import Blueprint, render_template, request, jsonify, session
 from app.firebase.firestore_service import FirestoreService
-from functools import wraps
 import os
 import time
 import uuid
+from app.core.security import login_required
 
 gallery_bp = Blueprint('gallery', __name__)
 db_service = FirestoreService()
@@ -26,18 +26,6 @@ def add_cache_headers(response):
     if request.headers.get('X-Pjax') and response.status_code == 200:
         response.headers['Cache-Control'] = 'private, max-age=10, stale-while-revalidate=30'
     return response
-
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            if request.path.startswith('/api/'):
-                return jsonify({'success': False, 'error': 'Not authenticated'}), 401
-            return redirect(url_for('auth_bp.login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS

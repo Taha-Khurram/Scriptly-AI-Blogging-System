@@ -1,27 +1,14 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, abort, make_response
+from flask import Blueprint, render_template, request, jsonify, session, make_response
 from firebase_admin import auth as admin_auth
 from app.firebase.firestore_service import FirestoreService
 from app.services.email_service import EmailService
 from app.utils.validators import is_valid_gmail
-from functools import wraps
+from app.core.security import admin_required
 
 # We define the blueprint. The 'url_prefix' will be handled in the app factory.
 user_bp = Blueprint('user_bp', __name__)
 db_service = FirestoreService()
 email_service = EmailService()
-
-
-def admin_required(f):
-    """Decorator to restrict routes to admin users only"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('auth_bp.login'))
-        if session.get('user_role') != 'ADMIN':
-            abort(404)  # Show 404 instead of 403 to hide the existence of the page
-        return f(*args, **kwargs)
-    return decorated_function
-
 
 @user_bp.route('/manage-users')
 @admin_required

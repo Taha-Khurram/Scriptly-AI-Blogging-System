@@ -5,28 +5,17 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 # exchange and the connect flow dies.
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, abort, current_app
-from functools import wraps
+from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, current_app
 from datetime import datetime, timedelta
 from app.firebase.firestore_service import FirestoreService
+from app.core.security import admin_required
+from app.utils.date_utils import utcnow
 
 analytics_bp = Blueprint('analytics_bp', __name__)
 db_service = FirestoreService()
 
 SCOPES = ['https://www.googleapis.com/auth/analytics.readonly']
 REDIRECT_PATH = '/analytics/callback'
-
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('auth_bp.login'))
-        if session.get('user_role') != 'ADMIN':
-            abort(404)
-        return f(*args, **kwargs)
-    return decorated_function
-
 
 def _get_analytics_config(user_id):
     doc = db_service.db.collection("analytics_config").document(user_id).get()
@@ -372,7 +361,7 @@ def callback():
         'token_expiry': creds.expiry.isoformat() if creds.expiry else None,
         'property_id': '',
         'property_name': '',
-        'connected_at': datetime.utcnow().isoformat()
+        'connected_at': utcnow().isoformat()
     })
 
     db_service.log_activity(

@@ -1,9 +1,28 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app.firebase.firebase_admin import FirebaseLoader
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from app.utils.cache import cache
 from app.utils.retry import retry_on_unavailable
+from app.utils.date_utils import ensure_aware, utcnow
+
+
+def _parse_filter_date(value, end_of_day=False):
+    """Parse a ``YYYY-MM-DD`` filter bound into an aware UTC datetime.
+
+    Filter bounds arrive from a query string as a bare date with no offset.
+    Treating them as UTC is the only defensible reading, and returning an aware
+    value keeps every comparison in this module on one side of the naive/aware
+    divide.
+    """
+    try:
+        parsed = datetime.strptime(value, '%Y-%m-%d')
+    except (ValueError, TypeError):
+        return None
+    if end_of_day:
+        parsed = parsed.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return parsed.replace(tzinfo=timezone.utc)
+
 
 class FirestoreService:
     def __init__(self):
@@ -48,7 +67,7 @@ class FirestoreService:
             from app.utils.slug_utils import generate_slug, ensure_unique_slug
 
             blog_data['created_at'] = firestore.SERVER_TIMESTAMP
-            blog_data['updated_at'] = datetime.utcnow()
+            blog_data['updated_at'] = utcnow()
             blog_data['author_id'] = user_id
             blog_data['site_owner_id'] = self.get_site_owner_for_user(user_id)
             blog_data['status'] = blog_data.get('status', 'DRAFT').upper()
@@ -108,7 +127,7 @@ class FirestoreService:
             update_data = {
                 'title': title,
                 'content': content,
-                'updated_at': datetime.utcnow()
+                'updated_at': utcnow()
             }
 
             # Update SEO fields if provided
@@ -155,7 +174,7 @@ class FirestoreService:
     #         doc_ref = self.db.collection(self.collection_name).document(blog_id)
     #         doc_ref.update({
     #             'status': status.upper(),
-    #             'updated_at': datetime.utcnow()
+    #             'updated_at': utcnow()
     #         })
     #         return True
     #     except Exception as e:
@@ -338,27 +357,22 @@ class FirestoreService:
                 if category_filter != 'all' and b.get('category', '').lower() != category_filter.lower():
                     continue
 
-                if date_from:
-                    try:
-                        from_date = datetime.strptime(date_from, '%Y-%m-%d')
-                        updated = b.get('updated_at') or b.get('created_at')
-                        if updated and hasattr(updated, 'replace'):
-                            updated = updated.replace(tzinfo=None)
-                        if isinstance(updated, datetime) and updated < from_date:
+                # Both sides are made timezone-aware before comparing. The
+                # previous code stripped tzinfo from the stored value, which
+                # compares two naive datetimes that only coincidentally agree,
+                # and raises TypeError the moment one of them is aware.
+                if date_from or date_to:
+                    updated = ensure_aware(
+                        b.get('updated_at') or b.get('created_at')
+                    )
+                    if date_from:
+                        from_date = _parse_filter_date(date_from)
+                        if from_date and updated and updated < from_date:
                             continue
-                    except (ValueError, TypeError):
-                        pass
-
-                if date_to:
-                    try:
-                        to_date = datetime.strptime(date_to, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-                        updated = b.get('updated_at') or b.get('created_at')
-                        if updated and hasattr(updated, 'replace'):
-                            updated = updated.replace(tzinfo=None)
-                        if isinstance(updated, datetime) and updated > to_date:
+                    if date_to:
+                        to_date = _parse_filter_date(date_to, end_of_day=True)
+                        if to_date and updated and updated > to_date:
                             continue
-                    except (ValueError, TypeError):
-                        pass
 
                 if search:
                     search_lower = search.lower()
@@ -625,7 +639,7 @@ class FirestoreService:
                 "type": type,
                 "action_text": action_text,
                 "blog_title": blog_title,
-                "timestamp": datetime.utcnow(),
+                "timestamp": utcnow(),
                 "created_at": firestore.SERVER_TIMESTAMP
             }
             if target_type:
@@ -663,11 +677,11 @@ class FirestoreService:
                         .limit(limit)
                         .stream())
             activities = []
-            now = datetime.utcnow()
+            now = utcnow()
             for doc in docs:
                 data = doc.to_dict()
                 if 'timestamp' in data:
-                    ts = data['timestamp'].replace(tzinfo=None)
+                    ts = ensure_aware(data['timestamp'])
                     diff = now - ts
                     if diff.days > 0:
                         data['timestamp'] = f"{diff.days}d ago"
@@ -837,13 +851,13 @@ class FirestoreService:
             else:
                 data['target_type'] = 'blog'
                 data['target_name'] = data.get('blog_title', '')
-        # Ensure timestamp is datetime for sorting
+        # Normalise to a timezone-aware datetime so a later sort or comparison
+        # cannot mix naive and aware values and raise TypeError.
         ts = data.get('timestamp')
-        if ts and hasattr(ts, 'replace'):
-            try:
-                data['timestamp'] = ts.replace(tzinfo=None)
-            except (AttributeError, TypeError):
-                pass
+        if ts is not None:
+            aware = ensure_aware(ts)
+            if aware is not None:
+                data['timestamp'] = aware
 
     # ---------------- USER METHODS ----------------
 
@@ -990,7 +1004,7 @@ class FirestoreService:
         try:
             self.db.collection('invitations').document(invitation_id).update({
                 "status": "accepted",
-                "accepted_at": datetime.utcnow()
+                "accepted_at": utcnow()
             })
             return True
         except Exception as e:
@@ -1077,7 +1091,7 @@ class FirestoreService:
 
             update_data = {
                 "status": new_status,
-                "updated_at": datetime.utcnow()
+                "updated_at": utcnow()
             }
 
             if new_status == "SCHEDULED" and scheduled_at:
@@ -1241,7 +1255,7 @@ class FirestoreService:
                 "category": category or "",
                 "site_owner_id": site_owner_id,
                 "status": "SCHEDULED",
-                "created_at": datetime.utcnow()
+                "created_at": utcnow()
             })
             return True
         except Exception as e:
@@ -1252,7 +1266,7 @@ class FirestoreService:
         """Update the status of a schedule entry (PUBLISHED or CANCELLED)."""
         try:
             doc_ref = self.db.collection("schedule_entries").document(blog_id)
-            doc_ref.update({"status": new_status, "updated_at": datetime.utcnow()})
+            doc_ref.update({"status": new_status, "updated_at": utcnow()})
             return True
         except Exception as e:
             print(f"Error updating schedule entry: {e}")
@@ -1456,7 +1470,7 @@ class FirestoreService:
 
             def get_team_recent_activity():
                 activities = []
-                now = datetime.utcnow()
+                now = utcnow()
                 for i in range(0, len(all_user_ids), 30):
                     batch = all_user_ids[i:i+30]
                     docs = (self.db.collection(self.activity_collection)
@@ -1467,7 +1481,7 @@ class FirestoreService:
                     for doc in docs:
                         data = doc.to_dict()
                         if 'timestamp' in data:
-                            ts = data['timestamp'].replace(tzinfo=None)
+                            ts = ensure_aware(data['timestamp'])
                             diff = now - ts
                             if diff.days > 0:
                                 data['timestamp'] = f"{diff.days}d ago"
@@ -1525,8 +1539,8 @@ class FirestoreService:
             "tagline": "Create, Manage & Publish Beautiful Blogs",
             "app_logo": "",
             "app_favicon": "",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": utcnow(),
+            "updated_at": utcnow()
         }
 
     @retry_on_unavailable
@@ -1559,7 +1573,7 @@ class FirestoreService:
     def update_app_settings(self, settings_data):
         """Updates app-level settings in Firestore."""
         try:
-            settings_data['updated_at'] = datetime.utcnow()
+            settings_data['updated_at'] = utcnow()
 
             self.db.collection("app_config").document("general").set(
                 settings_data,
@@ -2092,7 +2106,7 @@ For questions about these Terms, contact us at {contact_email}.
             # Validate settings
             validated = self._validate_site_settings(settings)
             validated['owner_id'] = user_id
-            validated['updated_at'] = datetime.utcnow()
+            validated['updated_at'] = utcnow()
 
             doc_ref = self.db.collection("site_settings").document(user_id)
             doc_ref.set(validated, merge=True)
@@ -2477,7 +2491,7 @@ For questions about these Terms, contact us at {contact_email}.
                 'removed_at': comment_data.get('removed_at'),
                 'removed_reason': comment_data.get('removed_reason'),
                 'created_at': firestore.SERVER_TIMESTAMP,
-                'updated_at': datetime.utcnow()
+                'updated_at': utcnow()
             }
             doc_ref = self.db.collection('comments').add(comment)
             return doc_ref[1].id
@@ -2589,14 +2603,14 @@ For questions about these Terms, contact us at {contact_email}.
                 'admin_name': admin_name,
                 'previous_text': current_data.get('display_text', ''),
                 'new_text': new_text[:5000],
-                'edited_at': datetime.utcnow(),
+                'edited_at': utcnow(),
                 'reason': reason[:500] if reason else ''
             }
 
             doc_ref.update({
                 'display_text': new_text[:5000],
                 'admin_edits': firestore.ArrayUnion([edit_entry]),
-                'updated_at': datetime.utcnow()
+                'updated_at': utcnow()
             })
             return True
         except Exception as e:
@@ -2608,12 +2622,12 @@ For questions about these Terms, contact us at {contact_email}.
         try:
             update_data = {
                 'status': new_status,
-                'updated_at': datetime.utcnow()
+                'updated_at': utcnow()
             }
 
             if new_status == 'removed':
                 update_data['removed_by'] = removed_by or 'admin'
-                update_data['removed_at'] = datetime.utcnow()
+                update_data['removed_at'] = utcnow()
                 update_data['removed_reason'] = reason
             elif new_status == 'published':
                 update_data['removed_by'] = None
@@ -2765,7 +2779,7 @@ For questions about these Terms, contact us at {contact_email}.
 
             doc_ref.update({
                 'active': False,
-                'unsubscribed_at': datetime.utcnow()
+                'unsubscribed_at': utcnow()
             })
             return True
         except Exception as e:
@@ -2785,7 +2799,7 @@ For questions about these Terms, contact us at {contact_email}.
 
             doc_ref.update({
                 'active': True,
-                'resubscribed_at': datetime.utcnow()
+                'resubscribed_at': utcnow()
             })
             return True
         except Exception as e:
@@ -2884,7 +2898,7 @@ For questions about these Terms, contact us at {contact_email}.
                 'closing': draft_data.get('closing', ''),
                 'html_content': draft_data.get('html_content', ''),
                 'created_at': firestore.SERVER_TIMESTAMP,
-                'updated_at': datetime.utcnow(),
+                'updated_at': utcnow(),
                 'status': 'draft'
             }
             doc_ref = self.db.collection('newsletter_drafts').add(draft)
@@ -2945,7 +2959,7 @@ For questions about these Terms, contact us at {contact_email}.
             doc_ref = self.db.collection(self.collection_name).document(blog_id)
             doc_ref.update({
                 'embedding': embedding,
-                'embedding_updated_at': datetime.utcnow()
+                'embedding_updated_at': utcnow()
             })
             return True
         except Exception as e:
@@ -3031,7 +3045,7 @@ For questions about these Terms, contact us at {contact_email}.
                 'url': url,
                 'size': size,
                 'content_type': content_type,
-                'created_at': datetime.utcnow().isoformat()
+                'created_at': utcnow().isoformat()
             }
             doc_ref = self.db.collection('gallery_images').add(doc_data)
             return doc_ref[1].id
@@ -3185,7 +3199,7 @@ For questions about these Terms, contact us at {contact_email}.
                 "recommendations": report_data.get("recommendations", []),
                 "new_title": report_data.get("new_title", ""),
                 "created_at": firestore.SERVER_TIMESTAMP,
-                "timestamp": datetime.utcnow()
+                "timestamp": utcnow()
             })
             return doc_ref.id
         except Exception as e:

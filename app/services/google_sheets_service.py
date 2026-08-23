@@ -5,6 +5,7 @@ from datetime import datetime
 
 import gspread
 from google.oauth2.service_account import Credentials
+from app.utils.date_utils import utcnow
 
 
 class GoogleSheetsService:
@@ -109,7 +110,7 @@ class GoogleSheetsService:
     def log_bulk_activities(self, events, spreadsheet_id=None):
         for event in events:
             row = [
-                event.get('timestamp', datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')),
+                event.get('timestamp', utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')),
                 event.get('user_name', ''),
                 event.get('user_id', ''),
                 event.get('action_type', 'click'),
@@ -152,19 +153,19 @@ class GoogleSheetsService:
             return []
 
     def log_activity(self, user_name, action_type, action_text, blog_title="", details="", spreadsheet_id=None):
-        timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+        timestamp = utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
         row = [timestamp, user_name, '', action_type, action_text, '', '', blog_title or details, '', '']
         self._append(row, spreadsheet_id)
         return True
 
     def sync_user(self, uid, name, email, role, created_by="", created_at=None, last_login=None, spreadsheet_id=None):
-        timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+        timestamp = utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
         row = [timestamp, name, uid, 'user_sync', f"{name} ({email}) - {role}", '', '', f"Created by: {created_by}", '', '']
         self._append(row, spreadsheet_id)
         return True
 
     def sync_blog(self, blog_id, title, status, category="", author_id="", created_at=None, updated_at=None, author_name="", spreadsheet_id=None):
-        timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+        timestamp = utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
         row = [timestamp, author_name, author_id, 'blog_sync', f"{title} [{status}]", '', '', f"Category: {category}, ID: {blog_id}", '', '']
         self._append(row, spreadsheet_id)
         return True
