@@ -20,6 +20,25 @@ import app.routes.auth as auth_module
 from tests.conftest import make_fake_id_token
 
 
+# Stand-ins for the firebase_admin.auth exception classes. The route
+# distinguishes expired / revoked / invalid tokens to give each its own
+# message, and `except` needs real classes to match against.
+class _ExpiredIdTokenError(Exception):
+    pass
+
+
+class _RevokedIdTokenError(Exception):
+    pass
+
+
+class _InvalidIdTokenError(Exception):
+    pass
+
+
+class _EmailAlreadyExistsError(Exception):
+    pass
+
+
 @pytest.fixture
 def fake_firebase(monkeypatch):
     """Patch the auth module's Firebase + Firestore + cache dependencies.
@@ -35,13 +54,23 @@ def fake_firebase(monkeypatch):
     from unittest.mock import MagicMock
 
     admin_auth = MagicMock(name="admin_auth")
-    admin_auth.verify_id_token.return_value = {"email": "user@gmail.com", "name": "User"}
+    # uid comes from the *verified* token now, not the client-supplied JWT
+    # payload, so the mock must supply it the way the real SDK does.
+    admin_auth.verify_id_token.return_value = {
+        "uid": "uid1", "email": "user@gmail.com", "name": "User",
+    }
+    # The route catches these by type to give each a distinct message; a
+    # MagicMock attribute is not a class and cannot appear in an `except`.
+    admin_auth.ExpiredIdTokenError = _ExpiredIdTokenError
+    admin_auth.RevokedIdTokenError = _RevokedIdTokenError
+    admin_auth.InvalidIdTokenError = _InvalidIdTokenError
+    admin_auth.EmailAlreadyExistsError = _EmailAlreadyExistsError
     monkeypatch.setattr(auth_module, "admin_auth", admin_auth)
 
     db = MagicMock(name="db_service")
     db.get_user_by_id.return_value = None
     db.get_pending_invitation_by_email.return_value = None
-    db.save_user.side_effect = lambda info: {**info, "role": info.get("role", "ADMIN")}
+    db.save_user.side_effect = lambda info: {**info, "role": info.get("role", "USER")}
     db.update_last_login.return_value = None
     db.accept_invitation.return_value = None
     monkeypatch.setattr(auth_module, "db_service", db)
@@ -62,7 +91,7 @@ def _verify(client, uid="uid1", email="user@gmail.com"):
 # =========================================================================== #
 def test_signup_with_valid_gmail_succeeds(client, fake_firebase):
     admin_auth, db = fake_firebase
-    admin_auth.verify_id_token.return_value = {"email": "newuser@gmail.com", "name": "New User"}
+    admin_auth.verify_id_token.return_value = {"uid": "uid-new", "email": "newuser@gmail.com", "name": "New User"}
 
     resp = _verify(client, "uid-new", "newuser@gmail.com")
     body = resp.get_json()
@@ -84,7 +113,7 @@ def test_existing_non_gmail_user_can_still_log_in(client, fake_firebase):
     db.get_user_by_id.return_value = {
         "name": "Legacy", "role": "ADMIN", "email": "legacy@company.com", "profile_image": "",
     }
-    admin_auth.verify_id_token.return_value = {"email": "legacy@company.com"}
+    admin_auth.verify_id_token.return_value = {"uid": "uid-legacy", "email": "legacy@company.com"}
 
     resp = _verify(client, "uid-legacy", "legacy@company.com")
 
@@ -96,7 +125,7 @@ def test_existing_non_gmail_user_can_still_log_in(client, fake_firebase):
 
 def test_invited_gmail_user_gets_invitation_role(client, fake_firebase):
     admin_auth, db = fake_firebase
-    admin_auth.verify_id_token.return_value = {"email": "invitee@gmail.com", "name": "Invitee"}
+    admin_auth.verify_id_token.return_value = {"uid": "uid-inv", "email": "invitee@gmail.com", "name": "Invitee"}
     db.get_pending_invitation_by_email.return_value = {
         "id": "inv1", "role": "EDITOR", "invited_by": "admin-1",
     }
@@ -114,7 +143,7 @@ def test_invited_gmail_user_gets_invitation_role(client, fake_firebase):
 # =========================================================================== #
 def test_signup_with_non_gmail_is_rejected_and_orphan_deleted(client, fake_firebase):
     admin_auth, db = fake_firebase
-    admin_auth.verify_id_token.return_value = {"email": "attacker@yahoo.com"}
+    admin_auth.verify_id_token.return_value = {"uid": "uid-bad", "email": "attacker@yahoo.com"}
 
     resp = _verify(client, "uid-bad", "attacker@yahoo.com")
     body = resp.get_json()
@@ -132,7 +161,7 @@ def test_signup_with_non_gmail_is_rejected_and_orphan_deleted(client, fake_fireb
 
 def test_invalid_token_returns_401(client, fake_firebase):
     admin_auth, db = fake_firebase
-    admin_auth.verify_id_token.side_effect = Exception("Token expired or invalid")
+    admin_auth.verify_id_token.side_effect = _InvalidIdTokenError("bad token")
 
     resp = _verify(client, "uid-x", "user@gmail.com")
 
@@ -141,20 +170,109 @@ def test_invalid_token_returns_401(client, fake_firebase):
     db.save_user.assert_not_called()
 
 
-def test_missing_id_token_returns_401(client, fake_firebase):
+def test_missing_id_token_returns_400(client, fake_firebase):
+    """A body with no token is a malformed request, not a failed sign-in.
+
+    400 rather than 401 is deliberate: 401 tells the frontend "your credentials
+    were rejected, show the expired-session prompt", which is the wrong thing
+    to show when the client simply never sent a token.
+    """
     resp = client.post("/api/auth/verify", data=json.dumps({}), content_type="application/json")
-    assert resp.status_code == 401
-    assert resp.get_json()["success"] is False
+    body = resp.get_json()
+
+    assert resp.status_code == 400
+    assert body["success"] is False
+    assert body["code"] == "validation_error"
+    # Every error response carries the id needed to find it in the logs.
+    assert body["request_id"]
 
 
 def test_malformed_token_returns_401(client, fake_firebase):
+    """A token that is not a valid JWT must be rejected by verification.
+
+    The mock raises the way the real SDK does. Asserting on the mock being
+    *called* is the point: a syntactically broken token must still reach
+    signature verification rather than being waved through by a parse
+    shortcut.
+    """
+    admin_auth, db = fake_firebase
+    admin_auth.verify_id_token.side_effect = _InvalidIdTokenError("not a JWT")
+
     resp = client.post(
         "/api/auth/verify",
         data=json.dumps({"idToken": "not-a-real-jwt"}),
         content_type="application/json",
     )
+
     assert resp.status_code == 401
     assert resp.get_json()["success"] is False
+    admin_auth.verify_id_token.assert_called_once()
+    db.save_user.assert_not_called()
+
+
+def test_expired_and_revoked_tokens_get_distinct_messages(client, fake_firebase):
+    """Expired and revoked are different situations for the user."""
+    admin_auth, db = fake_firebase
+
+    admin_auth.verify_id_token.side_effect = _ExpiredIdTokenError("expired", None)
+    expired = _verify(client)
+
+    admin_auth.verify_id_token.side_effect = _RevokedIdTokenError("revoked")
+    revoked = _verify(client)
+
+    assert expired.status_code == revoked.status_code == 401
+    assert expired.get_json()["error"] != revoked.get_json()["error"]
+
+
+def test_error_response_never_leaks_internals(client, fake_firebase):
+    """An unexpected upstream failure must not be echoed to the caller.
+
+    The original code returned `str(e)`, which put Firebase error codes and
+    gRPC transport details in front of an unauthenticated client.
+    """
+    admin_auth, db = fake_firebase
+    secret = "gRPC transport failed: /var/secrets/serviceAccount.json unreadable"
+    admin_auth.verify_id_token.side_effect = RuntimeError(secret)
+
+    resp = _verify(client)
+    body = resp.get_json()
+
+    assert resp.status_code == 401
+    assert "gRPC" not in json.dumps(body)
+    assert "serviceAccount" not in json.dumps(body)
+    assert body["request_id"]
+
+
+def test_session_role_defaults_to_user_not_admin(client, fake_firebase):
+    """A record with no role must not be treated as an administrator.
+
+    The original session default was ADMIN, so a partially-written user
+    document granted full administrative access.
+    """
+    admin_auth, db = fake_firebase
+    db.get_user_by_id.return_value = {"name": "No Role", "email": "user@gmail.com"}
+    admin_auth.verify_id_token.return_value = {"uid": "uid-norole", "email": "user@gmail.com"}
+
+    resp = _verify(client, "uid-norole")
+
+    assert resp.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess["user_role"] == "USER"
+
+
+def test_check_email_does_not_confirm_account_existence(client, fake_firebase):
+    """The endpoint must not work as an account-enumeration oracle."""
+    admin_auth, db = fake_firebase
+
+    resp = client.post(
+        "/api/auth/check-email",
+        data=json.dumps({"email": "somebody@gmail.com"}),
+        content_type="application/json",
+    )
+
+    assert resp.status_code == 200
+    # It never consults Firebase, so it cannot reveal what Firebase knows.
+    admin_auth.get_user_by_email.assert_not_called()
 
 
 # =========================================================================== #
@@ -164,7 +282,7 @@ def test_gmail_check_uses_verified_claim_not_client_payload(client, fake_firebas
     """A client can put anything in the JWT payload; the gate must use the
     cryptographically verified email. Payload says gmail, verified says evil."""
     admin_auth, db = fake_firebase
-    admin_auth.verify_id_token.return_value = {"email": "attacker@evil.com"}
+    admin_auth.verify_id_token.return_value = {"uid": "uid-spoof", "email": "attacker@evil.com"}
 
     # Client-supplied payload claims a Gmail address...
     resp = _verify(client, "uid-spoof", "trusted@gmail.com")
@@ -182,7 +300,7 @@ def test_gmail_check_uses_verified_claim_not_client_payload(client, fake_firebas
 ])
 def test_domain_spoof_rejected_at_api(client, fake_firebase, spoof_email):
     admin_auth, db = fake_firebase
-    admin_auth.verify_id_token.return_value = {"email": spoof_email}
+    admin_auth.verify_id_token.return_value = {"uid": "uid-spoof2", "email": spoof_email}
 
     resp = _verify(client, "uid-spoof2", spoof_email)
 
