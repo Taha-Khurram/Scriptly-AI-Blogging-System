@@ -1,209 +1,356 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Analytics | ScriptlyAI{% endblock %}
+{% block title %}Analytics | {{ app_config.app_name if app_config else 'ScriptlyAI' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/analytics.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/analytics.css') }}?v=2">
 {% endblock %}
 
+{#
+  Analytics — GA4, read as a dashboard rather than as four numeric tables.
+
+  Four states behind one screen: OAuth missing, not connected, connected but no
+  property chosen, and the dashboard itself. Only the last one has charts.
+
+  Chart decisions (docs/DESIGN_SYSTEM.md §1 "Colour — data-viz"):
+
+  * There is no categorical palette here at all. Every mark on the screen is
+    --accent — the time series, the channel bars, the share meters — because
+    nothing on this screen encodes *identity*. The series is chosen by the
+    reader (the KPI tiles are the selector), so the chart never has more than
+    one; and channel names are nominal, so colouring those bars by their value
+    would spend the identity channel re-encoding what bar length already shows.
+  * Validated, not eyeballed: --accent reaches 6.4:1 against --surface-1 in
+    light and 9.6:1 in dark, well past the 3:1 floor for marks. Axis and tick
+    text is --text-muted (6.1:1 / 6.3:1) rather than --text-faint, which only
+    manages 3.7:1 in light and would fail as small text.
+  * One filter row, above everything it scopes. Every figure, chart and list on
+    the screen answers to the same period.
+  * Every chart has a table view. The tooltip only ever enhances.
+
+  Everything lives inside .dashboard-main, modal included: PJAX swaps only that
+  element's innerHTML.
+#}
+
 {% block content %}
+{% set live = measurement_id and site_analytics_id == measurement_id %}
+
 <div class="dashboard-layout">
 
   {% include 'partials/sidebar.html' %}
 
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <div class="header-welcome-text">Insights</div>
-        <h1 class="header-title">Analytics</h1>
+
+    {% call page_header(title='Analytics', eyebrow='Insights') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    {% if connected %}
+    <button type="button" class="page-header-action is-ghost" data-action="disconnect">
+      <i class="bi bi-plug" aria-hidden="true"></i>
+      <span class="page-header-label">Disconnect</span>
+    </button>
+    {% endif %}
+    {% endcall %}
+
+    {# A connection attempt that failed. .is-danger rather than the warning
+       tone: this is something that went wrong, not a prerequisite missing. #}
+    {% if oauth_error %}
+    <div class="setup-banner is-danger reveal" role="alert">
+      <span class="setup-banner-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+      <div class="setup-banner-body">
+        <p class="setup-banner-title">Google Analytics connection failed</p>
+        <p class="setup-banner-text">{{ oauth_error }}</p>
       </div>
-      <div>
-        {% if connected %}
-        <button class="btn-disconnect" onclick="disconnectAnalytics()">
-          <i class="bi bi-x-circle"></i> Disconnect
-        </button>
-        {% endif %}
+    </div>
+    {% endif %}
+
+    {# Filled by the page script when a token turns out to be dead mid-session. #}
+    <div class="setup-banner is-danger reveal" data-reconnect-banner hidden>
+      <span class="setup-banner-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+      <div class="setup-banner-body">
+        <p class="setup-banner-title">Google Analytics disconnected</p>
+        <p class="setup-banner-text">
+          The connection expired while you were here, so the figures below have stopped updating.
+        </p>
       </div>
-    </header>
-
-    <div class="dashboard-content-wrapper animate-fade-up">
-
-      {% if oauth_error %}
-      <div class="analytics-reconnect-banner" role="alert">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        <div>
-          <strong>Google Analytics connection failed</strong>
-          <p>{{ oauth_error }}</p>
-        </div>
-      </div>
-      {% endif %}
-
-      {% if not has_oauth %}
-      <!-- No OAuth Configured -->
-      <div class="analytics-connect-card">
-        <div class="connect-icon">
-          <i class="bi bi-gear"></i>
-        </div>
-        <h3>OAuth Not Configured</h3>
-        <p>Add <code>GOOGLE_OAUTH_CLIENT_ID</code> and <code>GOOGLE_OAUTH_CLIENT_SECRET</code> to your environment variables to enable Google Analytics integration.</p>
-      </div>
-
-      {% elif not connected %}
-      <!-- Connect Card -->
-      <div class="analytics-connect-card">
-        <div class="connect-icon">
-          <i class="bi bi-bar-chart-line"></i>
-        </div>
-        <h3>Connect Google Analytics</h3>
-        <p>Link your Google Analytics account to view real-time traffic data, page views, and visitor insights directly in your dashboard.</p>
-        <a href="{{ url_for('analytics_bp.connect') }}" class="btn-connect">
-          <i class="bi bi-google"></i> Connect with Google
-        </a>
-        <div class="connect-steps">
-          <div class="step"><span>1</span> Sign in with Google</div>
-          <div class="step"><span>2</span> Grant analytics access</div>
-          <div class="step"><span>3</span> Select your property</div>
-        </div>
-      </div>
-
-      {% elif not property_id %}
-      <!-- Property Selection -->
-      <div class="analytics-connect-card">
-        <div class="connect-icon connected">
-          <i class="bi bi-check-circle"></i>
-        </div>
-        <h3>Select a Property</h3>
-        <p>Your Google account is connected. Choose the GA4 property you want to track.</p>
-        <div id="propertyList" class="property-list">
-          <div class="text-center py-3">
-            <div class="spinner-border spinner-border-sm text-primary"></div>
-            <p class="text-secondary small mt-2 mb-0">Loading properties...</p>
-          </div>
-        </div>
-      </div>
-
-      {% else %}
-      <!-- Analytics Dashboard -->
-      <div class="analytics-property-bar">
-        <div class="property-info">
-          <i class="bi bi-bar-chart-line"></i>
-          <span>{{ property_name or 'GA4 Property' }}</span>
-        </div>
-        <div class="period-selector">
-          <button class="period-btn" data-period="1">Today</button>
-          <button class="period-btn active" data-period="7">7 Days</button>
-          <button class="period-btn" data-period="30">30 Days</button>
-        </div>
-      </div>
-
-      <!-- Tracking Status Banner -->
-      <div class="tracking-status-banner">
-        <div class="tracking-status-item">
-          <i class="bi bi-globe2"></i>
-          <span class="tracking-label">Domain</span>
-          <span class="tracking-value">{{ custom_domain or 'Not set' }}</span>
-        </div>
-        <div class="tracking-status-item">
-          <i class="bi bi-tag"></i>
-          <span class="tracking-label">Measurement ID</span>
-          <span class="tracking-value">{{ measurement_id or 'Not linked' }}</span>
-        </div>
-        <div class="tracking-status-item">
-          <i class="bi bi-{% if measurement_id and site_analytics_id == measurement_id %}check-circle-fill{% else %}x-circle{% endif %}"></i>
-          <span class="tracking-label">Tracking</span>
-          <span class="tracking-value tracking-{{ 'active' if measurement_id and site_analytics_id == measurement_id else 'inactive' }}">
-            {{ 'Live' if measurement_id and site_analytics_id == measurement_id else 'Inactive' }}
-          </span>
-        </div>
-      </div>
-
-      <!-- Real-time + Stats -->
-      <div class="analytics-stats-row">
-        <div class="stat-card realtime-card">
-          <div class="stat-icon stat-realtime"><i class="bi bi-broadcast"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="realtimeCount">-</span>
-            <span class="stat-label">Active Now</span>
-          </div>
-          <div class="realtime-pulse"></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-views"><i class="bi bi-eye"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="pageViews">-</span>
-            <span class="stat-label">Page Views</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-sessions"><i class="bi bi-cursor"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="sessions">-</span>
-            <span class="stat-label">Sessions</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-users"><i class="bi bi-people"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="totalUsers">-</span>
-            <span class="stat-label">Users</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Secondary Stats -->
-      <div class="analytics-secondary-row">
-        <div class="secondary-stat">
-          <span class="secondary-label">Avg. Duration</span>
-          <span class="secondary-value" id="avgDuration">-</span>
-        </div>
-        <div class="secondary-stat">
-          <span class="secondary-label">Bounce Rate</span>
-          <span class="secondary-value" id="bounceRate">-</span>
-        </div>
-      </div>
-
-      <!-- Top Pages & Traffic Sources -->
-      <div class="analytics-grid">
-        <div class="analytics-card">
-          <div class="analytics-card-header">
-            <h3><i class="bi bi-file-text"></i> Top Pages</h3>
-          </div>
-          <div class="analytics-card-body" id="topPagesBody">
-            <div class="text-center py-4">
-              <div class="spinner-border spinner-border-sm text-primary opacity-50"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="analytics-card">
-          <div class="analytics-card-header">
-            <h3><i class="bi bi-signpost-split"></i> Traffic Sources</h3>
-          </div>
-          <div class="analytics-card-body" id="trafficSourcesBody">
-            <div class="text-center py-4">
-              <div class="spinner-border spinner-border-sm text-primary opacity-50"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {% endif %}
-
+      <a href="{{ url_for('analytics_bp.connect') }}" class="app-btn is-primary setup-banner-action">Reconnect</a>
     </div>
 
-    <!-- Disconnect Confirmation Modal (kept inside .dashboard-main so Pjax
-         navigation swaps it in with the rest of the page content) -->
-    <div id="disconnectModal" class="analytics-modal-overlay" style="display:none;">
-      <div class="analytics-modal">
-        <div class="analytics-modal-icon">
-          <i class="bi bi-exclamation-triangle"></i>
+    {# ================= GATE 1 — no OAuth credentials ================= #}
+    {% if not has_oauth %}
+    <div class="an-gate reveal">
+      <span class="an-gate-icon"><i class="bi bi-key" aria-hidden="true"></i></span>
+      <h2 class="an-gate-title">Google OAuth is not configured</h2>
+      <p class="an-gate-text">
+        Analytics needs a Google OAuth client before it can ask for access to your data.
+        Add <code>GOOGLE_OAUTH_CLIENT_ID</code> and <code>GOOGLE_OAUTH_CLIENT_SECRET</code> to
+        your environment, then reload this page.
+      </p>
+      <p class="an-gate-note">
+        Create one under <em>APIs &amp; Services → Credentials</em> in the Google Cloud console, and
+        enable both the Analytics Data API and the Analytics Admin API for the project.
+      </p>
+    </div>
+
+    {# ================= GATE 2 — not connected ================= #}
+    {% elif not connected %}
+    <div class="an-gate reveal">
+      <span class="an-gate-icon"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i></span>
+      <h2 class="an-gate-title">Connect Google Analytics</h2>
+      <p class="an-gate-text">
+        Link a GA4 property to read live traffic, page views and channel mix here — beside the
+        posts that earned them, instead of in another tab.
+      </p>
+      <a href="{{ url_for('analytics_bp.connect') }}" class="an-gate-cta">
+        {% include 'partials/google_mark.html' %}
+        Continue with Google
+      </a>
+      <ol class="an-steps">
+        <li><span class="an-step-n">1</span> Sign in with Google</li>
+        <li><span class="an-step-n">2</span> Grant read-only analytics access</li>
+        <li><span class="an-step-n">3</span> Pick the property to track</li>
+      </ol>
+      <p class="an-gate-note">Read-only. Scriptly never writes to your Analytics account.</p>
+    </div>
+
+    {# ================= GATE 3 — connected, no property ================= #}
+    {% elif not property_id %}
+    <div class="an-gate is-wide reveal">
+      <span class="an-gate-icon is-done"><i class="bi bi-check-lg" aria-hidden="true"></i></span>
+      <h2 class="an-gate-title">Pick a property</h2>
+      <p class="an-gate-text">
+        Your Google account is connected. Choose the GA4 property this site reports to — Scriptly
+        will also pick up its measurement ID and domain automatically.
+      </p>
+
+      <div class="an-properties" data-property-list aria-busy="true">
+        <div class="an-properties-loading">
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          <span>Looking for GA4 properties…</span>
         </div>
-        <h4 class="analytics-modal-title">Disconnect Analytics?</h4>
-        <p class="analytics-modal-text">This will remove your Google Analytics connection. You can reconnect anytime.</p>
-        <div class="analytics-modal-actions">
-          <button class="btn-modal-cancel" onclick="closeDisconnectModal()">Cancel</button>
-          <button class="btn-modal-confirm" onclick="confirmDisconnect()">
-            <i class="bi bi-x-circle"></i> Disconnect
-          </button>
+      </div>
+    </div>
+
+    {# ================= THE DASHBOARD ================= #}
+    {% else %}
+
+    {#
+      One filter row, above everything it scopes — never a control inside a
+      chart card. Every tile, chart and list below re-reads the same period, so
+      the numbers on screen always agree with each other.
+    #}
+    <section class="surface-card filter-bar an-filters reveal" aria-label="Reporting period">
+      <div class="filter-bar-controls">
+        <div class="seg-tabs" role="tablist" aria-label="Reporting period">
+          <button type="button" class="seg-tab" role="tab" aria-selected="false" data-period="1">Today</button>
+          <button type="button" class="seg-tab is-active" role="tab" aria-selected="true" data-period="7">7 days</button>
+          <button type="button" class="seg-tab" role="tab" aria-selected="false" data-period="30">30 days</button>
+        </div>
+      </div>
+
+      {# What the numbers are *of*. A dashboard that does not name its source
+         invites the reader to assume it is the site they are looking at. #}
+      <div class="an-source">
+        <span class="an-source-item" title="GA4 property">
+          <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
+          {{ property_name or 'GA4 property' }}
+        </span>
+        {% if custom_domain %}
+        <span class="an-source-item" title="Site domain">
+          <i class="bi bi-globe2" aria-hidden="true"></i>
+          {{ custom_domain }}
+        </span>
+        {% endif %}
+        <span class="an-source-item">
+          <span class="an-tag {{ 'is-live' if live else 'is-off' }}">
+            <i class="bi bi-{{ 'broadcast' if live else 'slash-circle' }}" aria-hidden="true"></i>
+            {{ 'Tracking live' if live else 'Tracking inactive' }}
+          </span>
+          {% if measurement_id %}<code class="an-mid">{{ measurement_id }}</code>{% endif %}
+        </span>
+      </div>
+    </section>
+
+    {#
+      The KPI row is also the chart's control. Three tiles, one per series the
+      time series can plot, and pressing one repaints the chart below — which
+      is why the chart never needs a second colour or a legend. The old screen
+      had four medallions and four bare figures: they said how many and left
+      the reader to guess whether that was good.
+    #}
+    <div class="an-kpis reveal" style="--reveal-delay: 60ms" role="group" aria-label="Metrics — choose one to chart">
+      {% for key, label, icon in [
+        ('page_views', 'Page views', 'bi-eye'),
+        ('sessions',   'Sessions',   'bi-cursor'),
+        ('users',      'Users',      'bi-people')
+      ] %}
+      <button type="button" class="stat-card an-kpi{{ ' is-active' if loop.first else '' }}"
+        data-metric="{{ key }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
+        <span class="stat-icon an-kpi-icon"><i class="bi {{ icon }}" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">{{ label }}</span>
+          {# The dash is the honest resting value: nothing is known until GA4
+             answers, and a 0 would be a claim. #}
+          <span class="stat-count" data-kpi="{{ key }}">—</span>
+          <span class="stat-delta" data-delta="{{ key }}"></span>
+        </span>
+        <span class="an-kpi-trend" data-trend="{{ key }}"></span>
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="an-split is-chart reveal" style="--reveal-delay: 120ms">
+
+      {# ---------------- Time series ---------------- #}
+      <section class="surface-card an-card" aria-labelledby="anChartTitle">
+        <div class="card-head">
+          <h2 class="card-title" id="anChartTitle">
+            <span data-chart-title>Page views</span>
+            <span class="an-card-sub" data-chart-range></span>
+          </h2>
+        </div>
+
+        {#
+          A single-series area chart: 2px line, a ~10% wash beneath it, hairline
+          solid gridlines. Built as inline SVG by the page script — the same
+          approach .stat-trend already takes — so there is no chart library to
+          load and the marks inherit the theme tokens directly.
+
+          The container is sized to include the x-axis band. A fixed height that
+          fits only the plot is what gives a card its own little scrollbar.
+        #}
+        <div class="an-chart" data-chart tabindex="0" role="img"
+          aria-describedby="anChartTable" aria-label="Loading chart">
+          <div class="an-chart-loading" data-chart-loading>
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          </div>
+          <div class="an-tip" data-chart-tip hidden aria-hidden="true"></div>
+        </div>
+
+        {# The table view. Not a fallback — the WCAG-clean twin of the chart,
+           so no value on this screen is reachable only by hovering. #}
+        <details class="an-table-wrap" id="anChartTable">
+          <summary class="an-table-toggle">
+            <i class="bi bi-table" aria-hidden="true"></i> Table view
+          </summary>
+          <div class="an-table-scroll">
+            <table class="an-table" data-chart-table>
+              <caption class="visually-hidden">Traffic by period</caption>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      {# ---------------- Live + engagement ---------------- #}
+      <section class="surface-card an-card an-live" aria-labelledby="anLiveTitle">
+        <div class="card-head">
+          <h2 class="card-title" id="anLiveTitle">Right now</h2>
+          <span class="an-pulse" data-live-pulse aria-hidden="true"></span>
+        </div>
+
+        {# The one hero figure on the screen. Same sans as everything else — a
+           display face here reads as decoration, not as data. #}
+        <p class="an-hero" data-realtime aria-describedby="anHeroNote">—</p>
+        {# Both plural forms live here, not in the script. The icon-font subset
+           script reads `textContent = 'people'` as a request for the Material
+           Symbols glyph of that name — and copy belongs beside copy anyway. #}
+        <p class="an-hero-note" id="anHeroNote">
+          <span data-realtime-word data-one="person" data-many="people">people</span>
+          active in the last 30 minutes
+        </p>
+
+        <div class="an-facts">
+          <div class="an-fact">
+            <span class="an-fact-label">Avg. session</span>
+            <span class="an-fact-value" data-avg-duration>—</span>
+          </div>
+
+          {# A ratio against a limit, so a meter rather than a series. The fill
+             stays in the neutral accent hue and claims nothing about whether
+             this number is good — a "healthy" bounce rate depends entirely on
+             what the page is for, and inventing a threshold here would put a
+             judgement in the colour that the data does not support. #}
+          <div class="an-fact">
+            <span class="an-fact-label">Bounce rate</span>
+            <span class="an-fact-value" data-bounce>—</span>
+            <span class="stat-meter an-fact-meter">
+              <span class="stat-meter-track">
+                <span class="stat-meter-fill" data-bounce-fill style="width: 0%"></span>
+              </span>
+            </span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="an-split is-lists reveal" style="--reveal-delay: 180ms">
+
+      {# ---------------- Top pages ---------------- #}
+      <section class="surface-card an-card" aria-labelledby="anPagesTitle">
+        <div class="card-head">
+          <h2 class="card-title" id="anPagesTitle">Top pages</h2>
+          <p class="an-card-note">Share is of all page views in the period.</p>
+        </div>
+        <div class="an-rows" data-top-pages aria-busy="true">
+          <div class="an-rows-loading">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          </div>
+        </div>
+      </section>
+
+      {# ---------------- Traffic sources ---------------- #}
+      <section class="surface-card an-card" aria-labelledby="anSourcesTitle">
+        <div class="card-head">
+          <h2 class="card-title" id="anSourcesTitle">Traffic sources</h2>
+          <p class="an-card-note">Sessions by channel.</p>
+        </div>
+
+        {#
+          Horizontal bars, every one in the same hue. The channel names are
+          nominal — swapping their order changes nothing — so identity is
+          carried by the label beside each bar, not by colour, and each row
+          prints its own count and share. That printed pair *is* the chart's
+          table view; the hover only ever adds the user count.
+        #}
+        <div class="an-bars" data-sources aria-busy="true">
+          <div class="an-rows-loading">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    {% endif %}
+
+    {# ================= DISCONNECT ================= #}
+    {#
+      Bootstrap's modal machinery wearing our chrome (.app-modal), replacing a
+      hand-rolled overlay that was shown by setting style.display and dismissed
+      by three inline onclick handlers — with no focus trap and no Escape.
+    #}
+    <div class="modal fade" id="disconnectModal" tabindex="-1" aria-labelledby="disconnectTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <div class="app-modal-head">
+            <h2 class="app-modal-title" id="disconnectTitle">Disconnect Analytics?</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="app-modal-body">
+            <p class="delete-copy">
+              This removes Scriptly's access to your Google Analytics account and clears the
+              measurement ID from your site settings, so tracking stops. Your Analytics data itself
+              is untouched, and you can reconnect at any time.
+            </p>
+          </div>
+          <div class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-danger" data-action="confirm-disconnect">Disconnect</button>
+          </div>
         </div>
       </div>
     </div>
@@ -213,5 +360,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/analytics.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/pages/analytics.js') }}?v=4"></script>
 {% endblock %}

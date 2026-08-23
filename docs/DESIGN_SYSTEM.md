@@ -1235,9 +1235,88 @@ working. A tidy-up of the CSS would have silently broken the counters. They are
 
 ### Analytics — `analytics.html`
 
-Card-based stat tiles on the same `--surface-1` / `--elev-1` / medallion pattern
-as Home, so the two screens read as one system. Reconnect and setup states are
-`--warning-soft` banners with `--warning-border`.
+Four states behind one screen — OAuth missing, not connected, connected with no
+property chosen, and the dashboard. The first three are centred `.an-gate`
+cards; only the last one has charts.
+
+```
+╔ page header ══════════════════════════════════════════════════════════╗
+║ Insights · H1 Analytics                       ( ☾ )  ( ⚡ Disconnect ) ║
+╚═══════════════════════════════════════════════════════════════════════╝
+┌ filter bar — one row, scopes everything below ────────────────────────┐
+│ (Today)(7 days)(30 days)     ⛁ property · 🌐 domain · ● Tracking live │
+└───────────────────────────────────────────────────────────────────────┘
+┌ Page views ──────┐┌ Sessions ────────┐┌ Users ───────────┐
+│ ▣ 12.4K ↑18%  ∿∿ ││ ▣ 8.1K  ↓6.5% ∿∿ ││ ▣ 6.3K level ∿∿ │ ← also the
+└──────────────────┘└──────────────────┘└──────────────────┘   chart's
+┌ Page views · last 7 days (8fr) ───────┐┌ Right now (4fr) ──┐  selector
+│ 500 ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈ ││        47         │
+│     ╱‾╲    ╱‾‾╲___╱‾╲  2px + 10% wash ││   people active…  │
+│ 0   ───────────────────────────────── ││ ───────────────── │
+│     Aug 16  18  20  22                ││ Avg. session 2m14 │
+│     ▸ Table view                      ││ Bounce  41% ▓▓░░  │
+└───────────────────────────────────────┘└───────────────────┘
+┌ Top pages (7fr) ──────────────────────┐┌ Traffic sources (5fr) ────────┐
+│ Home — Scriptly                       ││ Organic search ▓▓▓▓▓▓ 700 44% │
+│ /                    900  1m12s  36%  ││ Direct         ▓▓▓▓   400 25% │
+│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ││ …                             │
+└───────────────────────────────────────┘└ 2 other channels ▓  30  2%    ┘
+```
+
+**No categorical palette.** Every mark on the screen is `--accent`, because
+nothing here encodes *identity*. The time series carries one series at a time —
+the reader picks it — and channel names are nominal, so colouring those bars by
+value would spend the identity channel re-encoding what bar length already
+shows. That also means the screen needs no legend and no colour-matching.
+
+**The numbers were checked, not eyeballed.** `--accent` sits at 6.4:1 against
+`--surface-1` in light and 9.6:1 in dark, well past the 3:1 floor for marks.
+Axis and tick text is `--text-muted` (6.1:1 / 6.3:1); `--text-faint` manages
+only 3.7:1 in light, so no small text on this screen uses it. Gridlines are
+`--border-subtle` at 1.2:1, which is the point — a grid is recessive by spec.
+
+**Marks** follow the fixed specs: 2px line with round joins, a ~10% wash beneath
+it (`--accent-tint` is 8% light / 12% dark), hairline *solid* gridlines, one 8px
+endpoint dot with a 2px surface ring, and horizontal bars 10px thick with a 4px
+rounded data-end and a square baseline. The y axis rounds on a 1 / 2 / 2.5 / 5
+ladder — a plain 1 / 2 / 5 ladder sends a peak of 240 to an axis of 500, and the
+line then never rises past halfway.
+
+**The KPI row is the chart's control.** Three `.stat-card`s carrying the full
+`label · value · delta · trend` contract, each a button that repaints the chart.
+The screen this replaced had four medallions and four bare figures: they said
+how many and left the reader to guess whether that was good. The delta needed a
+comparison window, so `/api/analytics/overview` now reports the previous period
+of equal length beside the current one, and a new `/api/analytics/timeseries`
+supplies the shape — by hour for today, by day otherwise.
+
+**Gaps are real zeros.** GA4 omits days with no traffic, so plotting only what
+it returns compresses those gaps and the x-axis quietly misstates the range.
+`_fill_days` densifies the window; `_fill_hours` stops at the last hour that
+reported rather than padding a flat line across hours that have not happened.
+And the daily rows are never summed for the period total — `totalUsers` is
+de-duplicated, so a returning visitor would be counted twice.
+
+**Shares are of the whole.** Page share divides by the period's total page
+views, not by the ten rows on screen; the channel endpoint returns every channel
+rather than the top eight, so the percentages add up to 100 and the tail folds
+into one "Other" row instead of being dropped. The share *meter* on a page row
+scales against the top row, because at 3% of a site's traffic every bar would
+otherwise be an invisible sliver.
+
+**Every chart has a table view** — a `<details>` twin under the time series
+carrying all three series per point, so nothing is reachable only by hovering.
+The crosshair snaps to the nearest X (readers aim at a date, never at a 2px
+line), keyboard arrows walk the same readout, and the tooltip leads with the
+value because the reader already knows which series is on screen.
+
+**Failure is contained.** Each panel fetches independently, so a broken chart
+leaves the figures above it standing. An expired token reveals the pre-rendered
+`.setup-banner.is-danger` and dims the data in place — the screen this replaced
+overwrote the whole content wrapper with a banner to report it. The realtime
+pulse only animates while a poll is actually succeeding: a heartbeat over a dead
+connection is a lie the reader cannot catch. And a period change refetches
+behind the previous render held at reduced opacity — no skeleton, no jump.
 
 ### Account — `profile.html`
 
@@ -1322,7 +1401,11 @@ Reusable pieces, all token-driven:
 | Header action | `.page-header-action` / `.page-header-icon-btn` | primary / ghost pill, 44px round icon button |
 | Page header (legacy) | `.dashboard-header` / `.header-title` | plain eyebrow + H1, still used by the other screens |
 | Stat tile | `.stat-card` / `.stat-icon` / `.stat-label` / `.stat-count` / `.stat-delta` / `.stat-trend` / `.stat-meter` | the full label · value · delta · trend contract; in dashboard.css §12 since six screens use it — only the medallion's *colour* stays with the page |
-| Setup banner | `.setup-banner` | `--warning-soft` on `--warning-border`; a blocked screen explaining itself |
+| Setup banner | `.setup-banner` | `--warning-soft` on `--warning-border`; a blocked screen explaining itself. `.is-danger` for a connection that broke rather than one never set up. In dashboard.css §12 since analytics became its second user |
+| Time series | `.an-chart` / `.an-line` / `.an-area` / `.an-dot` / `.an-grid` / `.an-tick` / `.an-cursor` | single-series area chart, inline SVG at the container's real pixel size; crosshair + keyboard readout |
+| Chart table view | `.an-table-wrap` / `.an-table-toggle` / `.an-table` | the `<details>` twin every chart carries, so no value is hover-only |
+| Channel bars | `.an-bars` / `.an-bar-row` / `.an-bar-track` / `.an-bar-fill` | horizontal bars, one hue, direct-labelled; `.is-other` for the folded tail |
+| Gate card | `.an-gate` / `.an-gate-icon` / `.an-gate-cta` / `.an-steps` | a screen that cannot show its content yet, explaining what it needs |
 | Device toggle | `.device-toggle` / `.device-btn` | desktop ↔ phone preview width |
 | Email preview | `.preview-stage` / `.preview-device` | sandboxed iframe on `--email-paper`, which does not invert |
 | Send bar | `.send-bar` | sticky footer stating the audience beside the irreversible action |
