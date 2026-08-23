@@ -254,8 +254,12 @@
         {# The one hero figure on the screen. Same sans as everything else — a
            display face here reads as decoration, not as data. #}
         <p class="an-hero" data-realtime aria-describedby="anHeroNote">—</p>
+        {# Both plural forms live here, not in the script. The icon-font subset
+           script reads `textContent = 'people'` as a request for the Material
+           Symbols glyph of that name — and copy belongs beside copy anyway. #}
         <p class="an-hero-note" id="anHeroNote">
-          <span data-realtime-word>people</span> active in the last 30 minutes
+          <span data-realtime-word data-one="person" data-many="people">people</span>
+          active in the last 30 minutes
         </p>
 
         <div class="an-facts">

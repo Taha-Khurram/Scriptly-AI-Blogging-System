@@ -84,11 +84,17 @@
 
     // Axis ticks round to clean numbers — they carry the values the chart does
     // not directly label, so 1,000 / 2,000 rather than 1,873 / 3,746.
+    //
+    // The ladder includes 2.5 deliberately. On a plain 1/2/5/10 ladder a series
+    // peaking at 240 gets an axis of 500, so the line never rises past halfway
+    // and the chart visually understates its own data. 2.5 closes the widest
+    // gap in the ladder; the resulting ticks (0 / 125 / 250) still read as
+    // round numbers.
     function niceCeil(v) {
         if (v <= 0) return 1;
         const mag = Math.pow(10, Math.floor(Math.log10(v)));
         const norm = v / mag;
-        const step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+        const step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10;
         return step * mag;
     }
 
@@ -339,7 +345,10 @@
 
         const n = Number(data.active_users) || 0;
         if (ui.realtime) ui.realtime.textContent = grouped(n);
-        if (ui.realtimeWord) ui.realtimeWord.textContent = n === 1 ? 'person' : 'people';
+        if (ui.realtimeWord) {
+            const d = ui.realtimeWord.dataset;
+            ui.realtimeWord.textContent = n === 1 ? (d.one || '') : (d.many || '');
+        }
         if (ui.pulse) { ui.pulse.classList.add('is-live'); ui.pulse.classList.remove('is-stale'); }
     }
 
@@ -516,6 +525,11 @@
         state.series = data.points;
         state.granularity = data.granularity || 'day';
         state.focus = -1;
+        // Only now is the granularity known. loadPeriod() sets the caption up
+        // front so the card is never captionless, but it can only guess "by
+        // day" from the previous slice — switching to Today would otherwise
+        // sit there labelled "by day" over an hourly chart.
+        setChartCaption();
         if (ui.chartLoading) ui.chartLoading.hidden = true;
         drawChart();
         paintSparklines();
@@ -968,6 +982,10 @@
         Promise.all([fetchOverview(), fetchSeries(), fetchTopPages(), fetchSources()])
             .then(() => {
                 if (signal.aborted) return;
+                // Not if the connection died during the load. goDead() dims the
+                // screen precisely to say "these figures are no longer current",
+                // and this ran afterwards and brightened them all back up.
+                if (state.dead) return;
                 cards.forEach((c) => c.classList.remove('an-stale'));
             });
     }
