@@ -26,6 +26,19 @@ logger = get_logger(__name__)
 class GalleryRepository:
     """Metadata for the media library. The bytes live in storage_service."""
 
+    # (key function, reverse) per sort option the grid offers. Sorting happens
+    # in Python rather than Firestore because the grid also filters by filename
+    # substring and by file type, neither of which Firestore can express in the
+    # same query as an ordering.
+    GALLERY_SORTS = {
+        'newest': (lambda i: i.get('created_at') or '', True),
+        'oldest': (lambda i: i.get('created_at') or '', False),
+        'name': (lambda i: (i.get('filename') or '').lower(), False),
+        'name_desc': (lambda i: (i.get('filename') or '').lower(), True),
+        'largest': (lambda i: int(i.get('size') or 0), True),
+        'smallest': (lambda i: int(i.get('size') or 0), False),
+    }
+
     def save_gallery_image(self, user_id, filename, url, size, content_type):
         try:
             doc_data = {

@@ -162,7 +162,7 @@ class FirebaseStorageBackend(StorageBackend):
 
     name = 'firebase'
 
-    def __init__(self):
+    def __init__(self, verify=True):
         from app.firebase.firebase_admin import FirebaseLoader
 
         self._bucket = FirebaseLoader.get_bucket()
@@ -172,6 +172,29 @@ class FirebaseStorageBackend(StorageBackend):
                 'stored durably. Set it, or set UPLOAD_BACKEND=local for '
                 'local development only.'
             )
+
+        # The SDK hands back a Bucket handle without contacting the network, so
+        # a handle proves nothing -- a name for a bucket that does not exist
+        # constructs perfectly and then 404s on the first upload. Verified once
+        # at startup instead, which is the difference between a clear boot-time
+        # message and every upload failing at request time with the reason
+        # buried in a stack trace.
+        if verify and not self._exists():
+            raise ConfigurationError(
+                f'Storage bucket "{self._bucket.name}" does not exist or is '
+                'not accessible with these credentials. Enable Storage for '
+                'the project (Firebase console > Build > Storage), or correct '
+                'FB_STORAGE_BUCKET.'
+            )
+
+    def _exists(self):
+        try:
+            return bool(self._bucket.exists())
+        except Exception:
+            logger.warning(
+                'Could not confirm the storage bucket exists', exc_info=True
+            )
+            return False
 
     def save(self, object_name, data, content_type):
         blob = self._bucket.blob(object_name)
@@ -314,9 +337,16 @@ class StorageService:
             self._backend = FirebaseStorageBackend()
             logger.info('Upload backend: Firebase Storage')
         except Exception as exc:
+            # Falling back rather than refusing to boot: the gallery is one
+            # feature, and taking the whole application down over it would be
+            # the larger outage. But it is logged at ERROR, and /healthz reports
+            # storage as degraded, because uploads accepted onto this disk are
+            # lost on the next deploy -- silent data loss is worse than a
+            # feature being unavailable.
             logger.error(
-                'Firebase Storage unavailable (%s); falling back to local disk. '
-                'Uploads will NOT survive a deploy.', exc,
+                'Firebase Storage is unavailable, falling back to local disk. '
+                'Uploads will NOT survive a deploy or reach other instances. '
+                'Reason: %s', exc,
             )
             self._backend = LocalStorageBackend()
 

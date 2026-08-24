@@ -6,6 +6,7 @@ does not invalidate, a queue that accepts work it cannot start, and an upload
 validator that trusts a filename all look fine in a single-user click-through.
 """
 import time
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -421,3 +422,80 @@ class TestErrorClassification:
         client = GeminiClient()
         with pytest.raises(ConfigurationError):
             client.generate_text('hello')
+
+
+class TestStorageBackendVerification:
+    """A Bucket handle is not proof the bucket exists.
+
+    The SDK constructs a handle without contacting the network, so a name for a
+    non-existent bucket builds fine and then 404s on the first upload. That is
+    how a real project reported `backend: firebase, durable: true` while every
+    upload would have failed.
+    """
+
+    def test_nonexistent_bucket_is_refused_at_construction(self, monkeypatch):
+        from app.core.errors import ConfigurationError
+        from app.services import storage_service
+
+        missing = MagicMock(name='bucket')
+        missing.exists.return_value = False
+        missing.name = 'project.appspot.com'
+        monkeypatch.setattr(
+            'app.firebase.firebase_admin.FirebaseLoader.get_bucket',
+            classmethod(lambda cls: missing),
+        )
+
+        with pytest.raises(ConfigurationError) as excinfo:
+            storage_service.FirebaseStorageBackend()
+        assert 'does not exist' in excinfo.value.message
+
+    def test_configure_falls_back_to_local_rather_than_failing_to_boot(self, monkeypatch):
+        """The gallery being unavailable must not take the whole app down."""
+        from app.services import storage_service
+
+        missing = MagicMock(name='bucket')
+        missing.exists.return_value = False
+        missing.name = 'project.appspot.com'
+        monkeypatch.setattr(
+            'app.firebase.firebase_admin.FirebaseLoader.get_bucket',
+            classmethod(lambda cls: missing),
+        )
+
+        service = storage_service.StorageService()
+        service.configure(backend='firebase', max_bytes=1024)
+
+        assert service.backend_name == 'local'
+        # And it must admit the degradation rather than claiming durability.
+        assert service.is_durable is False
+
+    def test_existing_bucket_is_accepted(self, monkeypatch):
+        from app.services import storage_service
+
+        present = MagicMock(name='bucket')
+        present.exists.return_value = True
+        present.name = 'project.appspot.com'
+        monkeypatch.setattr(
+            'app.firebase.firebase_admin.FirebaseLoader.get_bucket',
+            classmethod(lambda cls: present),
+        )
+
+        service = storage_service.StorageService()
+        service.configure(backend='firebase', max_bytes=1024)
+
+        assert service.backend_name == 'firebase'
+        assert service.is_durable is True
+
+    def test_verification_can_be_skipped(self, monkeypatch):
+        """For a caller that has already established the bucket is present and
+        does not want to spend a second round trip on it."""
+        from app.services import storage_service
+
+        unchecked = MagicMock(name='bucket')
+        unchecked.name = 'project.appspot.com'
+        monkeypatch.setattr(
+            'app.firebase.firebase_admin.FirebaseLoader.get_bucket',
+            classmethod(lambda cls: unchecked),
+        )
+
+        storage_service.FirebaseStorageBackend(verify=False)
+        unchecked.exists.assert_not_called()
