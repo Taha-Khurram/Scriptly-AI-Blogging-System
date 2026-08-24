@@ -18,7 +18,6 @@ SEO tooling, team collaboration, and a 13-agent AI pipeline.
 ![Firebase](https://img.shields.io/badge/Firebase-Firestore-FFCA28?style=flat-square&logo=firebase&logoColor=black)
 ![Auth](https://img.shields.io/badge/Auth-Firebase%20%2B%20Google%20OAuth-EA4335?style=flat-square&logo=googleauthenticator&logoColor=white)
 ![Analytics](https://img.shields.io/badge/Analytics-Google%20Analytics-E37400?style=flat-square&logo=googleanalytics&logoColor=white)
-![Render](https://img.shields.io/badge/Deploy-Render-46E3B7?style=flat-square&logo=render&logoColor=white)
 ![License](https://img.shields.io/badge/License-Proprietary%20(All%20Rights%20Reserved)-6E56CF?style=flat-square)
 
 
@@ -37,7 +36,7 @@ SEO tooling, team collaboration, and a 13-agent AI pipeline.
 - **📊 Google integrations** — real-time Analytics dashboard (OAuth), plus a Google Sheets Activity Agent that batches every dashboard click into a single "Blogs" tab.
 - **⚡ SEO Optimization Suite** — URL/keyword metrics via Ahrefs and full site-audit reports, all through RapidAPI.
 - **🖼️ Media Gallery & Leads** — upload/manage blog images and triage contact-form submissions with read/unread stats.
-- **🚀 Production-ready** — gzip + WhiteNoise static caching, in-memory query cache, APScheduler auto-publish, and one-click Render deploys via `render.yaml`.
+- **🚀 Production-ready** — structured JSON logging with request ids, real health probes, CSRF and rate limiting, write-time HTML sanitisation, gzip + WhiteNoise static caching, a Redis-backed shared cache, and APScheduler auto-publish behind a single-runner lease.
 
 ---
 
@@ -72,7 +71,7 @@ SEO tooling, team collaboration, and a 13-agent AI pipeline.
 | **Scheduling** | APScheduler (background auto-publish) |
 | **Static / perf** | WhiteNoise + Flask-Compress (gzip), instant.page prefetch |
 | **Server** | Gunicorn (Linux/Mac) · Waitress (Windows) |
-| **Deploy** | Render (`render.yaml`) |
+| **Deploy** | Any WSGI host (`gunicorn.conf.py` provided) |
 
 ---
 
@@ -152,7 +151,7 @@ User action → frontend tracker (batched) → /api/track-activity → server qu
 ## 🚀 Quick start
 
 ### Prerequisites
-- Python 3.11 (Render build target, pinned in `runtime.txt`; 3.9+ works locally)
+- Python 3.11 (pinned in `runtime.txt`; 3.9+ works locally)
 - Firebase project with Firestore + Authentication enabled
 - Google Gemini API key
 
@@ -236,25 +235,32 @@ gunicorn main:app --workers 1 --threads 8 --timeout 300 -b 0.0.0.0:8080
 waitress-serve --port=8080 main:app
 ```
 
-### Deploy to Render (free tier, no card required)
+### Deploying anywhere
 
-The repo ships a [`render.yaml`](render.yaml) Blueprint that provisions a single
-Python web service running the app, the background workers, and the APScheduler
-auto-publisher together.
+No host-specific configuration ships with the repo. The app is a standard WSGI
+application; [`gunicorn.conf.py`](gunicorn.conf.py) carries the server tuning
+with the reasoning for each value.
 
-1. Push the repo to GitHub.
-2. In the [Render dashboard](https://dashboard.render.com/), click **New +** →
-   **Blueprint** and select the repo. Render reads `render.yaml` automatically.
-3. When prompted, fill in every secret env var (see [`.env.example`](.env.example)).
-   For `FIREBASE_SERVICE_ACCOUNT`, paste the **entire** service-account JSON as
-   the value — the app parses either a file path or a raw JSON string.
-4. Deploy. After the first build, add the `https://<your-service>.onrender.com`
-   callback to your Google OAuth authorized redirect URIs.
+```bash
+gunicorn --config gunicorn.conf.py main:app
+```
 
-> **Notes on the free plan:** the service sleeps after ~15 min of inactivity and
-> cold-starts on the next request; while asleep the APScheduler auto-publisher
-> does not fire. That's fine for demos — upgrade to a paid instance (or move the
-> scheduler to Render Cron) if you need always-on publishing.
+What a host needs to provide:
+
+| Requirement | Why |
+|---|---|
+| The env vars in [`.env.example`](.env.example) | Four are mandatory; the rest have documented defaults |
+| `REDIS_URL` | Shared cache, rate-limit counters and the scheduler's single-runner lease. Without it all three are per-process |
+| `FB_STORAGE_BUCKET` + Storage enabled | Uploads. Without it they land on a disk most hosts wipe on deploy |
+| Health check pointed at `/readyz` | Performs a real Firestore read and answers 503 when it cannot serve |
+| `WEB_CONCURRENCY=1` | Background AI task state is per-process; see [docs/OPERATIONS.md](docs/OPERATIONS.md#scaling) |
+
+Deploy the Firestore indexes before the code — `firebase deploy --only
+firestore:indexes` — and add your deployed callback URL to the Google OAuth
+authorised redirect URIs.
+
+[docs/OPERATIONS.md](docs/OPERATIONS.md) has the full pre-deploy checklist and a
+runbook.
 
 ---
 
@@ -298,11 +304,12 @@ FYP-main/
 │   ├── __init__.py      # App factory
 │   └── scheduler.py     # Background job scheduler
 ├── docs/                # DOCUMENTATION.md — full reference
-├── scripts/             # backfill_embeddings.py
+├── scripts/             # migrations, load test, backfills
 ├── tests/               # Pytest suite
-├── app.py · main.py · wsgi.py   # Entry points
+├── main.py               # The single WSGI entry point
+├── gunicorn.conf.py      # Server tuning, with reasoning
 ├── config.py · requirements.txt · firestore.indexes.json
-├── render.yaml · runtime.txt · .env.example
+├── runtime.txt · .env.example
 └── firebase.json · .firebaserc · .gitignore
 ```
 

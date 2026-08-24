@@ -67,7 +67,7 @@ would never come back and every login would appear to fail).
 ### Tests
 
 ```bash
-pytest                            # 275 tests, ~20s
+pytest                            # 307 tests, ~25s
 pytest -q --cov=app --cov-report=term-missing
 pytest -m "not slow"
 pyflakes app/ config.py main.py scripts/ tests/
@@ -86,9 +86,9 @@ request pipeline instead of a stand-in.
 gunicorn --config gunicorn.conf.py main:app
 ```
 
-`render.yaml` declares the whole thing: the web service, a managed Redis, the
-health-check path, and every environment variable. Push, then point a Render
-Blueprint at the repo.
+No host-specific configuration ships with the repo. Any WSGI host works;
+provide the environment from [`.env.example`](../.env.example), a Redis
+instance, and a health check pointed at `/readyz`.
 
 ### Before the first production deploy
 

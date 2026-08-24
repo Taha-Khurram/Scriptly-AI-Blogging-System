@@ -3,7 +3,7 @@
 **Project:** Scriptly (FYP)
 **Audited:** 2026-08-15 · **Remediated:** 2026-08-24
 **Scope:** ~14,500 lines Python · 14 blueprints · 11 AI agents · 26 templates
-**Target deployment:** Render + Firebase/Firestore + Google Gemini + Redis
+**Target deployment:** any WSGI host + Firebase/Firestore + Google Gemini + Redis
 
 ---
 
@@ -12,11 +12,11 @@
 | Dimension | Was | Now | Notes |
 |---|---|---|---|
 | Code structure & organisation | Good | **Strong** | God object split into 13 repositories; single definition of each control |
-| Secret hygiene | Good | **Good** | Unchanged and verified; CI now fails if a secret file is tracked |
+| Secret hygiene | Good | **Good** | Unchanged and verified; no secret file is tracked |
 | Security posture | **Poor** | **Good** | CSRF, rate limiting, secure cookies, CSP/HSTS, write-time sanitisation |
 | Scalability | **Poor** | **Adequate** | Redis-shared cache and limits, leased scheduler; task pool still per-process |
 | Operability | **Poor** | **Strong** | Structured logs with request ids, real health probes, runbook |
-| Test coverage | **Poor** (3%) | **Adequate** (34%) | 275 tests; infrastructure and security paths well covered |
+| Test coverage | **Poor** (3%) | **Adequate** (34%) | 307 tests; infrastructure and security paths well covered |
 | **Production-grade?** | **No** — 7 × P0 | **Yes, with one caveat** | See [Remaining work](#remaining-work) |
 
 The one caveat: **`WEB_CONCURRENCY` must stay at 1** until background AI task
@@ -105,9 +105,12 @@ an exception escaping a job now marks it failed instead of vanishing into an
 unread future; polling reports queue position; and SIGTERM drains in-flight work
 so a deploy cannot truncate a Firestore write mid-flight.
 
-### P0-7 · Free plan not a production tier — **FIXED (config)**
-`render.yaml` moves to `starter` and declares a managed Redis, with the reason
-recorded inline. A billing decision, now a documented one.
+### P0-7 · Free plan not a production tier — **DOCUMENTED, NOT FIXED**
+No host configuration is committed, so this is a deployment decision rather
+than a code one. What the app needs: a tier that does not sleep on idle, enough
+memory for a ~350 MB import footprint, and a managed Redis. Recorded here and
+in the README so it is a deliberate choice rather than a default nobody
+revisited.
 
 ---
 
@@ -121,7 +124,7 @@ recorded inline. A billing decision, now a documented one.
 | **P1-4** | Not debuggable in production | JSON logs, per-request correlation ids in `X-Request-ID` and every error body, access logging with duration, secret redaction, optional Sentry |
 | **P1-5** | No caching on public routes | Data layer caches; the blanket `no-store` is now scoped to authenticated responses, so public pages are cacheable by the browser and any CDN |
 | **P1-6** | AI concurrency hardcoded to 2 | Configurable pool, bounded queue, 503 with `Retry-After` when full, queue position in the poll response |
-| **P1-7** | Health check verified nothing | `/livez`, `/readyz`, `/healthz` with per-component checks, each time-boxed and run concurrently; `render.yaml` points at `/readyz` |
+| **P1-7** | Health check verified nothing | `/livez`, `/readyz`, `/healthz` with per-component checks, each time-boxed and run concurrently. Point the host at `/readyz` |
 
 ---
 
@@ -132,10 +135,10 @@ recorded inline. A billing decision, now a documented one.
 | **P2-1** | 3,132-line `FirestoreService` god object | Split into 13 repository mixins (largest 716 lines, median 194). Public surface verified identical by AST comparison: same 99 methods, same signatures, same 9 retry decorators |
 | **P2-2** | Oversized modules | `firestore_service.py` 3,300 → 86. `blog_routes.py` and `seo_agent.py` remain large; see below |
 | **P2-3** | Three competing entrypoints | `app.py` and `wsgi.py` deleted; `main.py` plus a commented `gunicorn.conf.py` |
-| **P2-4** | Test coverage ~3% | 275 tests, 34%. Infrastructure and security paths 79–90% |
+| **P2-4** | Test coverage ~3% | 307 tests, 35%. Infrastructure and security paths 79–90% |
 | **P2-5** | O(n) query per draft creation | One indexed query, bounded at 25 probes. 500 reads → 1 for a 500-post site |
 | **P2-6** | Raw HTML rendered via `\|safe` | Sanitised at **write** time in the data layer, so every write path is covered and nothing depends on a template remembering |
-| **P2-7** | Pinned to Python 3.11.0 | `render.yaml` moves to 3.11.9. All 48 `datetime.utcnow()` calls migrated, which was the blocker for 3.12 |
+| **P2-7** | Pinned to Python 3.11.0 | All 48 `datetime.utcnow()` calls migrated, which was the blocker for 3.12. Set the interpreter to the latest 3.11.x on the host |
 | **P2-8** | 15-minute session timeout | 8-hour sliding window, configurable |
 
 ---
@@ -145,7 +148,7 @@ recorded inline. A billing decision, now a documented one.
 | ID | Issue | Status |
 |---|---|---|
 | P3-1 | No security headers | **Done.** CSP, HSTS, frame, MIME, referrer, permissions, COOP |
-| P3-2 | No dependency scanning | **Done.** `pip-audit` in CI, advisory |
+| P3-2 | No dependency scanning | **Open.** `pip-audit -r requirements.txt` runs locally; no pipeline configured |
 | P3-3 | No backup strategy | **Open.** Schedule a Firestore export |
 | P3-4 | No metrics or uptime monitoring | **Partial.** `/healthz` exposes component state; no external monitor configured |
 | P3-5 | Global `no-store` on all responses | **Done.** Scoped to authenticated responses |
@@ -236,7 +239,6 @@ smoothly:
   verified absent from history
 - **Deliberate, documented dependency pinning**, including the
   `grpcio-status`/protobuf conflict explained inline
-- **Infrastructure as code** via `render.yaml`
 - **`ProxyFix`, `WhiteNoise`, `flask-compress`** all correctly configured
 - **Multi-tenant isolation** via a consistent `site_owner_id` scoping key
 - **Server-side validation** of the Gmail-only and password rules, using the
