@@ -74,10 +74,14 @@ def _rate_limit_key():
 
 limiter = Limiter(
     key_func=_rate_limit_key,
-    # Applied to every route that does not declare its own limit, so a new
-    # endpoint is protected by default rather than by remembering to add a
-    # decorator.
-    default_limits=['1200 per hour'],
+    # `default_limits` is deliberately NOT passed here. flask-limiter only
+    # falls back to RATELIMIT_DEFAULT from config when the constructor did not
+    # supply a value (_extension.py: `if not self.limit_manager._default_limits
+    # and conf_limits`), so passing a literal here made the documented
+    # RATELIMIT_DEFAULT environment variable silently dead -- the limit was
+    # always the hardcoded one no matter what was configured. The default is
+    # applied in _init_limiter from config instead, which is also what makes it
+    # tunable per environment.
     headers_enabled=True,
     strategy='fixed-window',
     swallow_errors=True,   # a storage outage must not 500 every request
@@ -217,18 +221,31 @@ def _init_limiter(app):
         app.config['RATELIMIT_STORAGE_URI'] = redis_url
         app.logger.info('Rate limit storage: Redis')
     else:
-        # In-memory counters are per-process, so N workers allow N times the
-        # configured rate. Better than nothing, but it must be visible.
-        app.config['RATELIMIT_STORAGE_URI'] = 'memory://'
-        app.logger.warning(
-            'Rate limit storage: in-memory. Limits are per-worker, so the '
-            'effective rate is multiplied by the worker count. Set REDIS_URL.'
+        # SQLite, not memory://. Importing the module registers the `sqlite`
+        # scheme with `limits` via Storage's metaclass, which is what lets the
+        # URI below resolve. In-memory counters are per *process*, so with N
+        # gunicorn workers they permit N times the configured rate and reset on
+        # every reload -- a limit that does not hold is worse than none,
+        # because it reads as protection that is not there.
+        from app.core import ratelimit_store  # noqa: F401  (registers 'sqlite')
+
+        app.config['RATELIMIT_STORAGE_URI'] = 'sqlite://'
+        app.logger.info(
+            'Rate limit storage: SQLite (shared across this instance\'s '
+            'workers and threads)'
         )
 
+    # Applied to every route that does not declare its own limit, so a new
+    # endpoint is protected by default rather than by remembering a decorator.
+    # Read from config here, which is the only place flask-limiter will honour
+    # it -- see the note on the Limiter constructor above.
     app.config['RATELIMIT_DEFAULT'] = app.config.get(
         'RATELIMIT_DEFAULT', '1200 per hour'
     )
     limiter.init_app(app)
+    app.logger.info(
+        'Rate limiting enabled. Default: %s', app.config['RATELIMIT_DEFAULT']
+    )
 
     @app.errorhandler(429)
     def _handle_rate_limit(error):

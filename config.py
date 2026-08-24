@@ -64,18 +64,67 @@ class BaseConfig:
     MAX_CONTENT_LENGTH = _env_int('MAX_CONTENT_LENGTH_MB', 8) * 1024 * 1024
 
     # --- Sessions ---------------------------------------------------------
-    # Sliding window: SESSION_REFRESH_EACH_REQUEST re-stamps the cookie on
-    # every request, so this is an *inactivity* timeout, not a hard cap. Eight
-    # hours suits a content-authoring tool where a user may draft for a long
-    # stretch without issuing a request.
+    # Inactivity timeout. Sliding: the stored expiry moves forward as the
+    # session is used, so this is time-since-last-activity, not a hard cap
+    # (SESSION_ABSOLUTE_LIFETIME below is the hard cap).
+    #
+    # Ten minutes, not the eight hours this used to be. A dashboard session is
+    # an administrative credential -- it can publish, delete posts, change
+    # roles and remove accounts -- and an eight-hour idle window meant an
+    # unattended browser stayed fully privileged for the rest of the working
+    # day.
+    #
+    # A window this short is only usable because activity actually extends it:
+    # the frontend sends a throttled heartbeat while the user is interacting
+    # (see /api/session/heartbeat and the inactivity block in app.js), so
+    # "inactivity" means genuinely idle rather than merely not having navigated.
+    # Without that heartbeat a ten-minute timeout would log an author out in
+    # the middle of writing a post, because typing into the editor issues no
+    # request of its own.
     PERMANENT_SESSION_LIFETIME = timedelta(
-        minutes=_env_int('SESSION_TIMEOUT_MINUTES', 480)
+        minutes=_env_int('SESSION_TIMEOUT_MINUTES', 10)
     )
     SESSION_REFRESH_EACH_REQUEST = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_NAME = 'scriptly_session'
+
+    # 'sqlite' keeps session contents server-side and makes them revocable.
+    # 'cookie' is Flask's default client-side signed cookie, kept only as an
+    # escape hatch: it cannot revoke a session, so a deleted or demoted user
+    # retains their access until the cookie expires.
+    SESSION_BACKEND = os.getenv('SESSION_BACKEND', 'sqlite')
+
+    # A hard cap on session age regardless of activity. The sliding idle
+    # timeout above never expires a session that keeps being used, so on its
+    # own it means "indefinitely" for an active client. 0 disables the cap.
+    _session_absolute_hours = _env_int('SESSION_ABSOLUTE_HOURS', 720)
+    SESSION_ABSOLUTE_LIFETIME = (
+        timedelta(hours=_session_absolute_hours) if _session_absolute_hours else None
+    )
+
+    # A sliding expiry has to move the stored expiry forward, which is a write.
+    # Doing it per request means a write per request; this batches it, so an
+    # actively browsing user costs one write per interval instead of hundreds.
+    #
+    # It is also the *slack* on the idle timeout: a request arriving just inside
+    # the throttle window does not push the expiry out, so the effective
+    # inactivity window is (timeout - touch) to timeout. At 30s against a
+    # 10-minute timeout that is 9m30s-10m, which stays inside the intended
+    # band. Raising the touch interval without raising the timeout narrows the
+    # real window.
+    SESSION_TOUCH_SECONDS = _env_int('SESSION_TOUCH_SECONDS', 30)
+
+    # How long before expiry the frontend warns the user, in seconds. It offers
+    # a "Stay signed in" action, which matters because nothing in the editor
+    # autosaves -- being logged out mid-post loses the draft.
+    SESSION_WARNING_SECONDS = _env_int('SESSION_WARNING_SECONDS', 60)
+
+    # Where the session and rate-limit store lives. Empty means Flask's
+    # instance_path, which sits outside the application tree so WhiteNoise
+    # never serves it and a source deploy does not overwrite it.
+    SQLITE_STORE_PATH = os.getenv('SQLITE_STORE_PATH', '')
 
     # --- CSRF (Flask-WTF) -------------------------------------------------
     WTF_CSRF_ENABLED = True
@@ -162,6 +211,12 @@ class BaseConfig:
     SLOW_REQUEST_MS = _env_int('SLOW_REQUEST_MS', 2000)
     SENTRY_DSN = os.getenv('SENTRY_DSN')
 
+    # Per-request Firestore round-trip accounting (app.core.profiling). Page
+    # latency here is round-trip *count* x latency, not CPU, so this is the
+    # measurement that actually explains a slow page. It costs a stack walk per
+    # query, so it is opt-in and belongs off in production.
+    PROFILE_QUERIES = _env_bool('PROFILE_QUERIES', False)
+
     # --- Security headers -------------------------------------------------
     SECURITY_HEADERS_ENABLED = _env_bool('SECURITY_HEADERS_ENABLED', True)
     HSTS_MAX_AGE = _env_int('HSTS_MAX_AGE', 31536000)
@@ -200,9 +255,13 @@ class DevelopmentConfig(BaseConfig):
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
     STATIC_MAX_AGE = 0
 
-    # A dev box has no Redis by default and one developer generates no load,
-    # so rate limiting only gets in the way of manual testing.
-    RATELIMIT_ENABLED = _env_bool('RATELIMIT_ENABLED', False)
+    # On by default now. It was off because a dev box has no Redis, and
+    # in-memory counters were the only alternative; the store is SQLite, which
+    # every machine has, so development exercises the same limiter production
+    # does. That matters because a limit that only exists in production is a
+    # limit nobody has tested. Set RATELIMIT_ENABLED=false to opt out while
+    # hammering an endpoint by hand.
+    RATELIMIT_ENABLED = _env_bool('RATELIMIT_ENABLED', True)
 
     SECRET_KEY = os.getenv('SECRET_KEY') or 'dev-only-insecure-key'
 

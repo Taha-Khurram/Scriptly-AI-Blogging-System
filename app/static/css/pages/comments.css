@@ -1,703 +1,623 @@
 /* ==========================================================================
-   Comment Moderation Dashboard Styles
+   Comments — moderation queue
+
+   Composed from the shared primitives in dashboard.css: §12's .stat-card /
+   .filter-bar / .surface-card / .card-head / .data-row / .status-pill /
+   .list-empty / .seg-tabs / .pager, and §14's .app-modal / .app-field /
+   .app-btn. A comment is the same kind of record as a draft, a person or a
+   lead — a mark, a title, a line of meta and a trailing control — so it now
+   reads like one.
+
+   What used to live here was a parallel implementation of all of that:
+   .comment-stats-row / .comment-filters / .filter-tab / .comments-container
+   with a .drafts-header of column captions above flex .draft-rows,
+   .comment-pagination / .page-btn, .custom-modal-header / -body / -footer,
+   .comment-modal-tabs and .btn-modal — roughly 700 lines restating the design
+   system in this screen's own vocabulary, none of it reachable from anywhere
+   else in the app.
+
+   The row also said less than it took up. Both the comment and the post title
+   were truncated to 25 characters server-side *and* again in JS, so the
+   column that matters most on a moderation screen — what the person actually
+   wrote — was cut to about three words.
+
+   What is genuinely specific to this screen and stays:
+     - the column template (an AI verdict and a status each get a column)
+     - the two comment statuses and the AI verdict pill
+     - the moderation timeline in the detail dialog
+     - the before/after text blocks
+     - the ⋮ menu, restated because this page loads neither drafts.css nor
+       all_blogs.css
    ========================================================================== */
 
-/* ==================== STATS ROW ==================== */
-.comment-stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.25rem;
-    margin-bottom: 2rem;
+/* --- Stats -------------------------------------------------------------- */
+
+.comments-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
 }
 
-/* .stat-card / .stat-icon / .stat-info / .stat-count / .stat-label moved to
-   dashboard.css §12 — six templates use them and this file was the only
-   definition, so any page that loaded a different stylesheet got unstyled
-   tiles. Only this screen's own medallion colours stay here. */
-.stat-total { background: var(--accent-tint); color: var(--primary-color); }
-.stat-published { background: var(--success-soft); color: var(--success); }
-.stat-removed { background: var(--danger-soft); color: var(--danger); }
+/* Medallion hues. What a tile *means* is a page-level decision, so these stay
+   here while the tile itself lives in dashboard.css §12. */
+.stat-all { background: var(--accent-tint); color: var(--accent); }
+.stat-live { background: var(--success-soft); color: var(--success); }
+.stat-hidden { background: var(--danger-soft); color: var(--danger); }
 
-/* ==================== FILTER TABS ==================== */
-.comment-filters {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
+/* --- Filter bar --------------------------------------------------------- */
+/* Status is the primary dimension, so it stays a permanently visible
+   segmented control. "AI edited" is a filter the API has supported all along
+   (status=edited maps to ai_action == 'edited' in the repository) and the old
+   screen never offered — three tabs for four answers. */
+
+.comments-filter {
+  padding: var(--sp-4);
 }
 
-.filter-tab {
-    padding: 0.5rem 1.25rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface-1);
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.2s ease;
+/* --- Rows --------------------------------------------------------------- */
+
+.comments-card {
+  padding-bottom: var(--sp-6);
+  /* the ⋮ menu escapes the card */
+  overflow: visible;
 }
 
-.filter-tab:hover {
-    background: var(--surface-2);
-    color: var(--text-2);
+.comments-list {
+  padding: var(--sp-4) var(--sp-4) 0;
 }
 
-.filter-tab.active {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    border-color: var(--primary-color);
+/* The AI verdict and the status each get a column of their own rather than
+   another line of meta. This is the screen you open to answer "what did the
+   filter do, and is it still up?", and that answer only reads as an answer
+   when it lines up down the page.
+
+   Fixed tracks rather than `auto`, because .data-rows is a grid of grids —
+   each row sizes its own columns, so an `auto` verdict column would sit at a
+   different offset on every row and there would be nothing to scan down. */
+.comments-list .data-row {
+  grid-template-columns: 36px minmax(0, 1fr) 104px 96px auto;
 }
 
-/* ==================== COMMENTS TABLE ==================== */
-.comments-container {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    overflow: visible;
+/* `start` keeps each pill only as wide as its own label inside its track. */
+.comments-list .data-row .ai-pill,
+.comments-list .data-row .status-pill {
+  justify-self: start;
 }
 
-.comments-container .drafts-header {
-    display: flex;
-    padding: 1.25rem 2rem;
-    background: transparent;
-    border-bottom: 1px solid var(--border-subtle);
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--secondary-color);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+/* The comment itself is the row title, so it takes the full width it can and
+   is clipped by the column rather than by a character count. .row-title's
+   medium weight is for names and headlines; this is a sentence. */
+.comment-row-text {
+  font-weight: var(--fw-regular);
+  color: var(--text-1);
 }
 
-.comments-container .draft-row {
-    display: flex;
-    align-items: center;
-    padding: 1rem 2rem;
-    border-bottom: 1px solid var(--border-subtle);
-    transition: all 0.2s ease;
+/* A removed comment is off the site, so the row recedes — the status pill
+   beside it says the same thing in a word. */
+.comments-list .data-row.is-removed .row-mark {
+  background: var(--surface-2);
+  color: var(--text-faint);
 }
 
-.comments-container .draft-row:hover {
-    background: var(--bg-body);
+.comments-list .data-row.is-removed .comment-row-text {
+  color: var(--text-muted);
 }
 
-.comments-container .draft-row:last-child {
-    border-bottom: none;
+/* --- Comment statuses --------------------------------------------------
+   .status-pill's shared modifiers are the four *post* states. A comment is
+   either on the site or taken down, so those two live here.
+   ------------------------------------------------------------------------ */
+
+.status-pill.status-live {
+  background: var(--success-soft);
+  color: var(--success);
 }
 
-/* Column widths */
-.col-commenter { flex: 2; min-width: 0; }
-.col-comment { flex: 3; min-width: 0; font-size: 0.875rem; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-post { flex: 2; min-width: 0; font-size: 0.85rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-status { flex: 1.2; min-width: 0; }
-.col-actions { flex: 0 0 60px; text-align: right; }
-
-/* Commenter info */
-.commenter-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+.status-pill.status-hidden {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
-.commenter-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--text-on-accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 500;
-    font-size: 0.9rem;
-    flex-shrink: 0;
+/* --- AI verdict --------------------------------------------------------
+   Deliberately not a .status-pill. The status is where the comment is now; the
+   verdict is what the automatic filter did to it on the way in. The two sit in
+   adjacent columns, so they must not read as two values of one thing — hence
+   an outlined pill against the status pill's filled one.
+
+   Nothing is drawn for the ordinary case. Most comments are approved
+   untouched, and a pill on every row saying so would be a column of noise
+   hiding the handful worth looking at. The empty cell keeps the column
+   aligned.
+   ------------------------------------------------------------------------ */
+
+.ai-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
+.ai-pill i {
+  font-size: 0.95em;
+}
+
+.ai-pill.is-edited {
+  border-color: var(--warning-border);
+  color: var(--warning);
+}
+
+.ai-pill.is-removed {
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+/* --- Loading state ------------------------------------------------------
+   The list arrives over fetch on every filter and page change, so the card
+   has a third state between empty and full. Same shape as .list-empty,
+   without the icon medallion.
+   ------------------------------------------------------------------------ */
+
+.comments-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-12) var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+
+.comments-state p {
+  margin: 0;
+}
+
+/* --- Detail dialog: tab bar --------------------------------------------
+   .seg-tabs in a band of its own between .app-modal-head and the scrolling
+   body, so switching tabs never moves the title and the tabs never scroll
+   away from the content they select. The old dialog used an underlined tab
+   strip inside the body — a fourth "selected" idiom in an app that already
+   has one.
+   ------------------------------------------------------------------------ */
+
+.comment-tabbar {
+  padding: var(--sp-4) var(--sp-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.comment-tabbar .seg-tabs {
+  width: fit-content;
+  max-width: 100%;
+}
+
+/* --- Detail dialog: who wrote it --------------------------------------- */
+
+.commenter-strip {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-5);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.commenter-mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--accent-on-soft);
+}
+
+.commenter-id {
+  min-width: 0;
+}
+
+/* `block` is load-bearing, not tidiness: both this and .commenter-id are
+   spans, and .commenter-id is blockified only because it is a grid item — its
+   children are not, so the name and the address flowed onto one line and
+   neither could ellipsis. */
 .commenter-name {
-    font-weight: 500;
-    font-size: 0.875rem;
-    color: var(--text-strong);
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.commenter-date {
-    font-size: 0.75rem;
-    color: var(--text-faint);
+/* A mailto, because the reason to read an address here is to answer it. */
+.commenter-email {
+  display: inline-block;
+  max-width: 100%;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* ==================== AI BADGES ==================== */
-.badge-ai {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.3rem 0.7rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.7rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+.commenter-email:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
-.badge-ai-approved { background: var(--success-soft); color: var(--success); }
-.badge-ai-edited { background: var(--warning-soft); color: var(--warning); }
-.badge-ai-removed { background: var(--danger-soft); color: var(--danger); }
+/* --- Detail dialog: where and when ------------------------------------- */
 
-/* ==================== STATUS BADGES (override) ==================== */
-.status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.7rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.7rem;
-    font-weight: 500;
-    text-transform: uppercase;
+.comment-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
 }
 
-.status-badge .bi-circle-fill { font-size: 0.4rem; }
-
-.status-published { background: var(--success-soft); color: var(--success); }
-.status-removed { background: var(--danger-soft); color: var(--danger); }
-
-/* ==================== PAGINATION ==================== */
-.comment-pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 1.25rem 0;
+.comment-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  text-decoration: none;
 }
 
-.page-btn {
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface-1);
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s ease;
+.comment-fact i {
+  flex-shrink: 0;
+  font-size: 0.9em;
+  color: var(--text-faint);
 }
 
-.page-btn:hover:not(.disabled):not(.active) {
-    background: var(--surface-2);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
+.comment-fact span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.page-btn.active {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    border-color: var(--primary-color);
+.comment-fact[hidden] {
+  display: none;
 }
 
-.page-btn.disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+/* --- Detail dialog: the text ------------------------------------------- */
+
+.text-block {
+  margin-bottom: var(--sp-5);
 }
 
-.page-dots {
-    padding: 0 0.25rem;
-    color: var(--text-faint);
+.text-block:last-child {
+  margin-bottom: 0;
 }
 
-/* ==================== MODAL BASE ==================== */
-#commentModal .modal-content,
-#deleteModal .modal-content {
-    border: none;
-    border-radius: var(--radius-lg, 16px);
-    box-shadow: var(--elev-3);
-    overflow: hidden;
+.text-block[hidden] {
+  display: none;
 }
 
-#commentModal .custom-modal-header,
-#deleteModal .custom-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 1.75rem;
-    border-bottom: 1px solid var(--border-subtle);
-    background: var(--surface-1);
+.text-block-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-#commentModal .custom-modal-title,
-#deleteModal .custom-modal-title,
-#deleteModal .modal-title {
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin: 0;
+/* The prose keeps --text-1 on a neutral surface and the *rule* carries which
+   version this is. The old boxes painted the whole of the original in
+   --danger and the whole of the AI version in --success, which made a
+   moderator read two paragraphs of red and green text to compare them — and
+   put a failure colour on a comment whose only fault was being the earlier
+   version. Hue belongs on the label, not on the body copy. */
+.text-body {
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 3px solid var(--border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--text-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-#commentModal .custom-modal-title i {
-    color: var(--primary-color, var(--accent));
+.text-block.is-before .text-body {
+  border-left-color: var(--border-strong);
 }
 
-#commentModal .custom-modal-body,
-#deleteModal .custom-modal-body {
-    padding: 1.5rem 1.75rem;
-    background: var(--surface-1);
-    max-height: 70vh;
-    overflow-y: auto;
+.text-block.is-after .text-body {
+  border-left-color: var(--success);
 }
 
-#commentModal .custom-modal-body::-webkit-scrollbar { width: 5px; }
-#commentModal .custom-modal-body::-webkit-scrollbar-track { background: var(--surface-3); }
-#commentModal .custom-modal-body::-webkit-scrollbar-thumb { background: var(--surface-4); border-radius: var(--radius-xs); }
-
-#commentModal .custom-modal-footer,
-#deleteModal .custom-modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding: 1rem 1.75rem;
-    border-top: 1px solid var(--border-subtle);
-    background: var(--surface-2);
+.text-block.is-live .text-body {
+  border-left-color: var(--accent);
+  background: var(--accent-tint);
 }
 
-/* ==================== MODAL TABS ==================== */
-.comment-modal-tabs {
-    display: flex;
-    list-style: none;
-    padding: 0;
-    margin: 0 0 1.5rem 0;
-    border-bottom: 2px solid var(--border-subtle);
-    gap: 0;
+/* --- Detail dialog: moderation timeline -------------------------------- */
+
+.mod-log {
+  display: grid;
+  gap: var(--sp-5);
 }
 
-.comment-modal-tabs .tab-item {
-    padding: 0.65rem 1.15rem;
-    font-size: 0.835rem;
-    font-weight: 500;
-    color: var(--text-faint);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+.mod-entry {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: var(--sp-4);
 }
 
-.comment-modal-tabs .tab-item:hover {
-    color: var(--text-muted);
-    background: var(--surface-2);
+.mod-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 0.9rem;
 }
 
-.comment-modal-tabs .tab-item.active {
-    color: var(--primary-color, var(--accent));
-    border-bottom-color: var(--primary-color, var(--accent));
-    background: transparent;
+.mod-mark.is-ai {
+  background: var(--accent-tint);
+  color: var(--accent);
 }
 
-.comment-modal-tabs .tab-item i {
-    font-size: 0.85rem;
+.mod-mark.is-admin {
+  background: var(--info-soft);
+  color: var(--info);
 }
 
-.tab-content {
+.mod-body {
+  min-width: 0;
+}
+
+.mod-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
+}
+
+.mod-title strong {
+  font-weight: var(--fw-medium);
+}
+
+.mod-when {
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+
+/* A quoted reason rather than a tinted box: it is something the filter or a
+   person said, so it is set as a quotation. */
+.mod-reason {
+  margin: var(--sp-2) 0 0;
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--border);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+}
+
+.mod-diff {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.mod-diff .text-block {
+  margin: 0;
+}
+
+.mod-diff .text-body {
+  font-size: var(--fs-xs);
+}
+
+/* --- Detail dialog: edit form ------------------------------------------ */
+
+.comment-edit-fields {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+.comment-edit-fields textarea {
+  min-height: 132px;
+  line-height: var(--lh-body);
+  resize: vertical;
+}
+
+/* Says what editing here does and does not do, so it is read before the
+   textarea rather than discovered afterwards. */
+.edit-scope {
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--text-muted);
+}
+
+/* --- Delete dialog ----------------------------------------------------- */
+
+/* The comment about to be destroyed is quoted, because "this comment" is not
+   enough to identify what is going. */
+.delete-quote {
+  margin: var(--sp-4) 0 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 3px solid var(--border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+/* --- Row menu -----------------------------------------------------------
+   The same treatment the drafts, all-blogs and users listings give their ⋮
+   menus, restated because this page loads none of those stylesheets.
+   ------------------------------------------------------------------------ */
+
+.btn-dropdown-trigger {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: var(--transition-base);
+}
+
+.btn-dropdown-trigger:hover {
+  background: var(--surface-3);
+  color: var(--text-strong);
+}
+
+.dropdown-menu {
+  border: none;
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2);
+  padding: var(--sp-2);
+  min-width: 208px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-1);
+  transition: var(--transition-base);
+}
+
+.dropdown-item:hover {
+  background: var(--surface-2);
+  color: var(--text-strong);
+}
+
+.dropdown-item i {
+  width: 20px;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.dropdown-item.text-danger {
+  color: var(--danger);
+}
+
+.dropdown-item.text-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.dropdown-divider {
+  margin: var(--sp-1) 0;
+  border-color: var(--border-subtle);
+}
+
+/* Both of these are rendered on every row and revealed by CSS only once the
+   column they stand in for has been dropped — see the media queries below.
+   Always in the markup, so nothing has to re-render on resize. */
+.row-meta-ai,
+.row-meta-status {
+  display: none;
+}
+
+/* --- Responsive --------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  /* The verdict is the first column to go: it is the exception rather than
+     the rule, and dropping it buys the comment text the width it needs before
+     it truncates. It reappears in the meta line in the same breath.
+
+     The blank has to go with the pill. `display: none` takes a grid item out
+     of placement, but an empty <span> left behind still claims a cell — so a
+     row without a verdict would have five items for four tracks and its ⋮
+     menu would wrap onto a second line. */
+  .comments-list .data-row {
+    grid-template-columns: 36px minmax(0, 1fr) 96px auto;
+  }
+
+  .comments-list .data-row .ai-pill,
+  .comments-list .data-row .ai-pill-blank {
     display: none;
+  }
+
+  .comments-list .data-row .row-meta-ai {
+    display: inline;
+  }
 }
 
-.tab-content.active {
-    display: block;
-}
+@media (max-width: 620px) {
+  .comments-list .data-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: var(--sp-3);
+  }
 
-/* ==================== COMMENTER CARD ==================== */
-.commenter-card {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem;
-    padding: 0.85rem 1rem;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    margin-bottom: 1rem;
-}
-
-.commenter-card-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--text-on-accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 500;
-    font-size: 0.95rem;
-    flex-shrink: 0;
-}
-
-.commenter-card-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.commenter-card-name {
-    font-weight: 500;
-    font-size: 0.9rem;
-    color: var(--text-strong);
-    line-height: 1.3;
-}
-
-.commenter-card-email {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    margin-top: 0.1rem;
-}
-
-.commenter-card-email i {
-    font-size: 0.7rem;
-    color: var(--text-faint);
-}
-
-.commenter-card-badge {
-    flex-shrink: 0;
-}
-
-/* ==================== META BAR ==================== */
-.comment-meta-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    padding: 0.75rem 0;
-    margin-bottom: 1.15rem;
-    border-bottom: 1px solid var(--border-subtle);
-}
-
-.comment-meta-bar .meta-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.8rem;
-    color: var(--text-2);
-    background: var(--surface-3);
-    padding: 0.3rem 0.75rem;
-    border-radius: var(--radius-xs);
-}
-
-.comment-meta-bar .meta-chip i {
-    color: var(--primary-color, var(--accent));
-    font-size: 0.8rem;
-}
-
-/* ==================== CONTENT SECTIONS ==================== */
-.comment-content-section {
-    margin-bottom: 1.15rem;
-}
-
-.comment-content-section:last-child {
-    margin-bottom: 0;
-}
-
-.content-label {
-    font-size: 0.7rem;
-    font-weight: 500;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.4rem;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.content-label i {
-    color: var(--primary-color, var(--accent));
-    font-size: 0.75rem;
-}
-
-.comment-text-box {
-    padding: 0.85rem 1rem;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    line-height: 1.65;
-    color: var(--text-1);
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
-.comment-text-box.diff-old {
-    border-left: 3px solid var(--danger-border);
-    background: var(--danger-soft);
-    color: var(--danger);
-}
-
-.comment-text-box.diff-new {
-    border-left: 3px solid var(--success-border);
-    background: var(--success-soft);
-    color: var(--success);
-}
-
-.comment-text-box.comment-text-display {
-    border-left: 3px solid var(--primary-color, var(--accent));
-    background: var(--accent-tint);
-}
-
-/* ==================== EDIT TAB ==================== */
-.edit-field {
-    margin-bottom: 1.15rem;
-}
-
-.edit-label {
-    display: block;
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: var(--text-2);
-    margin-bottom: 0.4rem;
-}
-
-.edit-optional {
-    font-weight: 400;
-    color: var(--text-faint);
-}
-
-.edit-textarea,
-.edit-input {
-    width: 100%;
-    padding: 0.7rem 0.9rem;
-    font-size: 0.875rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text-1);
-    background: var(--surface-1);
-    font-family: inherit;
-    transition: all 0.2s ease;
-}
-
-.edit-textarea:focus,
-.edit-input:focus {
-    outline: none;
-    border-color: var(--primary-color, var(--accent));
-    box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
-.edit-textarea {
-    resize: vertical;
-    min-height: 110px;
-    line-height: 1.6;
-}
-
-/* ==================== MODAL BUTTONS ==================== */
-.btn-modal {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.55rem 1.15rem;
-    border-radius: var(--radius-sm);
-    font-weight: 500;
-    font-size: 0.835rem;
-    transition: all 0.2s ease;
-    border: none;
-    cursor: pointer;
-}
-
-.btn-modal-secondary {
-    background: var(--surface-1);
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-}
-
-.btn-modal-secondary:hover {
-    background: var(--surface-2);
-    color: var(--text-2);
-}
-
-.btn-modal-primary {
-    background: var(--primary-color, var(--accent));
-    color: var(--text-on-accent);
-}
-
-.btn-modal-primary:hover {
-    opacity: 0.9;
-}
-
-.btn-modal-primary:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-/* ==================== MODERATION LOG ==================== */
-.moderation-log {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.log-entry {
-    display: flex;
-    gap: 0.85rem;
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border-subtle);
-}
-
-.log-entry:first-child {
-    padding-top: 0;
-}
-
-.log-entry:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.log-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.9rem;
-    flex-shrink: 0;
-}
-
-.log-icon-ai { background: var(--accent-tint); color: var(--primary-color, var(--accent)); }
-.log-icon-admin { background: var(--info-soft); color: var(--info); }
-
-.log-body {
-    flex: 1;
-    min-width: 0;
-}
-
-.log-title {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    margin-bottom: 0.25rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.log-reason {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 0.4rem;
-    padding: 0.35rem 0.65rem;
-    background: var(--surface-2);
-    border-radius: var(--radius-xs);
-    border-left: 2px solid var(--border);
-}
-
-.log-diff {
-    margin: 0.4rem 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-}
-
-.log-diff .diff-old,
-.log-diff .diff-new {
-    padding: 0.5rem 0.75rem;
-    border-radius: var(--radius-xs);
-    font-size: 0.78rem;
-    line-height: 1.5;
-}
-
-.log-diff .diff-old {
-    background: var(--danger-soft);
-    border-left: 3px solid var(--danger-border);
-    color: var(--danger);
-}
-
-.log-diff .diff-new {
-    background: var(--success-soft);
-    border-left: 3px solid var(--success-border);
-    color: var(--success);
-}
-
-.log-date {
-    font-size: 0.72rem;
-    color: var(--text-faint);
-    margin-top: 0.2rem;
-}
-
-/* ==================== DROPDOWN (reuse from drafts) ==================== */
-.comments-container .btn-dropdown-trigger {
+  .comments-card .row-mark {
     width: 32px;
     height: 32px;
-    border: none;
-    background: transparent;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-faint);
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
+  }
 
-.comments-container .btn-dropdown-trigger:hover {
-    background: var(--surface-3);
-    color: var(--text-muted);
-}
+  /* The status moves into the meta line rather than disappearing — whether a
+     comment is still on the site is the whole point of the row. */
+  .comments-list .data-row .status-pill {
+    display: none;
+  }
 
-.comments-container .dropdown-menu {
-    border: none;
-    border-radius: var(--radius-md);
-    box-shadow: var(--elev-2);
-    padding: 0.5rem;
-    min-width: 200px;
-}
+  .comments-list .data-row .row-meta-status {
+    display: inline;
+  }
 
-.comments-container .dropdown-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 1rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-1);
-    transition: all 0.15s ease;
-}
+  /* A hover shortcut plus a menu is more than a phone row can carry, and the
+     menu offers everything the shortcut does. */
+  .comments-card .row-action {
+    display: none;
+  }
 
-.comments-container .dropdown-item:hover { background: var(--surface-2); color: var(--text-strong); }
-.comments-container .dropdown-item.text-danger { color: var(--danger); }
-.comments-container .dropdown-item.text-danger:hover { background: var(--danger-soft); color: var(--danger); }
+  /* Wrapping, not truncating. Every piece of the meta line is a fixed short
+     string — a name, a post title, a date, a verdict, a status — and squeezing
+     five of them into one phone-width line leaves each ellipsed to two or
+     three characters, which says nothing at all. */
+  .comments-list .row-meta {
+    flex-wrap: wrap;
+  }
 
-/* ==================== RESPONSIVE ==================== */
-@media (max-width: 1024px) {
-    .comment-stats-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
+  /* <time> is not a <span>, so .row-meta > span's nowrap does not reach it. */
+  .comments-list .row-meta time {
+    white-space: nowrap;
+  }
 
-@media (max-width: 768px) {
-    .comment-stats-row {
-        grid-template-columns: 1fr;
-    }
+  .commenter-strip {
+    grid-template-columns: 40px minmax(0, 1fr);
+    row-gap: var(--sp-3);
+  }
 
-    .comments-container .drafts-header {
-        display: none;
-    }
-
-    .comments-container .draft-row {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        padding: 1rem;
-    }
-
-    .col-commenter { flex: 1 1 100%; }
-    .col-comment { flex: 1 1 100%; white-space: normal; }
-    .col-post { flex: 1 1 50%; }
-    .col-status { flex: 1 1 auto; }
-    .col-actions { flex: 0 0 auto; }
-
-    .comment-filters {
-        flex-wrap: wrap;
-    }
+  .commenter-strip .status-pill {
+    grid-column: 2;
+    justify-self: start;
+  }
 }

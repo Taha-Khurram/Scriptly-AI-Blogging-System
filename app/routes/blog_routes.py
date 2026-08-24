@@ -117,8 +117,11 @@ def home():
             username=username,
             total_blogs=dashboard_data['total_blogs'],
             published_count=dashboard_data['published_count'],
-            drafts_count=len(dashboard_data['drafts']),
-            pending_count=len(dashboard_data['pending']),
+            # From count() aggregations, not len() of the row lists: those are
+            # capped at the handful of rows the page renders, so their length
+            # is no longer the bucket total.
+            drafts_count=dashboard_data.get('drafts_count', len(dashboard_data['drafts'])),
+            pending_count=dashboard_data.get('pending_count', len(dashboard_data['pending'])),
             all_blogs=all_blogs[:5],
             pending_blogs=dashboard_data['pending'][:5],
             published_blogs=published_blogs[:5]
@@ -174,26 +177,43 @@ def drafts_page():
 @blog_bp.route('/approval')
 @admin_required
 def approval_page():
-    user_id = session.get('user_id')
-    page = request.args.get('page', 1, type=int)
-    per_page = 10
+    """The review queue: everything a writer has submitted and nobody has ruled on.
 
+    The whole queue is rendered in one response and the page windows it in the
+    browser. Server-side paging used to slice a list this method had *already
+    fetched in full*, so every extra page was a second round trip that re-read
+    Firestore to hand back rows it had held a moment earlier -- and the header
+    search could then only ever see the ten rows in front of it. A review queue
+    is also short by definition: anything left in it is work nobody has done
+    yet.
+    """
+    user_id = session.get('user_id')
     pending_blogs = db_service.get_approval_queue(admin_id=user_id)
 
-    total_count = len(pending_blogs)
-    total_pages = math.ceil(total_count / per_page) if total_count else 1
+    # Firestore hands back datetimes, `requested_schedule_at` may be either, and
+    # a <time datetime=""> needs one shape. Normalised once here so neither the
+    # template nor approval.js has to test for it.
+    def iso(value):
+        if not value:
+            return ''
+        return value.isoformat() if hasattr(value, 'isoformat') else str(value)
 
-    start = (page - 1) * per_page
-    end = start + per_page
-    paginated_blogs = pending_blogs[start:end]
+    for blog in pending_blogs:
+        blog['submitted_iso'] = iso(blog.get('updated_at'))
+        blog['requested_iso'] = iso(blog.get('requested_schedule_at'))
+
+    requested = sum(1 for b in pending_blogs if b.get('requested_iso'))
+    waiting_since = min(
+        (b['submitted_iso'] for b in pending_blogs if b['submitted_iso']),
+        default=''
+    )
 
     return render_template(
         'approval_queue.html',
-        pending_blogs=paginated_blogs,
-        current_page=page,
-        total_pages=total_pages,
-        has_next=page < total_pages,
-        has_prev=page > 1
+        pending_blogs=pending_blogs,
+        pending_total=len(pending_blogs),
+        requested_total=requested,
+        waiting_since=waiting_since
     )
 
 
@@ -212,7 +232,13 @@ def categories_page():
 @blog_bp.route('/comments')
 @admin_required
 def comments_page():
-    """Comment Moderation Dashboard"""
+    """Comment Moderation Dashboard.
+
+    The stats cards and the moderation table both read through
+    ``CommentRepository._owner_comments``, which is memoised for the request, so
+    this page costs one Firestore round trip where it previously cost two full
+    scans of the same collection back to back.
+    """
     user_id = session.get('user_id')
     stats = db_service.get_comment_stats(user_id)
 
@@ -1222,7 +1248,14 @@ def format_content():
                 "toc": result['toc'],
                 "toc_html": result['toc_html'],
                 "reading_time": result['reading_time_text'],
-                "statistics": result['statistics']
+                "statistics": result['statistics'],
+                # The formatter has always answered these three; the page used
+                # to drop them here and re-derive them in the browser with its
+                # own regexes, which is two implementations of one question and
+                # only one of them counting the cleaned content.
+                "has_code_blocks": result['has_code_blocks'],
+                "has_images": result['has_images'],
+                "has_tables": result['has_tables']
             }
         })
 
@@ -1239,8 +1272,15 @@ def get_drafts_for_seo():
         if not user_id:
             return jsonify({"success": False, "error": "Unauthorized"}), 401
 
-        # Get all drafts for this user
-        drafts = db_service.get_blogs_by_status("DRAFT", user_id=user_id)
+        # This endpoint builds a 100-character preview, so unlike the other
+        # list callers it genuinely needs `content` and asks for it explicitly.
+        # The projection still leaves behind the embedding vector, outline, seo
+        # and formatting maps, which is the bulk of a blog document.
+        from app.repositories._helpers import BLOG_LIST_FIELDS
+
+        drafts = db_service.get_blogs_by_status(
+            "DRAFT", user_id=user_id, fields=BLOG_LIST_FIELDS + ('content',)
+        )
 
         # Format for dropdown
         draft_list = []
@@ -1319,19 +1359,27 @@ def site_settings_page():
     """Site Settings Dashboard"""
     user_id = session.get('user_id')
 
+    from app.repositories._helpers import BLOG_LIST_FIELDS
     from app.utils.parallel import run_parallel_simple
 
     results = run_parallel_simple([
         (db_service.get_site_settings, (user_id,)),
-        (lambda: db_service.get_published_blogs(user_id, limit=100), ()),
+        # Projected: this list feeds a title-only picker and the unpublish
+        # table, which show a title, category and date. Unprojected it was two
+        # queries of ~8.4 s each, because it pulled every published post's
+        # rendered body and semantic-search embedding vector across the wire.
+        (lambda: db_service.get_published_blogs(
+            user_id, limit=100, fields=BLOG_LIST_FIELDS), ()),
         (lambda: db_service.get_all_categories(user_id=user_id), ()),
-        (db_service.get_blogs_by_status, ("UNDER_REVIEW", user_id)),
+        # Only the count is rendered, so count it in Firestore rather than
+        # fetching the documents and calling len() on them.
+        (db_service.count_blogs_by_status, ("UNDER_REVIEW", user_id)),
     ], max_workers=4)
 
     settings = results[0] or {}
     published_blogs = results[1] or []
     categories = results[2] or []
-    pending = results[3] or []
+    pending_count = results[3] or 0
 
     # Get time preview based on current settings
     time_preview = get_current_time_preview(
@@ -1356,7 +1404,7 @@ def site_settings_page():
         published_blogs=published_blogs,
         published_count=len(published_blogs),
         categories_count=len(categories),
-        pending_count=len(pending),
+        pending_count=pending_count,
         username=session.get('user_name', 'User'),
         # Locale & timezone data
         timezones=COMMON_TIMEZONES,
@@ -1538,7 +1586,6 @@ def track_activity():
 
         from app.services.google_sheets_service import GoogleSheetsService
         sheets = GoogleSheetsService.get_instance()
-        spreadsheet_id = GoogleSheetsService.get_spreadsheet_id_for_user(user_id)
 
         enriched_events = []
         for event in events[:50]:
@@ -1555,13 +1602,23 @@ def track_activity():
                 'session_id': session_id
             })
 
+        # The Sheets write was already backgrounded, but resolving *which*
+        # spreadsheet to write to is a Firestore read and was still happening
+        # inline -- so this endpoint, which the tracker fires on every single
+        # navigation, blocked the response on a round trip whose result the
+        # caller never sees. It belongs on the same background thread as the
+        # write it is an argument to.
+        def flush():
+            try:
+                spreadsheet_id = GoogleSheetsService.get_spreadsheet_id_for_user(user_id)
+                sheets.log_bulk_activities(
+                    enriched_events, spreadsheet_id=spreadsheet_id
+                )
+            except Exception:
+                logger.exception("Activity tracking flush failed")
+
         import threading
-        threading.Thread(
-            target=sheets.log_bulk_activities,
-            args=(enriched_events,),
-            kwargs={'spreadsheet_id': spreadsheet_id},
-            daemon=True
-        ).start()
+        threading.Thread(target=flush, name='track-activity', daemon=True).start()
 
         return jsonify({"success": True, "tracked": len(enriched_events)})
 
@@ -1622,12 +1679,15 @@ def newsletter_page():
     results = run_parallel_simple([
         (db_service.get_published_count, (user_id,)),
         (db_service.get_subscriber_count, (user_id,)),
-        (db_service.get_newsletter_history, (user_id,)),
+        # A count() aggregation rather than len() of the first twenty history
+        # documents: the number is exact instead of capped at twenty, and one
+        # integer crosses the wire instead of twenty newsletter records.
+        (db_service.count_newsletter_history, (user_id,)),
     ], max_workers=3)
 
     published_count = results[0] or 0
     subscriber_count = results[1] or 0
-    sent_count = len(results[2]) if results[2] else 0
+    sent_count = results[2] or 0
 
     return render_template(
         'newsletter.html',
@@ -1804,7 +1864,12 @@ def api_edit_comment(comment_id):
 def api_remove_comment(comment_id):
     """Soft-remove a comment from the public site."""
     try:
-        data = request.get_json() or {}
+        # silent=True: the reason is optional, so a caller with nothing to say
+        # sends no body at all. Under Flask 3 a bare get_json() raises 415 on
+        # such a request, which this handler's `except` then reported as a 500
+        # -- every bodyless "remove" failed for a reason that had nothing to do
+        # with removing anything.
+        data = request.get_json(silent=True) or {}
         reason = (data.get('reason', '') or '').strip()
 
         success = db_service.update_comment_status(

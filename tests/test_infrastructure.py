@@ -94,11 +94,38 @@ class TestCacheApi:
         assert fresh_cache.get('published_blogs:owner1:100') is None
         assert fresh_cache.get('published_blogs:owner2:10') == ['c']
 
-    def test_reports_it_is_not_shared_without_redis(self, fresh_cache):
-        """The health endpoint surfaces this: an in-process cache with several
-        workers means invalidation does not propagate."""
-        assert fresh_cache.is_shared is False
-        assert fresh_cache.stats()['backend'] == 'memory'
+    def test_without_redis_it_is_still_shared_between_workers(self, fresh_cache):
+        """The default backend is SQLite, not an in-process dict.
+
+        This used to assert the opposite -- that without Redis the cache was
+        per-process and therefore not shared. That was the bug, not the
+        contract: with several workers an in-process cache means invalidation
+        does not propagate, so publishing a post cleared the cached list in one
+        worker and left every other one serving the pre-publish version until
+        its TTL ran out. The local SQLite store is shared by every worker on the
+        host, so a clear in one is a clear in all.
+        """
+        assert fresh_cache.stats()['backend'] == 'sqlite'
+        assert fresh_cache.is_shared is True
+
+    def test_only_redis_claims_to_be_shared_across_instances(self, fresh_cache):
+        """SQLite is shared per host, so it must not over-claim.
+
+        A second instance keeps its own file. Every entry has a TTL so nothing
+        is served wrong indefinitely, but invalidation is per instance -- and
+        the health endpoint has to say so rather than report a guarantee that
+        is not there.
+        """
+        assert fresh_cache.is_shared_across_instances is False
+
+    def test_the_memory_backend_reports_that_it_is_not_shared(self):
+        """The fallback used outside an application context."""
+        from app.utils.cache import Cache, MemoryBackend
+
+        standalone = Cache()
+        standalone._backend = MemoryBackend()
+        assert standalone.is_shared is False
+        assert standalone.is_shared_across_instances is False
 
     def test_tracks_hit_rate(self, fresh_cache):
         fresh_cache.set('x', 1)

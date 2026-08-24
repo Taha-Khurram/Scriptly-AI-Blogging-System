@@ -37,6 +37,15 @@ if ROOT not in sys.path:
 os.environ['FLASK_ENV'] = 'testing'
 os.environ.setdefault('SECRET_KEY', 'test-secret-key')
 os.environ.setdefault('FIREBASE_SERVICE_ACCOUNT', '{}')
+
+# Sessions and rate-limit counters live in SQLite. Point the suite at a
+# throwaway file: the default is Flask's instance_path, which is inside the
+# working tree, so a test run would leave a database of session rows in the
+# repository.
+import tempfile  # noqa: E402
+
+_STORE_DIR = tempfile.mkdtemp(prefix='scriptly-test-store-')
+os.environ['SQLITE_STORE_PATH'] = os.path.join(_STORE_DIR, 'test.db')
 # A REDIS_URL inherited from a developer's shell would make the suite depend on
 # a running Redis and share cache state between test runs.
 os.environ.pop('REDIS_URL', None)
@@ -82,17 +91,28 @@ def client(app):
 
 @pytest.fixture(autouse=True)
 def clean_cache():
-    """Isolate tests from each other's cached values.
+    """Isolate tests from each other's cached and stored state.
 
-    The cache is a module-level singleton, so a user record cached by one test
-    would otherwise satisfy the fast path in the next and skip the Firestore
-    calls that test is asserting on.
+    Both the cache and the SQLite store are module-level singletons, so a user
+    record cached by one test would otherwise satisfy the fast path in the next
+    and skip the Firestore calls that test is asserting on -- and a session row
+    written by one test would still be there for the next.
     """
+    from app.core.store import store
     from app.utils.cache import cache
 
-    cache.clear()
+    def _reset():
+        cache.clear()
+        if store.configured:
+            try:
+                store.write('DELETE FROM sessions')
+                store.write('DELETE FROM rate_limits')
+            except Exception:
+                pass
+
+    _reset()
     yield
-    cache.clear()
+    _reset()
 
 
 @pytest.fixture

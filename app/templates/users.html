@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Users | ScriptlyAI{% endblock %}
+{% block title %}Users | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/users.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/users.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
@@ -11,461 +12,183 @@
 
   {% include 'partials/sidebar.html' %}
 
-  <!-- MAIN CONTENT -->
+  {#
+     The modals and the page script live inside .dashboard-main, like every
+     other screen. PJAX swaps only that element's innerHTML — the script used
+     to sit in the extra_js block, outside the layout wrapper entirely, and
+     survived navigation only because the PJAX asset scraper happens to re-run
+     every inline <script> it finds anywhere in the response. Nothing about
+     this page should depend on that.
+  #}
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <div class="header-welcome-text">Administration</div>
-        <h1 class="header-title">User Management</h1>
-      </div>
-      <div>
-        <button class="btn btn-primary d-flex align-items-center gap-2 text-white shadow-sm" data-bs-toggle="modal"
-          data-bs-target="#inviteUserModal">
-          <i class="bi bi-person-plus-fill"></i> Invite User
-        </button>
-      </div>
-    </header>
 
-    <div class="dashboard-content-wrapper animate-fade-up">
+    {% call page_header(
+    title='Users',
+    eyebrow='Administration',
+    search=true,
+    search_placeholder='Search people',
+    search_id='usersSearch') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    <button type="button" class="page-header-action is-primary" data-bs-toggle="modal"
+      data-bs-target="#inviteUserModal">
+      <i class="bi bi-person-plus" aria-hidden="true"></i>
+      <span class="page-header-label">Invite user</span>
+    </button>
+    {% endcall %}
 
-      <div class="users-container shadow-card">
-        <div class="users-header">
-          <div class="col-username">User</div>
-          <div class="col-email">Email Address</div>
-          <div class="col-role">Role</div>
-          <div class="col-status">Status</div>
-          <div class="col-actions">Actions</div>
-        </div>
+    <section class="surface-card users-card reveal" aria-labelledby="usersHeading">
+      <header class="card-head">
+        <h2 class="card-title" id="usersHeading">
+          People <span class="card-count" data-users-count>—</span>
+        </h2>
+        {# Filled by users.js: "1 admin · 2 editors · 1 invitation pending". #}
+        <span class="card-note" data-users-note></span>
+      </header>
 
-        <div id="usersList">
-          <div class="text-center py-5">
-            <div class="spinner-border text-primary opacity-50 mb-3" role="status"></div>
-            <p class="text-secondary fw-medium">Loading users...</p>
+      <div class="users-container">
+        <div id="usersList" aria-live="polite" aria-busy="true">
+          <div class="users-state">
+            <div class="spinner-border spinner-border-sm text-primary opacity-50" role="status"></div>
+            <p>Loading people…</p>
           </div>
         </div>
 
-        <div id="noUsers" class="text-center py-5 d-none">
-          <div class="mb-3 text-muted opacity-50"><i class="bi bi-people fs-1"></i></div>
-          <p class="text-secondary fw-bold">No users or invitations yet.</p>
-        </div>
+        <p class="list-noresults" data-noresults hidden>No one matches that search.</p>
       </div>
-    </div>
+    </section>
 
-    <!-- Invite User Modal -->
-    <div id="inviteUserModal" class="modal fade" tabindex="-1">
+    {# ==================== INVITE ==================== #}
+    <div class="modal fade" id="inviteUserModal" tabindex="-1" aria-hidden="true" aria-labelledby="inviteUserTitle">
       <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow-card">
-          <div class="modal-header border-bottom p-4">
-            <h5 class="modal-title fw-bold text-dark">Invite User</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <form id="inviteUserForm" class="no-loader">
-            <div class="modal-body p-4">
-              <div class="mb-3">
-                <label class="form-label text-secondary small fw-bold text-uppercase">Email Address</label>
-                <input type="email" id="inviteEmail" name="email" class="form-control rounded-pill px-3"
-                  placeholder="user@example.com" required>
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="inviteUserTitle">Invite user</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <form id="inviteUserForm" class="ajax-form">
+            <div class="app-modal-body">
+              <div class="users-fields">
+                <div class="app-field">
+                  <label for="inviteEmail">Email address</label>
+                  <input type="email" id="inviteEmail" name="email" placeholder="name@gmail.com" required
+                    autocomplete="off">
+                  <span class="app-field-hint">
+                    Sign-in goes through Google, so only Gmail addresses can be invited.
+                  </span>
+                </div>
+
+                {# A segmented control rather than a dropdown: see the role
+                   picker note in users.css. The value lives on the pressed
+                   button, which users.js reads — there is no hidden input to
+                   fall out of step with what is on screen. #}
+                <div class="app-field">
+                  <span class="field-label" id="inviteRoleLabel">Role</span>
+                  <div class="seg-tabs role-choice" role="radiogroup" aria-labelledby="inviteRoleLabel"
+                    data-role-choice>
+                    <button type="button" class="seg-tab is-active" role="radio" aria-checked="true" data-role="EDITOR">
+                      <i class="bi bi-pencil" aria-hidden="true"></i> Editor
+                    </button>
+                    <button type="button" class="seg-tab" role="radio" aria-checked="false" tabindex="-1"
+                      data-role="ADMIN">
+                      <i class="bi bi-shield-lock" aria-hidden="true"></i> Admin
+                    </button>
+                  </div>
+                  <span class="app-field-hint" data-role-hint></span>
+                </div>
               </div>
-              <div class="mb-3">
-                <label class="form-label text-secondary small fw-bold text-uppercase">Role</label>
-                <select id="inviteRole" name="role" class="form-select rounded-pill px-3" required>
-                  <option value="editor">Editor</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <p class="text-muted small mb-0">
-                <i class="bi bi-info-circle"></i> An invitation email will be sent. The user will create their own account.
-              </p>
             </div>
-            <div class="modal-footer border-top p-3 bg-light">
-              <button type="button" class="btn btn-light text-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
-              <button type="submit" class="btn btn-primary text-white">
-                <i class="bi bi-send-fill"></i> Send Invitation
-              </button>
-            </div>
+
+            <footer class="app-modal-foot">
+              <span class="app-modal-note">They create their own account from the link.</span>
+              <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="app-btn is-primary">Send invitation</button>
+            </footer>
           </form>
         </div>
       </div>
     </div>
 
-    <!-- Edit Role Modal -->
-    <div id="editRoleModal" class="modal fade" tabindex="-1">
+    {# ==================== CHANGE ROLE ==================== #}
+    <div class="modal fade" id="editRoleModal" tabindex="-1" aria-hidden="true" aria-labelledby="editRoleTitle">
       <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow-card">
-          <div class="modal-header border-bottom p-4">
-            <h5 class="modal-title fw-bold text-dark">Edit User Role</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <form id="editRoleForm" class="no-loader">
-            <div class="modal-body p-4">
-              <input type="hidden" id="editUserId" name="userId">
-              <div class="mb-3">
-                <label class="form-label text-secondary small fw-bold text-uppercase">Username</label>
-                <input type="text" id="editUsername" name="username"
-                  class="form-control bg-light border-0 rounded-pill px-3" readonly>
-              </div>
-              <div class="mb-3">
-                <label class="form-label text-secondary small fw-bold text-uppercase">Role</label>
-                <select id="editRole" name="role" class="form-select rounded-pill px-3" required>
-                  <option value="editor">Editor</option>
-                  <option value="admin">Admin</option>
-                </select>
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="editRoleTitle">Change role</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <form id="editRoleForm" class="ajax-form">
+            <input type="hidden" id="editUserId" name="userId">
+            <div class="app-modal-body">
+              <div class="users-fields">
+                {# The person being changed is stated as a sentence rather than
+                   parked in a disabled text input. It was never editable; a
+                   greyed-out field only invites the reader to try. #}
+                <p class="delete-copy">
+                  Role for <strong id="editUserName"></strong>.
+                </p>
+
+                <div class="app-field">
+                  <span class="field-label" id="editRoleLabel">Role</span>
+                  <div class="seg-tabs role-choice" role="radiogroup" aria-labelledby="editRoleLabel" data-role-choice>
+                    <button type="button" class="seg-tab is-active" role="radio" aria-checked="true" data-role="EDITOR">
+                      <i class="bi bi-pencil" aria-hidden="true"></i> Editor
+                    </button>
+                    <button type="button" class="seg-tab" role="radio" aria-checked="false" tabindex="-1"
+                      data-role="ADMIN">
+                      <i class="bi bi-shield-lock" aria-hidden="true"></i> Admin
+                    </button>
+                  </div>
+                  <span class="app-field-hint" data-role-hint></span>
+                </div>
               </div>
             </div>
-            <div class="modal-footer border-top p-3 bg-light">
-              <button type="button" class="btn btn-light text-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
-              <button type="submit" class="btn btn-primary text-white">Update Role</button>
-            </div>
+
+            <footer class="app-modal-foot">
+              <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="app-btn is-primary">Save role</button>
+            </footer>
           </form>
         </div>
       </div>
     </div>
 
-    <!-- Delete User Confirmation Modal -->
-    <div id="deleteUserModal" class="modal fade" tabindex="-1">
+    {# ==================== REMOVE ==================== #}
+    <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true" aria-labelledby="deleteUserTitle">
       <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow-card">
-          <div class="modal-header border-bottom p-4">
-            <h5 class="modal-title fw-bold text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Delete User</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body p-4">
-            <p class="text-secondary mb-1">Are you sure you want to delete this user?</p>
-            <p class="fw-bold text-dark" id="deleteUserName"></p>
-            <p class="text-muted small mb-0">
-              <i class="bi bi-info-circle"></i> This action cannot be undone. The user will be removed from the system permanently.
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="deleteUserTitle">Remove user</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="app-modal-body">
+            <p class="delete-copy">
+              <strong id="deleteUserName"></strong> loses access immediately and their
+              account is deleted from Scriptly. Anything they have already published stays where it is.
+              This cannot be undone.
             </p>
           </div>
-          <div class="modal-footer border-top p-3 bg-light">
-            <button type="button" class="btn btn-light text-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-danger text-white" id="confirmDeleteBtn" onclick="executeDeleteUser()">
-              <i class="bi bi-trash"></i> Delete User
-            </button>
-          </div>
+
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-danger" id="confirmDeleteBtn">Remove user</button>
+          </footer>
         </div>
       </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/pages/users.js') }}?v=2"></script>
   </main>
 </div>
-
-{% endblock %}
-
-{% block extra_js %}
-<script>
-(function() {
-    function escapeHtml(text) {
-        if (!text) return '';
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function getUsersPrefetchCache(maxAgeMs) {
-      var ttl = typeof maxAgeMs === 'number' ? maxAgeMs : (2 * 60 * 1000);
-      var cache = window.__usersListPrefetchCache;
-      if (!cache || !cache.data || !cache.fetchedAt) return null;
-      if ((Date.now() - cache.fetchedAt) > ttl) return null;
-      return cache.data;
-    }
-
-    function setUsersPrefetchCache(data) {
-      if (!data) return;
-      window.__usersListPrefetchCache = {
-        data: data,
-        fetchedAt: Date.now()
-      };
-    }
-
-    function clearUsersPrefetchCache() {
-      window.__usersListPrefetchCache = null;
-      window.__usersListPrefetchPromise = null;
-    }
-
-    function renderUsersData(data, usersList, noUsers) {
-      var users = data.users || [];
-      var invitations = data.invitations || [];
-
-      if (users.length === 0 && invitations.length === 0) {
-        usersList.innerHTML = '';
-        if (noUsers) noUsers.classList.remove('d-none');
-        return;
-      }
-
-      if (noUsers) noUsers.classList.add('d-none');
-
-      var html = '';
-
-      users.forEach(function(user) {
-        var uid = user.uid || 'unknown';
-        var name = (user.name || user.username || 'User').trim();
-        var email = (user.email || '').trim();
-        var role = (user.role || 'editor').toLowerCase().trim();
-        var initials = (name === 'User' ? (email[0] || '?') : name.substring(0, 2)).toUpperCase();
-        var roleClass = role === 'admin' ? 'badge-admin' : 'badge-editor';
-
-        html += '<div class="user-row animate-fade-up">' +
-          '<div class="col-username d-flex align-items-center gap-3">' +
-            '<div class="footer-avatar shadow-sm" style="width:36px;height:36px;font-size:0.8rem;border-radius:10px;">' + initials + '</div>' +
-            '<span class="fw-bold">' + escapeHtml(name) + '</span>' +
-          '</div>' +
-          '<div class="col-email text-secondary">' + escapeHtml(email) + '</div>' +
-          '<div class="col-role"><span class="badge-role ' + roleClass + '">' + role.toUpperCase() + '</span></div>' +
-          '<div class="col-status"><span class="badge-status badge-active"><i class="bi bi-check-circle-fill"></i> Active</span></div>' +
-          '<div class="col-actions">' +
-            '<div class="action-dropdown">' +
-              '<button class="action-dots-btn" onclick="toggleActionMenu(this)">' +
-                '<i class="bi bi-three-dots-vertical"></i>' +
-              '</button>' +
-              '<div class="action-menu">' +
-                '<button class="action-menu-item" onclick="openEditRole(\'' + uid + '\', \'' + escapeHtml(name).replace(/'/g, "\\'") + '\', \'' + role + '\')">' +
-                  '<i class="bi bi-pencil-square"></i> Edit Role' +
-                '</button>' +
-                '<button class="action-menu-item action-menu-item-danger" onclick="confirmDeleteUser(\'' + uid + '\', \'' + escapeHtml(name).replace(/'/g, "\\'") + '\')">' +
-                  '<i class="bi bi-trash"></i> Delete' +
-                '</button>' +
-              '</div>' +
-            '</div>' +
-          '</div></div>';
-      });
-
-      var pendingInvitations = (invitations || []).filter(function(inv) { return inv.status === 'pending'; });
-      pendingInvitations.forEach(function(inv) {
-        var email = inv.email || '';
-        var role = (inv.role || 'editor').toLowerCase().trim();
-        var roleClass = role === 'admin' ? 'badge-admin' : 'badge-editor';
-        var initial = email.charAt(0).toUpperCase();
-
-        html += '<div class="user-row animate-fade-up">' +
-          '<div class="col-username d-flex align-items-center gap-3">' +
-            '<div class="footer-avatar shadow-sm" style="width:36px;height:36px;font-size:0.8rem;border-radius:10px;opacity:0.6;">' + initial + '</div>' +
-            '<span class="fw-bold text-muted">' + escapeHtml(email.split('@')[0]) + '</span>' +
-          '</div>' +
-          '<div class="col-email text-secondary">' + escapeHtml(email) + '</div>' +
-          '<div class="col-role"><span class="badge-role ' + roleClass + '">' + role.toUpperCase() + '</span></div>' +
-          '<div class="col-status"><span class="badge-status badge-pending"><i class="bi bi-clock-fill"></i> Pending</span></div>' +
-          '<div class="col-actions">' +
-            '<button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="resendInvitation(\'' + escapeHtml(email) + '\')" title="Resend"><i class="bi bi-arrow-clockwise"></i> Resend</button>' +
-          '</div></div>';
-      });
-
-      usersList.innerHTML = html;
-    }
-
-  async function fetchUsersListFromServer() {
-    var response = await fetch('/users/list', {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-      credentials: 'same-origin'
-    });
-
-    var contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-      throw new Error('Session expired or server error. Please refresh the page.');
-    }
-
-    if (!response.ok) throw new Error('Server returned ' + response.status);
-
-    var data = await response.json();
-    if (!data.success) throw new Error(data.error || 'Failed to fetch users.');
-    setUsersPrefetchCache(data);
-    return data;
-  }
-
-    async function loadUsers() {
-        var usersList = document.getElementById('usersList');
-        var noUsers = document.getElementById('noUsers');
-        if (!usersList) return;
-
-      var cachedData = getUsersPrefetchCache();
-      if (!cachedData) {
-        usersList.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary opacity-50 mb-3" role="status"></div><p class="text-secondary fw-medium">Loading users...</p></div>';
-      }
-
-        try {
-          var data;
-        if (cachedData) {
-          data = cachedData;
-        } else if (window.__usersListPrefetchPromise) {
-            try {
-              data = await window.__usersListPrefetchPromise;
-            } catch (prefetchError) {
-              data = await fetchUsersListFromServer();
-            } finally {
-              window.__usersListPrefetchPromise = null;
-            }
-          } else {
-            data = await fetchUsersListFromServer();
-          }
-        renderUsersData(data, usersList, noUsers);
-
-        } catch (error) {
-            usersList.innerHTML = '<div class="p-5 text-center bg-white rounded border"><div class="text-danger mb-2"><i class="bi bi-exclamation-triangle-fill fs-2"></i></div><p class="text-secondary fw-bold">Failed to load users</p><p class="small text-muted mb-3">' + escapeHtml(error.message) + '</p><button class="btn btn-sm btn-primary rounded-pill px-4" onclick="loadUsers()">Retry</button></div>';
-        }
-    }
-
-    window.loadUsers = loadUsers;
-
-    window.openEditRole = function(uid, username, currentRole) {
-        document.getElementById('editUserId').value = uid;
-        document.getElementById('editUsername').value = username;
-        document.getElementById('editRole').value = currentRole.toLowerCase();
-        var modalEl = document.getElementById('editRoleModal');
-        var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-        modal.show();
-    };
-
-    window.resendInvitation = async function(email) {
-        try {
-            var res = await fetch('/users/resend-invite', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email })
-            });
-            var data = await res.json();
-            if (data.success) {
-                showToast({ type: 'success', title: 'Sent', message: 'Invitation resent to ' + email });
-            } else {
-                showToast({ type: 'error', title: 'Error', message: data.error || 'Failed to resend' });
-            }
-        } catch (err) {
-            showToast({ type: 'error', title: 'Error', message: 'Connection failed' });
-        }
-    };
-
-    var deleteUserId = '';
-    var deleteUsername = '';
-
-    window.confirmDeleteUser = function(uid, username) {
-        deleteUserId = uid;
-        deleteUsername = username;
-        document.getElementById('deleteUserName').textContent = username;
-        var modalEl = document.getElementById('deleteUserModal');
-        var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-        modal.show();
-    };
-
-    window.executeDeleteUser = async function() {
-        var btn = document.getElementById('confirmDeleteBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Deleting...';
-
-        try {
-            var res = await fetch('/users/delete-user', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: deleteUserId, username: deleteUsername })
-            });
-            var data = await res.json();
-            if (data.success) {
-                var modalEl = document.getElementById('deleteUserModal');
-                var modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-              clearUsersPrefetchCache();
-                loadUsers();
-                showToast({ type: 'success', title: 'Deleted', message: data.message || 'User deleted' });
-            } else {
-                showToast({ type: 'error', title: 'Error', message: data.error || 'Failed to delete user' });
-            }
-        } catch (err) {
-            showToast({ type: 'error', title: 'Error', message: 'Connection failed' });
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-trash"></i> Delete User';
-        }
-    };
-
-    function initForms() {
-        var inviteForm = document.getElementById('inviteUserForm');
-        if (inviteForm) {
-            inviteForm.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                var submitBtn = inviteForm.querySelector('button[type="submit"]');
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
-
-                try {
-                    var formData = Object.fromEntries(new FormData(inviteForm).entries());
-                    var res = await fetch('/users/invite', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(formData)
-                    });
-                    var data = await res.json();
-                    if (data.success) {
-                        var modalEl = document.getElementById('inviteUserModal');
-                        var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-                        modal.hide();
-                        inviteForm.reset();
-                      clearUsersPrefetchCache();
-                        loadUsers();
-
-                        showToast({ type: 'success', title: 'Invitation Sent', message: data.message || 'User has been invited successfully!' });
-                    } else {
-                        showToast({ type: 'error', title: 'Error', message: data.error || 'Failed to send invitation' });
-                    }
-                } catch (err) {
-                    showToast({ type: 'error', title: 'Error', message: 'Connection failed' });
-                } finally {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="bi bi-send-fill"></i> Send Invitation';
-                }
-            });
-        }
-
-        var editRoleForm = document.getElementById('editRoleForm');
-        if (editRoleForm) {
-            editRoleForm.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                var userId = document.getElementById('editUserId').value;
-                var role = document.getElementById('editRole').value;
-                try {
-                    var res = await fetch('/users/update-role', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: userId, role: role })
-                    });
-                    var data = await res.json();
-                    if (data.success) {
-                        var modalEl = document.getElementById('editRoleModal');
-                        var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-                        modal.hide();
-                      clearUsersPrefetchCache();
-                        loadUsers();
-                        showToast({ type: 'success', title: 'Updated', message: 'Role updated' });
-                    } else {
-                        showToast({ type: 'error', title: 'Error', message: data.error || 'Failed to update' });
-                    }
-                } catch (err) {
-                    showToast({ type: 'error', title: 'Error', message: 'Connection failed' });
-                }
-            });
-        }
-    }
-
-    window.toggleActionMenu = function(btn) {
-        var menu = btn.nextElementSibling;
-        var isOpen = menu.classList.contains('show');
-
-        document.querySelectorAll('.action-menu.show').forEach(function(m) {
-            m.classList.remove('show');
-        });
-
-        if (!isOpen) {
-            menu.classList.add('show');
-        }
-    };
-
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.action-dropdown')) {
-            document.querySelectorAll('.action-menu.show').forEach(function(m) {
-                m.classList.remove('show');
-            });
-        }
-    });
-
-    loadUsers();
-    initForms();
-})();
-</script>
 {% endblock %}

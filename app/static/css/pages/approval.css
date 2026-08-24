@@ -1,116 +1,200 @@
 /* ==========================================================================
-   Approval Queue Page Styles
+   Approvals — the review queue
+
+   Composed from the shared primitives in dashboard.css: §12's .surface-card /
+   .card-head / .stat-card / .data-row / .status-pill / .list-empty / .pager /
+   .cal, and §14's .app-modal / .app-btn. A submission is the same kind of
+   record as a draft, a lead or a person — a mark, a title, a line of meta and
+   a trailing control — so a submission now reads like one.
+
+   What used to live here was a parallel implementation of most of that:
+   .approvals-container / .drafts-header / .draft-row / .col-title / .col-tags /
+   .badge-tag laying out a table by hand, plus .custom-modal-header /
+   .custom-modal-body / .custom-modal-footer / .btn-modal and four button
+   variants — a second modal shell that existed only on this screen. The
+   .status-badge / .status-under-review pair was a third spelling of
+   .status-pill, hyphenated where the shared one is underscored, so neither
+   could ever match the other's markup.
+
+   What is genuinely specific to this screen and stays:
+     - the column template (a requested date gets a column of its own)
+     - the "date requested" pill, which is a request rather than a status
+     - the preview dialog's facts row, contents block and prose
+     - the publish-time picker: the shared .cal grid plus a time column
+     - the Publish Time Agent's suggestions
+     - the ⋮ menu, restated because this page loads neither drafts.css nor
+       all_blogs.css
    ========================================================================== */
 
-/* Local overrides for Approval List */
-.approvals-container {
-  background: var(--surface-1);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+/* --- Stats -------------------------------------------------------------- */
+
+.approval-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+
+.approval-stats .stat-waiting {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.approval-stats .stat-requested {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.approval-stats .stat-oldest {
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+/* "3 days" is a phrase, not a figure, and --fs-h1 set on a phrase reads as a
+   headline rather than as a tile value. It also has to survive sitting beside
+   two real numerals without making the row look ragged, so it takes the step
+   below and keeps the same weight and colour. */
+.approval-stats .stat-count.is-text {
+  font-size: var(--fs-h2);
+  letter-spacing: -0.01em;
+}
+
+/* Nothing is waiting: the tile still has to say something, and "—" at value
+   size is a hyphen pretending to be data. */
+.approval-stats .stat-count.is-empty {
+  font-size: var(--fs-h2);
+  color: var(--text-faint);
+}
+
+/* --- Card and rows ------------------------------------------------------ */
+
+.approval-card {
+  padding-bottom: var(--sp-6);
+  /* the ⋮ menu escapes the card */
   overflow: visible;
 }
 
-.drafts-header {
-  display: flex;
-  padding: 1.25rem 2rem;
-  background: transparent;
-  border-bottom: 1px solid var(--border-subtle);
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--secondary-color);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
+.approval-list {
+  padding: var(--sp-4) var(--sp-4) 0;
 }
 
-.draft-row {
-  display: flex;
-  align-items: center;
-  padding: 1.25rem 2rem;
-  border-bottom: 1px solid var(--border-subtle);
-  transition: var(--transition-base);
+/* The slot here holds a page counter and the search in force, so it takes the
+   counter treatment: one line, tabular figures, and an ellipsis rather than a
+   card head that grows sideways when someone searches for something long. The
+   shared rule stays neutral because other screens wrap a sentence into it. */
+.approval-card .card-note {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
-.draft-row:hover {
-  background: var(--bg-body);
+/* A requested date gets a column of its own rather than another line of meta.
+   This is the screen you open to answer "what has someone asked me to do?",
+   and a request only reads as one when it lines up down the page. */
+.approval-card .data-row {
+  grid-template-columns: 36px minmax(0, 1fr) 148px 108px auto;
 }
 
-.draft-row:last-child {
-  border-bottom: none;
-  border-bottom-left-radius: var(--radius-lg);
-  border-bottom-right-radius: var(--radius-lg);
+/* A fixed track rather than `auto`: .data-rows is a grid of grids, so each row
+   sizes its own columns and an `auto` request column would sit at a different
+   offset on every row, leaving nothing to scan down. `start` keeps the pill
+   only as wide as its own label inside that track. */
+.approval-card .data-row .status-pill {
+  justify-self: start;
 }
 
-.col-title {
-  flex: 3;
-  font-weight: 500;
-  color: var(--info-color);
-}
-
-.col-tags {
-  flex: 1.5;
-}
-
-.col-status {
-  flex: 1.5;
-  color: var(--secondary-color);
-  font-size: 0.9rem;
-}
-
-.col-actions {
-  flex: 0 0 80px;
-  text-align: right;
-}
-
-/* Badge styling */
-.badge-tag {
+/* A submission carrying a request is the one the reviewer has to make a
+   decision *about* rather than just on, so its mark picks up the accent the
+   pill beside it uses. */
+.approval-card .data-row.is-requested .row-mark {
   background: var(--accent-tint);
-  color: var(--primary-color);
-  padding: 0.35rem 1rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.8rem;
-  font-weight: 500;
+  color: var(--accent);
 }
 
-/* Custom Dropdown Styles */
+/* A write is in flight against this row. Dimmed rather than replaced, so the
+   reader can still see which submission is being acted on — the old page swapped
+   the whole ⋮ button for a spinner and restored it from a hardcoded icon
+   string, which nested a second <i> inside it every time a retry failed. */
+.approval-card .data-row.is-busy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* --- The request pill ---------------------------------------------------
+   Deliberately not one of §12's four status pills. Every row on this screen
+   has the same status — under review — so printing it would be four identical
+   words down a column. What differs between rows is whether the writer asked
+   for a date, and that is what the column says. */
+.status-pill.status-requested {
+  background: var(--accent-soft);
+  color: var(--accent-on-soft);
+}
+
+.status-pill.status-requested i {
+  font-size: 0.9em;
+}
+
+.status-pill-blank {
+  display: block;
+}
+
+/* Shown only once the request column has been dropped — see the 900px block. */
+.row-meta-requested {
+  display: none;
+}
+
+/* Publishing is what this screen is for, so the hover shortcut says so in the
+   status palette rather than in the neutral one every other row action uses. */
+.approval-card .row-action.is-publish:hover {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.approval-card .row-action i {
+  font-size: 1rem;
+}
+
+/* --- Row menu -----------------------------------------------------------
+   Restated here because this page loads neither drafts.css nor all_blogs.css,
+   which is where the same block lives for the screens that do. */
+
 .btn-dropdown-trigger {
+  display: grid;
+  place-items: center;
   width: 32px;
   height: 32px;
   border: none;
-  background: transparent;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: transparent;
   color: var(--text-faint);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--transition-base);
 }
 
 .btn-dropdown-trigger:hover {
   background: var(--surface-3);
-  color: var(--text-muted);
+  color: var(--text-strong);
 }
 
 .dropdown-menu {
   border: none;
   border-radius: var(--radius-md);
   box-shadow: var(--elev-2);
-  padding: 0.5rem;
-  min-width: 200px;
+  padding: var(--sp-2);
+  min-width: 210px;
 }
 
 .dropdown-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.65rem 1rem;
+  gap: var(--sp-3);
   border-radius: var(--radius-sm);
-  font-size: 0.9rem;
-  font-weight: 500;
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   color: var(--text-1);
-  transition: all 0.15s ease;
+  transition: var(--transition-base);
 }
 
 .dropdown-item:hover {
@@ -119,9 +203,9 @@
 }
 
 .dropdown-item i {
-  font-size: 1rem;
   width: 20px;
   text-align: center;
+  font-size: 1rem;
 }
 
 .dropdown-item.text-danger {
@@ -134,326 +218,651 @@
 }
 
 .dropdown-divider {
-  margin: 0.35rem 0;
+  margin: var(--sp-1) 0;
   border-color: var(--border-subtle);
 }
 
-/* Custom Modal Styles */
-.modal-content {
-  border: none;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--elev-3);
+/* ==========================================================================
+   PREVIEW DIALOG
+
+   The reviewer's actual job. It gets the tall dialog and the wide measure,
+   because everything else on this screen exists to get someone here.
+   ========================================================================== */
+
+.preview-modal .app-modal-body {
+  max-height: min(72vh, 660px);
+}
+
+.preview-modal .app-modal-title {
+  min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.custom-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 2rem;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-1);
-}
-
-.custom-modal-title {
-  font-size: 1.25rem;
-  font-weight: 500;
-  color: var(--text-strong);
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 0;
-}
-
-.custom-modal-title i { color: var(--primary-color); }
-
-.custom-modal-body {
-  padding: 1.5rem 2rem;
-  background: var(--surface-1);
-}
-
-.custom-modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1rem 2rem;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--surface-2);
-}
-
-/* Status Badge */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.85rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.7rem;
-  font-weight: 500;
-  text-transform: uppercase;
-}
-
-.status-under-review, .status-under_review { background: var(--info-soft); color: var(--info); }
-.status-published { background: var(--success-soft); color: var(--success); }
-
-/* Blog Title in Modal */
-.blog-title-display {
-  font-size: 1.35rem;
-  font-weight: 500;
-  color: var(--text-strong);
-  margin-bottom: 1rem;
-  line-height: 1.4;
-}
-
-/* Author Card */
-.author-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  margin: 1rem 0;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-}
-
-.author-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--text-on-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 500;
-  font-size: 0.95rem;
-}
-
-.author-name { font-weight: 500; color: var(--text-strong); font-size: 0.9rem; }
-.author-meta { font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; }
-.author-meta i { color: var(--primary-color); font-size: 0.75rem; }
-
-/* Meta Info Bar */
-.meta-info-bar {
+/* Facts about the submission, not about the post: who wrote it, where it
+   files, how long it is, how long it has been sitting there. A row of quiet
+   chips rather than a card, because none of them is worth a decision on its
+   own — they are the frame the prose below is read inside. */
+.preview-facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.25rem;
-  padding: 1rem 0;
-  margin-bottom: 1.25rem;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  padding-bottom: var(--sp-4);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.meta-chip {
-  display: flex;
+.preview-fact {
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
-.meta-chip i { color: var(--primary-color); font-size: 0.9rem; }
-
-/* TOC */
-.toc-container {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 1.25rem;
-  margin-bottom: 1.5rem;
+.preview-fact i {
+  font-size: 0.95em;
+  color: var(--text-faint);
 }
 
-.toc-header {
+/* The request. Tinted because it is the one line in the dialog that is somebody
+   asking for something, and it carries the button that grants it — so the
+   reviewer never has to copy a date out of a sentence and back into a picker. */
+.preview-request {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--primary-color);
-  text-transform: uppercase;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  margin: var(--sp-4) 0 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--accent-tint);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
 }
 
-.toc-container ul { list-style: none; padding: 0; margin: 0; }
-.toc-container li { padding: 0.35rem 0; }
-.toc-container a { color: var(--text-muted); text-decoration: none; font-size: 0.875rem; }
-.toc-container a:hover { color: var(--primary-color); }
-.toc-level-1 { font-weight: 500; }
-.toc-level-2 { padding-left: 1rem; }
-.toc-level-3 { padding-left: 2rem; font-size: 0.8rem; }
+.preview-request[hidden] {
+  display: none;
+}
 
-/* Content Preview */
-.content-label {
-  font-size: 0.75rem;
-  font-weight: 500;
+.preview-request>i {
+  color: var(--accent);
+}
+
+.preview-request strong {
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
+}
+
+.preview-request-btn {
+  margin-left: auto;
+  padding: var(--sp-1) var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-1);
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--accent);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-base);
+}
+
+.preview-request-btn:hover {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.preview-request-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Contents -----------------------------------------------------------
+   A <details>, closed by default. The old dialog printed the whole table of
+   contents above the prose, so on a long post the reviewer scrolled past a
+   list of headings to reach the first paragraph of what they came to read. */
+.preview-toc {
+  margin-top: var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.preview-toc[hidden] {
+  display: none;
+}
+
+.preview-toc summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.preview-toc summary::-webkit-details-marker {
+  display: none;
+}
+
+.preview-toc summary i {
+  color: var(--text-faint);
+}
+
+/* The disclosure triangle we draw ourselves, so it takes the product's icon
+   weight rather than the browser's default glyph. */
+.preview-toc summary::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-right: 1.5px solid var(--text-faint);
+  border-bottom: 1.5px solid var(--text-faint);
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.preview-toc[open] summary::after {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+.preview-toc summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.preview-toc ul {
+  margin: 0;
+  padding: 0 var(--sp-4) var(--sp-3);
+  list-style: none;
+}
+
+.preview-toc li {
+  padding: 3px 0;
+}
+
+.preview-toc a {
+  font-size: var(--fs-xs);
   color: var(--text-muted);
-  text-transform: uppercase;
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  text-decoration: none;
 }
 
-.content-label i { color: var(--primary-color); }
+.preview-toc a:hover {
+  color: var(--accent);
+}
 
-.blog-content-preview {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 1.5rem;
-  max-height: 50vh;
-  overflow-y: auto;
-  line-height: 1.8;
+.preview-toc .toc-level-2 {
+  padding-left: var(--sp-4);
+}
+
+.preview-toc .toc-level-3 {
+  padding-left: var(--sp-8);
+}
+
+/* --- Prose --------------------------------------------------------------
+   The post as the reader will get it. Capped at a reading measure rather than
+   run to the full width of an .modal-xl: the old preview set 60-odd characters
+   of body copy across 1100px, which is a line length nobody can track back
+   from. It is the only block on this screen with a max-width. */
+.preview-prose {
+  max-width: 68ch;
+  margin-top: var(--sp-5);
+  font-size: var(--fs-body);
+  line-height: var(--lh-relaxed);
   color: var(--text-1);
 }
 
-.blog-content-preview::-webkit-scrollbar { width: 5px; }
-.blog-content-preview::-webkit-scrollbar-track { background: var(--surface-3); }
-.blog-content-preview::-webkit-scrollbar-thumb { background: var(--surface-4); border-radius: var(--radius-xs); }
+.preview-prose> :first-child {
+  margin-top: 0;
+}
 
-.blog-content-preview h1, .blog-content-preview h2, .blog-content-preview h3 {
+.preview-prose h1,
+.preview-prose h2,
+.preview-prose h3 {
+  margin: var(--sp-6) 0 var(--sp-3);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
   color: var(--text-strong);
-  margin-top: 1.5rem;
-  margin-bottom: 0.75rem;
-  font-weight: 500;
+  letter-spacing: -0.01em;
 }
-.blog-content-preview h1:first-child, .blog-content-preview h2:first-child { margin-top: 0; }
-.blog-content-preview p { margin-bottom: 1rem; }
-.blog-content-preview ul, .blog-content-preview ol { margin-bottom: 1rem; padding-left: 1.5rem; }
-.blog-content-preview code { background: var(--surface-3); padding: 0.2rem 0.4rem; border-radius: var(--radius-xs); font-size: 0.9em; }
-.blog-content-preview pre { background: var(--surface-3); color: var(--text-1); padding: 1rem; border-radius: var(--radius-sm); overflow-x: auto; margin-bottom: 1rem; }
 
-/* Buttons */
-.btn-modal {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1.25rem;
+.preview-prose h1 {
+  font-size: var(--fs-h2);
+}
+
+.preview-prose h2 {
+  font-size: var(--fs-h3);
+}
+
+.preview-prose h3 {
+  font-size: var(--fs-body);
+}
+
+.preview-prose p,
+.preview-prose ul,
+.preview-prose ol {
+  margin: 0 0 var(--sp-4);
+}
+
+.preview-prose ul,
+.preview-prose ol {
+  padding-left: var(--sp-6);
+}
+
+.preview-prose li {
+  margin-bottom: var(--sp-2);
+}
+
+.preview-prose a {
+  color: var(--accent);
+}
+
+.preview-prose img {
+  max-width: 100%;
+  height: auto;
   border-radius: var(--radius-sm);
-  font-weight: 500;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-  border: none;
 }
 
-.btn-modal-secondary { background: var(--surface-1); color: var(--text-muted); border: 1px solid var(--border); }
-.btn-modal-secondary:hover { background: var(--surface-2); color: var(--text-2); }
-
-.btn-modal-success { background: var(--success-color); color: var(--text-on-accent); }
-.btn-modal-success:hover { opacity: 0.9; }
-
-.btn-modal-danger { background: var(--surface-1); color: var(--danger); border: 1px solid var(--danger-border); }
-.btn-modal-danger:hover { background: var(--danger-soft); }
-
-/* ==================== BEST TIME SUGGESTIONS ==================== */
-.best-time-container {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 1rem;
+.preview-prose blockquote {
+  margin: 0 0 var(--sp-4);
+  padding-left: var(--sp-4);
+  border-left: 2px solid var(--border);
+  color: var(--text-2);
 }
 
-.best-time-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    margin-bottom: 0.75rem;
+.preview-prose code {
+  padding: 2px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
 }
 
-.best-time-header i {
-    color: var(--primary-color);
+.preview-prose pre {
+  margin: 0 0 var(--sp-4);
+  padding: var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  overflow-x: auto;
 }
 
-.best-time-list {
-    display: flex;
+.preview-prose pre code {
+  padding: 0;
+  background: none;
+}
+
+.preview-prose table {
+  width: 100%;
+  margin-bottom: var(--sp-4);
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.preview-prose th,
+.preview-prose td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+}
+
+/* Loading, empty, or the fetch failed. Same slot, same voice. */
+.preview-placeholder {
+  margin: 0;
+  padding: var(--sp-10) 0;
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+
+/* ==========================================================================
+   SCHEDULE DIALOG
+   ========================================================================== */
+
+.schedule-dialog {
+  max-width: 560px;
+}
+
+/* Which post this is about, stated once at the top rather than assumed. The
+   old dialog put the title in a bare bold paragraph under the word "Choose"; a
+   mark beside it makes it the same object the row was. */
+.schedule-subject {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: 0 0 var(--sp-4);
+}
+
+.schedule-subject-text {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- The picker ---------------------------------------------------------
+   The Schedule screen's dialogs carry the same control (.sched-when there).
+   The two are not shared yet: that one is a scope-keyed pair driven from
+   schedule.js, and lifting it out is a change to a screen this redesign does
+   not touch. If a third publish-time picker ever appears, all three should
+   move to a partial and a component together rather than a fourth copy. */
+.when-picker {
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+/* Calendar takes the slack; the time column is fixed so "12:45 AM" never wraps
+   and the grid keeps a stable width as the month changes. */
+.when-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  align-items: start;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+}
+
+.when-times {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.when-times-head {
+  margin: 0;
+  padding-left: var(--sp-1);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Height matched to the six-week grid beside it, so the two columns end level
+   and the dialog does not grow a ragged bottom edge. */
+/* Positioned so the offsetTop the scroll maths reads is measured against this
+   column. Without it the nearest positioned ancestor is the .modal itself, and
+   every slot reports an offset from the top of the viewport. */
+.when-times-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 268px;
+  padding-right: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.when-times-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.when-times-list::-webkit-scrollbar-thumb {
+  background: var(--surface-4);
+  border-radius: var(--radius-pill);
+}
+
+.when-time {
+  flex-shrink: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: var(--transition-base);
+}
+
+.when-time:hover {
+  background: var(--surface-3);
+}
+
+.when-time:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.when-time.is-selected {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: var(--fw-medium);
+}
+
+/* Already gone by, on today's date. Greyed rather than dropped, so the column
+   does not silently start at an arbitrary row. */
+.when-time:disabled {
+  color: var(--text-faint);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.when-time:disabled:hover {
+  background: none;
+}
+
+/* Every slot on the chosen day has passed — the column would otherwise be a
+   scrollable list of nothing but dead rows. */
+.when-times-none {
+  margin: 0;
+  padding: var(--sp-4) var(--sp-2);
+  text-align: center;
+  font-size: var(--fs-2xs);
+  line-height: var(--lh-body);
+  color: var(--text-faint);
+}
+
+.when-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+/* Complete and valid: the line stops being an instruction and becomes the
+   statement of what the confirm button will do. */
+.when-summary.is-set {
+  color: var(--text-2);
+}
+
+.when-summary.is-set strong {
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
+}
+
+/* A real element, not a ::before with a hardcoded codepoint: the icon font's
+   private-use mappings are not a stable contract, and a wrong one renders as a
+   tofu box with nothing to explain it. */
+.when-summary>i {
+  flex-shrink: 0;
+  font-size: 0.9em;
+  color: var(--text-faint);
+}
+
+.when-summary.is-set>i {
+  color: var(--accent);
+}
+
+/* --- Publish Time Agent -------------------------------------------------
+   Three suggestions with the reason attached to each. The old chips carried
+   the reasoning in a `title=` attribute, so the only way to find out why a
+   time was being recommended was to hover it and wait. */
+.besttime {
+  margin-top: var(--sp-4);
+  padding: var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.besttime-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-2);
+}
+
+.besttime-head i {
+  color: var(--accent);
+}
+
+.besttime-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.besttime-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.besttime-loading .spinner-border {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-width: 2px;
+  color: var(--accent);
+}
+
+/* Where the numbers came from. Stated before the suggestions rather than
+   after, because it is what decides how much weight to give them. */
+.besttime-source {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-2xs);
+  line-height: var(--lh-body);
+  color: var(--text-faint);
+}
+
+.besttime-source i {
+  margin-top: 2px;
+  color: var(--success);
+}
+
+.besttime-source.is-warning i {
+  color: var(--warning);
+}
+
+.besttime-slot {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-base);
+}
+
+.besttime-slot:hover {
+  box-shadow: var(--elev-1);
+}
+
+.besttime-slot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.besttime-when {
+  flex-shrink: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.besttime-why {
+  min-width: 0;
+  font-size: var(--fs-2xs);
+  line-height: var(--lh-body);
+  color: var(--text-muted);
+}
+
+/* --- Responsive --------------------------------------------------------- */
+
+@media (max-width: 900px) {
+
+  /* The request column is the first to go: the date it holds is a detail of a
+     decision, and dropping it buys the title and the author the width they
+     need before either truncates. The request itself does not disappear — it
+     moves into the meta line, which is always rendered. */
+  .approval-card .data-row {
+    grid-template-columns: 36px minmax(0, 1fr) 96px auto;
+  }
+
+  .approval-card .data-row .status-pill,
+  .approval-card .data-row .status-pill-blank {
+    display: none;
+  }
+
+  .row-meta-requested {
+    display: inline;
+  }
+}
+
+@media (max-width: 620px) {
+  .approval-card .data-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: var(--sp-3);
+  }
+
+  .approval-card .row-mark {
+    width: 32px;
+    height: 32px;
+  }
+
+  .approval-card .data-row .row-time {
+    display: none;
+  }
+
+  /* A hover shortcut plus a menu is more than a phone row can carry, and the
+     menu offers everything the shortcut does. */
+  .approval-card .row-action {
+    display: none;
+  }
+
+  /* The time column below the grid rather than beside it: 108px of quarter
+     hours next to a seven-column month is not a layout, it is two scrollbars. */
+  .when-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .when-times-list {
+    height: 132px;
+  }
+
+  /* Four buttons in a footer that is now narrower than they are. */
+  .preview-modal .app-modal-foot {
     flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.best-time-chip {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.2rem;
-    padding: 0.5rem 0.85rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-1);
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text-1);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.best-time-chip:hover {
-    border-color: var(--primary-color);
-    background: var(--accent-tint);
-    color: var(--primary-color);
-}
-
-.best-time-chip i {
-    color: var(--primary-color);
-}
-
-.best-time-score {
-    font-size: 0.7rem;
-    font-weight: 400;
-    color: var(--text-muted);
-}
-
-.best-time-loading {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    padding: 0.25rem 0;
-}
-
-.best-time-source {
-    display: block;
-    width: 100%;
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    margin-bottom: 0.5rem;
-}
-
-.best-time-source i {
-    font-size: 0.7rem;
-}
-
-.best-time-source .bi-check-circle-fill {
-    color: var(--success);
-}
-
-.best-time-source .bi-lightbulb-fill {
-    color: var(--warning);
-}
-
-.best-time-source-warning {
-    color: var(--warning);
-}
-
-.best-time-source-warning i {
-    color: var(--warning);
-}
-
-/* ==================== REQUESTED SCHEDULE BADGE ==================== */
-.requested-schedule-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.7rem;
-    font-weight: 500;
-    color: var(--primary-color);
-    background: var(--accent-tint);
-    padding: 0.2rem 0.6rem;
-    border-radius: var(--radius-xs);
-    margin-left: 0.5rem;
-    white-space: nowrap;
+  }
 }

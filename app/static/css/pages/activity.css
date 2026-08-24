@@ -1,574 +1,279 @@
 /* ==========================================================================
-   Activity Log Dashboard Styles
+   Activity — the audit trail
+
+   Composed from the shared primitives in dashboard.css: §12's .surface-card /
+   .card-head / .stat-card / .filter-bar / .seg-tabs / .data-row / .list-empty /
+   .pager / .cal and the date-range dialog, plus §13's .select-pill menu. An
+   entry in the log is the same kind of record as a draft, a lead or a person —
+   a mark, a line that says what it is, and a time — so it now reads like one.
+
+   What used to live here was a parallel implementation of all of that:
+   .activity-stats-row with its own .stat-card, .activity-filter-tabs with its
+   own .filter-tab, a bare <select> and a hand-rolled search box, then
+   .activity-list-header / .activity-row / five .col-activity-* tracks laid out
+   with flex, .activity-pagination with its own .page-btn, and a date dialog
+   built from .custom-modal-* and two native <input type="date"> fields. None of
+   it was reachable from anywhere else in the app.
+
+   What is genuinely specific to this screen and stays:
+     - the column template
+     - the sentence a row is made of (actor · action · target)
+     - the type pill, which is a classification rather than a status
    ========================================================================== */
 
-/* ==================== STATS ROW ==================== */
-.activity-stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1.25rem;
-    margin-bottom: 2rem;
+/* --- Stats --------------------------------------------------------------
+   Total is the denominator, so it is the one tile without a meter. The other
+   three are shares of it, which is the only thing that makes a raw count of
+   "settings changes" mean anything on its own. */
+
+.activity-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
 }
 
-.activity-stats-row .stat-card {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 1.25rem 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    transition: all 0.2s ease;
+.activity-stats .stat-all {
+  background: var(--accent-tint);
+  color: var(--accent);
 }
 
-.activity-stats-row .stat-card:hover {
-    box-shadow: var(--shadow-card);
-    transform: translateY(-2px);
+.activity-stats .stat-content {
+  background: var(--info-soft);
+  color: var(--info);
 }
 
-.activity-stats-row .stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    flex-shrink: 0;
+.activity-stats .stat-people {
+  background: var(--success-soft);
+  color: var(--success);
 }
 
-.activity-stats-row .stat-total { background: var(--accent-tint); color: var(--primary-color); }
-.activity-stats-row .stat-blog { background: var(--info-soft); color: var(--info); }
-.activity-stats-row .stat-user { background: var(--success-soft); color: var(--success); }
-.activity-stats-row .stat-other { background: var(--surface-3); color: var(--text-muted); }
-
-.activity-stats-row .stat-info {
-    display: flex;
-    flex-direction: column;
+.activity-stats .stat-rest {
+  background: var(--surface-3);
+  color: var(--text-muted);
 }
 
-.activity-stats-row .stat-count {
-    font-size: 1.5rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    line-height: 1.2;
+/* --- Filter bar ---------------------------------------------------------
+   Seven tabs is more than a narrow canvas can hold, and .seg-tabs already
+   scrolls horizontally with its scrollbar hidden. What it needs here is
+   permission to shrink: as a flex item it defaults to min-content, so without
+   this the tab strip pushes the pills beside it off the card instead of
+   scrolling inside its own track. */
+
+.activity-filter .seg-tabs {
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 100%;
 }
 
-.activity-stats-row .stat-label {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    font-weight: 500;
+.activity-filter .seg-tab i {
+  font-size: 0.9em;
+  opacity: 0.85;
 }
 
-/* ==================== FILTER SECTION ==================== */
-.activity-filters {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+/* --- Card and rows ------------------------------------------------------ */
+
+.activity-card {
+  padding-bottom: var(--sp-6);
 }
 
-.activity-filter-tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
+.activity-list {
+  padding: var(--sp-4) var(--sp-4) 0;
 }
 
-.activity-filter-tabs .filter-tab {
-    padding: 0.5rem 1.25rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface-1);
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
+/* The slot here holds a page counter and the search in force, so it takes the
+   counter treatment: one line, tabular figures, and an ellipsis rather than a
+   card head that grows sideways when someone searches for something long. The
+   shared rule stays neutral because other screens wrap a sentence into it. */
+.activity-card .card-note {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
-.activity-filter-tabs .filter-tab:hover {
-    background: var(--surface-2);
-    color: var(--text-2);
-    border-color: var(--border-strong);
+/* Fixed tracks rather than `auto`, because .data-rows is a grid of grids —
+   each row sizes its own columns, so an `auto` type column would sit at a
+   different offset on every row and there would be nothing to scan down. */
+.activity-card .data-row {
+  grid-template-columns: 36px minmax(0, 1fr) 124px 92px;
 }
 
-.activity-filter-tabs .filter-tab.active {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    border-color: var(--primary-color);
-    box-shadow: var(--elev-2);
+/* `start` keeps each pill only as wide as its own label inside its track. */
+.activity-card .data-row .type-pill {
+  justify-self: start;
 }
 
-.activity-filter-controls {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    flex-wrap: wrap;
+/* An audit row is a statement, not a link: there is nothing behind it to open.
+   So it takes none of .data-row's hover affordance — only enough tint to keep
+   the eye on one line while reading across it. */
+.activity-card .data-row:hover {
+  background: var(--surface-2);
 }
 
-.activity-filters .filter-select {
-    padding: 0.55rem 2rem 0.55rem 0.85rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-body);
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-2);
-    cursor: pointer;
-    min-width: 150px;
-    appearance: auto;
-    transition: all 0.2s ease;
+/* --- The sentence -------------------------------------------------------
+   Actor, verb and object were a column each in the old table, with the object
+   truncated at 25 characters in Python — so the three halves of one statement
+   were read across three tracks and the half saying *what it happened to* was
+   the half that got cut. They are one line now, and the object gets the meta
+   line to itself. */
+
+.log-actor {
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
 }
 
-.activity-filters .filter-select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--focus-ring);
+/* The verb phrase is the writer's own words ("generated a blog as DRAFT"), so
+   it is set in the body colour rather than the strong one — the name in front
+   of it is what the eye is scanning for. */
+.log-action {
+  font-weight: var(--fw-regular);
+  color: var(--text-2);
 }
 
-.activity-filters .filter-search-wrap {
-    position: relative;
-    flex: 1;
-    min-width: 200px;
-    max-width: 320px;
+.log-target {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.activity-filters .filter-search-wrap i {
-    position: absolute;
-    left: 0.85rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-faint);
-    font-size: 0.85rem;
+/* Some entries genuinely have no object — connecting Analytics, say. Stated
+   rather than left as an empty line, so a blank meta row never reads as data
+   that failed to load. */
+.log-target.is-none {
+  color: var(--text-faint);
+  font-style: italic;
 }
 
-.activity-filters .filter-search {
-    width: 100%;
-    padding: 0.55rem 0.85rem 0.55rem 2.25rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-body);
-    font-size: 0.82rem;
-    color: var(--text-2);
-    transition: all 0.2s ease;
+/* --- Type pill ----------------------------------------------------------
+   Deliberately not one of §12's four status pills: those name where a post is
+   in its life, and none of these does. This says which part of the product an
+   entry belongs to, so it is a classification and takes the quieter treatment
+   — a tint and the icon that the matching filter tab carries, never a fill. */
+
+.type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
 }
 
-.activity-filters .filter-search:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--focus-ring);
-    background: var(--surface-1);
+.type-pill i {
+  font-size: 0.95em;
 }
 
-.activity-filters .filter-date-btn {
-    padding: 0.55rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-body);
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-2);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    white-space: nowrap;
+.type-pill.type-blog {
+  background: var(--info-soft);
+  color: var(--info);
 }
 
-.activity-filters .filter-date-btn:hover {
-    border-color: var(--primary-color);
-    color: var(--primary-color);
+.type-pill.type-user {
+  background: var(--success-soft);
+  color: var(--success);
 }
 
-.activity-filters .filter-date-btn.active {
-    background: var(--accent-tint);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
+.type-pill.type-comment {
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
-/* ==================== ACTIVITY TABLE ==================== */
-.activity-container {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    overflow: hidden;
+.type-pill.type-settings {
+  background: var(--surface-3);
+  color: var(--text-muted);
 }
 
-.activity-list-header {
-    display: flex;
-    padding: 1rem 2rem;
-    background: var(--bg-body);
-    border-bottom: 1px solid var(--border-subtle);
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--secondary-color);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+.type-pill.type-newsletter {
+  background: var(--accent-tint);
+  color: var(--accent);
 }
 
-.col-activity-user { flex: 2; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-activity-action { flex: 3; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-activity-target { flex: 2.5; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-activity-type { flex: 1.2; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-activity-time { flex: 1.5; min-width: 0; text-align: right; }
-
-/* ==================== ACTIVITY ROW ==================== */
-.activity-row {
-    display: flex;
-    align-items: center;
-    padding: 0.9rem 2rem;
-    border-bottom: 1px solid var(--border-subtle);
-    transition: all 0.15s ease;
+.type-pill.type-category {
+  background: var(--accent-soft);
+  color: var(--accent-on-soft);
 }
 
-.activity-row:hover {
-    background: var(--bg-body);
+.type-pill.type-other {
+  background: var(--surface-3);
+  color: var(--text-muted);
 }
 
-.activity-row:last-child {
-    border-bottom: none;
+/* --- Loading ------------------------------------------------------------
+   The list is replaced wholesale on every filter, so the wait needs to hold
+   the card's height rather than collapse it and bounce the pager up the page. */
+
+.activity-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  min-height: 320px;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
 }
 
-.activity-user-cell {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+.activity-loading .spinner-border {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-width: 2px;
+  color: var(--accent);
 }
 
-.activity-avatar {
+/* --- Responsive --------------------------------------------------------- */
+
+@media (max-width: 860px) {
+
+  /* The time goes before the type does. What kind of change something was is
+     what the reader came for; when it happened is already implied by where the
+     row sits in a list ordered by time. */
+  .activity-card .data-row {
+    grid-template-columns: 36px minmax(0, 1fr) 124px;
+  }
+
+  .activity-card .data-row .row-time {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+
+  /* Both trailing columns are gone, so the type moves into the meta line
+     beside the target — where it is a word rather than a pill, and costs a
+     track nothing. */
+  .activity-card .data-row {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: var(--sp-3);
+  }
+
+  .activity-card .row-mark {
     width: 32px;
     height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 500;
-    font-size: 0.8rem;
-    flex-shrink: 0;
-    color: var(--text-on-accent);
-    background: var(--accent);
+  }
+
+  .activity-card .data-row .type-pill {
+    display: none;
+  }
+
+  .activity-card .data-row .row-meta-type {
+    display: inline;
+  }
+
+  /* The sentence wraps rather than truncating: on a phone the row has no
+     second track to give it, and half a sentence is not a record. */
+  .activity-card .row-title {
+    white-space: normal;
+  }
 }
 
-.activity-user-name {
-    font-weight: 500;
-    font-size: 0.85rem;
-    color: var(--text-strong);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.activity-action-text {
-    font-size: 0.82rem;
-    color: var(--text-2);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.activity-target-text {
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.activity-time-text {
-    font-size: 0.78rem;
-    color: var(--text-faint);
-    text-align: right;
-    white-space: nowrap;
-}
-
-/* ==================== TYPE BADGES ==================== */
-.activity-type-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.25rem 0.65rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.68rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-}
-
-.badge-type-blog { background: var(--info-soft); color: var(--info); }
-.badge-type-user { background: var(--success-soft); color: var(--success); }
-.badge-type-comment { background: var(--warning-soft); color: var(--warning); }
-.badge-type-settings { background: var(--surface-3); color: var(--text-muted); }
-.badge-type-newsletter { background: var(--accent-tint); color: var(--accent-hover); }
-.badge-type-category { background: var(--accent-tint); color: var(--accent); }
-
-/* ==================== PAGINATION ==================== */
-.activity-pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 1.5rem 0 0.5rem;
-}
-
-.activity-pagination .page-btn {
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface-1);
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s ease;
-}
-
-.activity-pagination .page-btn:hover:not(.disabled):not(.active) {
-    background: var(--surface-2);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-}
-
-.activity-pagination .page-btn.active {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    border-color: var(--primary-color);
-    box-shadow: var(--elev-2);
-}
-
-.activity-pagination .page-btn.disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.activity-pagination .page-dots {
-    padding: 0 0.25rem;
-    color: var(--text-faint);
-}
-
-/* ==================== DATE MODAL ==================== */
-#dateRangeModal .custom-modal {
-    border: none;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--elev-3);
-    overflow: hidden;
-}
-
-#dateRangeModal .custom-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 1.75rem;
-    border-bottom: 1px solid var(--border-subtle);
-    background: var(--surface-1);
-}
-
-#dateRangeModal .custom-modal-title {
-    font-size: 1.05rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin: 0;
-}
-
-#dateRangeModal .custom-modal-title i {
-    color: var(--primary-color);
-}
-
-#dateRangeModal .custom-modal-body {
-    padding: 1.5rem 1.75rem;
-    background: var(--surface-1);
-}
-
-#dateRangeModal .custom-modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding: 1rem 1.75rem;
-    border-top: 1px solid var(--border-subtle);
-    background: var(--surface-2);
-}
-
-.date-range-field {
-    margin-bottom: 1rem;
-}
-
-.date-range-field .form-label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--text-2);
-    margin-bottom: 0.4rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.date-range-field .form-control {
-    width: 100%;
-    padding: 0.6rem 0.85rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    color: var(--text-1);
-    background: var(--surface-1);
-    transition: all 0.2s ease;
-}
-
-.date-range-field .form-control:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
-.date-range-presets {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-subtle);
-}
-
-.preset-btn {
-    padding: 0.45rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface-1);
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    text-align: center;
-}
-
-.preset-btn:hover {
-    background: var(--accent-tint);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-}
-
-/* ==================== MODAL BUTTONS ==================== */
-#dateRangeModal .btn-modal {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.55rem 1.15rem;
-    border-radius: var(--radius-sm);
-    font-weight: 500;
-    font-size: 0.82rem;
-    transition: all 0.2s ease;
-    border: none;
-    cursor: pointer;
-}
-
-#dateRangeModal .btn-modal-secondary {
-    background: var(--surface-1);
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-}
-
-#dateRangeModal .btn-modal-secondary:hover {
-    background: var(--surface-2);
-    color: var(--text-2);
-}
-
-#dateRangeModal .btn-modal-primary {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    box-shadow: var(--elev-2);
-}
-
-#dateRangeModal .btn-modal-primary:hover {
-    opacity: 0.9;
-}
-
-/* ==================== EMPTY STATE ==================== */
-.activity-empty {
-    padding: 3.5rem 1rem;
-    text-align: center;
-}
-
-.activity-empty i {
-    font-size: 2.5rem;
-    color: var(--text-faint);
-    margin-bottom: 0.75rem;
-    display: block;
-}
-
-.activity-empty p {
-    color: var(--text-faint);
-    font-weight: 500;
-    font-size: 0.9rem;
-    margin: 0;
-}
-
-/* ==================== RESPONSIVE ==================== */
-@media (max-width: 1200px) {
-    .activity-stats-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 1024px) {
-    .activity-list-header {
-        padding: 1rem 1.25rem;
-    }
-
-    .activity-row {
-        padding: 0.9rem 1.25rem;
-    }
-}
-
-@media (max-width: 768px) {
-    .activity-stats-row {
-        grid-template-columns: 1fr;
-    }
-
-    .activity-filters {
-        padding: 1rem;
-    }
-
-    .activity-list-header {
-        display: none;
-    }
-
-    .activity-row {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        padding: 1rem 1.25rem;
-    }
-
-    .col-activity-user { flex: 1 1 50%; }
-    .col-activity-action { flex: 1 1 100%; }
-    .col-activity-target { flex: 1 1 60%; }
-    .col-activity-type { flex: 0 0 auto; }
-    .col-activity-time { flex: 0 0 auto; text-align: left; }
-
-    .activity-filter-tabs {
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        padding-bottom: 0.5rem;
-    }
-
-    .activity-filter-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .activity-filters .filter-search-wrap {
-        max-width: none;
-    }
+/* Rendered on every row and revealed by the query above once the type column
+   has been dropped. Both are always in the markup — a class that is only
+   sometimes present cannot be switched on by a media query. */
+.row-meta-type {
+  display: none;
 }

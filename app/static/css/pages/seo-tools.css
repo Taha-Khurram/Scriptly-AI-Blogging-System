@@ -1,569 +1,920 @@
 /* ==========================================================================
-   SEO Tools Page Styles
+   SEO Tools — research keywords · score a draft · rewrite it for search
+
+   The screen composes from the dashboard's shared primitives (.surface-card,
+   .card-head, .select-pill, .app-btn, .app-field, .list-empty, .app-modal) and
+   adds only what is genuinely its own: the control row, the panel state
+   machine, the score head, the bare metrics, the bullet meters and the keyword
+   table.
+
+   The previous stylesheet restyled Bootstrap's own classes instead —
+   .form-control, .form-select, .btn-primary, .btn-success, .form-label — which
+   repainted every control on the page from a page stylesheet, and left the
+   markup carrying a grid (.row / .col-md-*) whose gutters no token controls.
+
+   Nothing here hardcodes a colour.
    ========================================================================== */
 
-/* Form Field Styles */
-.form-label {
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--primary-color);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 0.5rem;
+/* ==================== SHELL ==================== */
+
+.dashboard-main>.surface-card {
+    margin-bottom: var(--sp-5);
 }
 
-.form-control, .form-select {
-    border: 2px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 0.75rem 1rem;
-    font-size: 0.95rem;
-    color: var(--text-1);
-    background-color: var(--surface-2);
-    transition: all 0.2s ease;
+.dashboard-main>.surface-card:last-of-type {
+    margin-bottom: 0;
 }
 
-.form-control:hover, .form-select:hover {
-    border-color: var(--border-strong);
-    background-color: var(--surface-1);
+/* A note under a card title. Sentence case, muted, and it wraps — it carries
+   what the screen does, which a title has no room for. Beside a title (rather
+   than under it) it is a short right-aligned status line instead. */
+.card-note {
+    flex-basis: 100%;
+    margin: 0;
+    max-width: 62ch;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
 }
 
-.form-control:focus, .form-select:focus {
-    border-color: var(--primary-color);
-    background-color: var(--surface-1);
-    box-shadow: 0 0 0 4px var(--focus-ring);
-    outline: none;
+.card-head:not(.is-stacked) .card-note {
+    flex-basis: auto;
+    text-align: right;
 }
 
-.form-control::placeholder {
-    color: var(--text-faint);
-    font-weight: 400;
-}
+/* ==================== CONTROL ROW ==================== */
+/* One row: the thing you are acting on, the parameter, then the verbs. It wraps
+   before it shrinks, so the draft title never collapses to an ellipsis while
+   the region pill keeps its full width. */
 
-textarea.form-control {
-    min-height: 180px;
-    line-height: 1.6;
-    font-family: 'Inter', system-ui, sans-serif;
-}
-
-.form-select {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%234318FF' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
-    background-size: 16px 12px;
-    cursor: pointer;
-}
-
-/* Card Styles */
-.seo-card {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    padding: 2rem;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 1.5rem;
-    border: 1px solid var(--border-subtle);
-}
-
-.seo-card h3 {
-    color: var(--text-primary);
-    margin-bottom: 0.5rem;
+.seo-controls {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 1.25rem;
-    font-weight: 500;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--sp-3);
+    padding: var(--sp-5) var(--sp-6) var(--sp-6);
 }
 
-.seo-card h3 i {
-    color: var(--primary-color);
-    font-size: 1.1rem;
-    padding: 0.5rem;
-    background: var(--accent-tint);
-    border-radius: var(--radius-sm);
+.seo-picker {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-width: 0;
 }
 
-.seo-card > p.text-muted {
-    margin-bottom: 1.5rem;
+.seo-picker-grow {
+    flex: 1 1 260px;
+}
+
+.seo-label {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
     color: var(--text-muted);
-    font-size: 0.9rem;
 }
 
-/* Button Styles */
-.btn-primary {
-    background: var(--accent);
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: var(--radius-sm);
-    font-weight: 500;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
-    box-shadow: var(--elev-2);
+/* The pill states its own current value, so the chosen draft is readable
+   without opening anything. It fills its column and truncates, because a blog
+   title is long and the caret must stay pinned to the right edge. */
+.seo-picker .filter-pill {
+    width: 100%;
+    justify-content: flex-start;
+    height: 42px;
 }
 
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--elev-2);
+.seo-picker .filter-pill-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.btn-outline-primary {
-    border: 2px solid var(--primary-color);
-    color: var(--primary-color);
-    padding: 0.7rem 1.5rem;
-    border-radius: var(--radius-sm);
-    font-weight: 500;
-    font-size: 0.9rem;
-    background: transparent;
-    transition: all 0.2s ease;
+.seo-picker .filter-pill-caret {
+    margin-left: auto;
 }
 
-.btn-outline-primary:hover {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    transform: translateY(-2px);
+/* The draft menu is as wide as its trigger — a list of blog titles in a 220px
+   popover is a list of ellipses. */
+.seo-picker-grow .menu {
+    right: 0;
+    min-width: 100%;
 }
 
-.btn-outline-secondary {
-    border: 2px solid var(--border);
-    color: var(--text-muted);
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-sm);
-    font-weight: 500;
-    font-size: 0.85rem;
-    background: var(--surface-1);
-    transition: all 0.2s ease;
-}
-
-.btn-outline-secondary:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-2);
-    color: var(--text-2);
-}
-
-.btn-success {
-    background: var(--success);
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-sm);
-    font-weight: 500;
-    font-size: 0.85rem;
-    box-shadow: var(--elev-2);
-}
-
-/* Row Spacing */
-.row.g-3 {
-    margin-bottom: 0.5rem;
-}
-
-/* Divider */
-hr.my-4 {
-    border: none;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--border), transparent);
-    margin: 2rem 0;
-}
-
-/* Keyword Tag Styles */
-.keyword-tag {
-    display: inline-flex;
+/* The three verbs travel together: they wrap as a group rather than leaving one
+   button orphaned under the pickers. */
+.seo-verbs {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: var(--accent-tint);
-    border-radius: var(--radius-lg);
-    font-size: 0.9rem;
-    margin: 0.25rem;
-    transition: all 0.2s ease;
+    gap: var(--sp-2);
 }
 
-.keyword-tag:hover {
-    background: var(--accent-tint);
+.seo-refresh {
+    width: 42px;
+    padding: 0;
+    justify-content: center;
 }
 
-.keyword-tag.easy {
-    background: var(--success-soft);
-    color: var(--success-color);
+/* ==================== PANEL STATE ==================== */
+/* One attribute decides which of empty / loading / error / analysis / keywords
+   / comparison is on screen. The old page ran three sibling sections toggled
+   with inline `display`, so every path had to remember to hide the other two —
+   and there was no error state at all: a failed run alerted once and returned
+   the panel to a blank that looked exactly like a run you had never started. */
+
+.seo-body {
+    padding: var(--sp-5) var(--sp-6) var(--sp-6);
 }
 
-.keyword-tag.medium {
-    background: var(--warning-soft);
-    color: var(--warning-color);
+.seo-state {
+    display: none;
 }
 
-.keyword-tag.hard {
+.seo-body[data-state="empty"] .seo-state[data-for="empty"],
+.seo-body[data-state="loading"] .seo-state[data-for="loading"],
+.seo-body[data-state="error"] .seo-state[data-for="error"],
+.seo-body[data-state="analysis"] .seo-state[data-for="analysis"],
+.seo-body[data-state="keywords"] .seo-state[data-for="keywords"],
+.seo-body[data-state="comparison"] .seo-state[data-for="comparison"] {
+    display: block;
+    animation: fadeInUp var(--dur-base) var(--ease-standard) backwards;
+}
+
+.seo-error .list-empty-icon {
     background: var(--danger-soft);
     color: var(--danger);
 }
 
-.difficulty-badge {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
-    font-weight: 500;
+.seo-error p {
+    color: var(--text-2);
 }
 
-/* Score Circle */
-.score-circle {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
+/* --- The agent-working surface ----------------------------------------- */
+
+.seo-working {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    font-weight: bold;
-    margin: 0 auto 1rem;
+    gap: var(--sp-3);
+    padding: var(--sp-10) var(--sp-4);
+    text-align: center;
 }
 
-.score-circle.high {
-    background: var(--success-soft);
-    color: var(--success-color);
-    border: 3px solid var(--success-color);
-}
-
-.score-circle.medium {
-    background: var(--warning-soft);
-    color: var(--warning-color);
-    border: 3px solid var(--warning-color);
-}
-
-.score-circle.low {
-    background: var(--danger-soft);
-    color: var(--danger);
-    border: 3px solid var(--danger);
-}
-
-/* SEO Checklist */
-.seo-checklist {
-    list-style: none;
-    padding: 0;
-}
-
-.seo-checklist li {
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-subtle);
-    display: flex;
+.seo-working-badge {
+    display: inline-flex;
     align-items: center;
-    gap: 0.75rem;
-}
-
-.seo-checklist li:last-child {
-    border: none;
-}
-
-.check-icon {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-}
-
-.check-icon.pass {
-    background: var(--success-soft);
-    color: var(--success-color);
-}
-
-.check-icon.fail {
-    background: var(--danger-soft);
-    color: var(--danger);
-}
-
-.region-select {
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-1);
-    font-size: 0.9rem;
-}
-
-#results-section {
-    display: none;
-}
-
-/* SEO Loader */
-.seo-loader-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: var(--surface-1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.seo-loader-container.d-none {
-    display: none !important;
-}
-
-.seo-loader-container .shadow-card {
-    box-shadow: var(--elev-2);
-}
-
-/* Comparison Styles */
-.comparison-container {
-    display: none;
-}
-
-.comparison-card {
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-5);
+    border-radius: var(--radius-pill);
     background: var(--surface-2);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    margin-bottom: 1rem;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
 }
 
-.comparison-row {
+.seo-working-badge .spinner-border {
+    width: 16px;
+    height: 16px;
+    color: var(--accent);
+}
+
+.seo-working-note {
+    margin: 0;
+    max-width: 34rem;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-faint);
+}
+
+.seo-working-bar {
+    width: min(320px, 100%);
+    height: 4px;
+    margin-top: var(--sp-2);
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    overflow: hidden;
+}
+
+/* Names what was actually looked up, so a result set is never orphaned from its
+   query — you can leave the tab and come back and still know which draft and
+   which region these figures belong to. */
+.seo-source {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-subtle);
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-4);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
 }
 
-.comparison-row:last-child {
-    border-bottom: none;
+.seo-source i {
+    color: var(--accent);
 }
 
-.comparison-label {
-    font-weight: 500;
-    color: var(--text-primary);
-    flex: 1;
+/* ==================== SCORE HEAD ==================== */
+
+.seo-result-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-5);
+    padding: var(--sp-5) var(--sp-6);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    margin-bottom: var(--sp-5);
 }
 
-.comparison-before, .comparison-after {
-    flex: 1;
-    text-align: center;
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-sm);
+.seo-score {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
-.comparison-before {
+.seo-score-label {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+/* Proportional figures, not tabular: equal-width digits give every glyph the
+   width of a 0, which reads loose at display size. Tabular is for columns that
+   align vertically. */
+.seo-score-value {
+    font-size: var(--fs-display);
+    font-weight: var(--fw-regular);
+    line-height: 1;
+    color: var(--text-strong);
+    letter-spacing: -0.02em;
+}
+
+.seo-score-from {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+/* Direction is carried by the arrow glyph and the sign as well as by colour —
+   the status hues never mean anything on their own. */
+.seo-score-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px var(--sp-2);
+    border-radius: var(--radius-pill);
+    font-weight: var(--fw-medium);
+}
+
+.seo-score-delta.is-up {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.seo-score-delta.is-down {
     background: var(--danger-soft);
     color: var(--danger);
 }
 
-.comparison-after {
-    background: var(--success-soft);
-    color: var(--success-color);
+.seo-score-delta.is-flat {
+    background: var(--surface-3);
+    color: var(--text-muted);
 }
 
-.score-comparison {
+.seo-grade {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 2rem;
-    padding: 2rem;
-}
-
-.score-box {
-    text-align: center;
-}
-
-.score-box .score-value {
-    font-size: 3rem;
-    font-weight: bold;
-}
-
-.score-box.before .score-value {
-    color: var(--danger);
-}
-
-.score-box.after .score-value {
-    color: var(--success-color);
-}
-
-.score-arrow {
-    font-size: 2rem;
-    color: var(--primary-color);
-}
-
-.improvement-badge {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-lg);
-    font-weight: bold;
-    font-size: 1.1rem;
-}
-
-.improvement-badge.positive {
-    background: var(--success-soft);
-    color: var(--success-color);
-}
-
-.improvement-badge.negative {
-    background: var(--danger-soft);
-    color: var(--danger);
-}
-
-.changes-list {
-    list-style: none;
-    padding: 0;
-}
-
-.changes-list li {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding: 0.75rem;
+    gap: 2px;
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--radius-md);
     background: var(--surface-1);
-    border-radius: var(--radius-sm);
-    margin-bottom: 0.5rem;
-    border-left: 3px solid var(--primary-color);
 }
 
-.changes-list li i {
-    color: var(--primary-color);
-    margin-top: 0.2rem;
+.seo-grade-letter {
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-medium);
+    line-height: 1;
 }
 
-.recommendation-item {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border-subtle);
+.seo-grade-caption {
+    font-size: var(--fs-2xs);
+    color: var(--text-muted);
 }
 
-.recommendation-item:last-child {
-    border-bottom: none;
+.seo-grade.grade-a .seo-grade-letter {
+    color: var(--success);
 }
 
-/* Original Analysis Section */
-#original-analysis-section {
-    display: none;
+.seo-grade.grade-b .seo-grade-letter {
+    color: var(--info);
 }
 
-/* Custom Confirmation Modal */
-.confirm-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
+.seo-grade.grade-c .seo-grade-letter {
+    color: var(--warning);
+}
+
+.seo-grade.grade-d .seo-grade-letter,
+.seo-grade.grade-f .seo-grade-letter {
+    color: var(--danger);
+}
+
+/* The first action in the head sits hard right; anything after it follows on
+   its heels rather than being pushed to the far edge as well. */
+.seo-head-action {
+    margin-left: auto;
+}
+
+/* ==================== BARE METRICS ==================== */
+/* Not .stat-card: a stat tile promises label · value · delta · trend, and these
+   figures arrive with neither a comparison nor a series. They say what they
+   can — the figure, its unit, and a meter where the figure is a ratio. */
+
+.seo-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-5);
+}
+
+.seo-metrics.is-tight {
+    margin-bottom: 0;
+}
+
+.seo-metric {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-4) var(--sp-5);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+
+.seo-metric-label {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.seo-metric-value {
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-medium);
+    line-height: 1.15;
+    color: var(--text-strong);
+}
+
+.seo-metric.is-missing .seo-metric-value {
+    color: var(--text-faint);
+    font-weight: var(--fw-regular);
+}
+
+/* A keyword is prose, not a figure: at --fs-h2 a four-word phrase wraps into a
+   headline and shouts down the numbers beside it. */
+.seo-metric.is-text .seo-metric-value {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+}
+
+.seo-metric-note {
+    font-size: var(--fs-2xs);
+    color: var(--text-faint);
+}
+
+/* Both halves declare `display`. They are spans, and an inline box drops width
+   and height on the floor — which is exactly how the shared .stat-meter-fill
+   once shipped empty at every value. Relying on a flex parent to blockify them
+   works until someone changes the parent. */
+.seo-metric-track {
+    display: block;
+    height: 5px;
+    margin-top: var(--sp-2);
+    border-radius: var(--radius-pill);
+    background: var(--accent-tint);
+    overflow: hidden;
+}
+
+.seo-metric-fill {
+    display: block;
     height: 100%;
-    background: var(--scrim);
-    backdrop-filter: blur(4px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 1100;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.confirm-modal-overlay.active {
-    display: flex;
-    opacity: 1;
-}
-
-.confirm-modal-content {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg, 16px);
-    padding: 2rem;
-    max-width: 400px;
-    width: 90%;
-    text-align: center;
-    box-shadow: var(--elev-3);
-    transform: scale(0.9);
-    transition: transform 0.2s ease;
-}
-
-.confirm-modal-overlay.active .confirm-modal-content {
-    transform: scale(1);
-}
-
-.confirm-modal-icon {
-    width: 60px;
-    height: 60px;
+    border-radius: var(--radius-pill);
     background: var(--accent);
-    border-radius: 50%;
+    transition: width var(--dur-slow) var(--ease-standard);
+}
+
+/* ==================== BREAKDOWN METERS ==================== */
+/* A bullet chart per category. On the analysis panel the bar is the score as it
+   stands; on the comparison panel the bar is the score now and the tick is
+   where it started. Two stacked fills would hide the smaller of the pair
+   whichever way the run went, and a tick reads the same in both directions. */
+
+.seo-breakdown {
+    margin-bottom: var(--sp-6);
+}
+
+.seo-subhead {
     display: flex;
     align-items: center;
-    justify-content: center;
-    margin: 0 auto 1.25rem;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-4);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
 }
 
-.confirm-modal-icon i {
-    font-size: 1.5rem;
-    color: var(--text-on-accent);
-}
-
-.confirm-modal-title {
-    font-size: 1.25rem;
-    font-weight: 500;
-    color: var(--text-primary, var(--text-strong));
-    margin-bottom: 0.5rem;
-}
-
-.confirm-modal-message {
+.seo-subhead i {
     color: var(--text-muted);
-    font-size: 0.95rem;
-    margin-bottom: 1.5rem;
-    line-height: 1.5;
 }
 
-.confirm-modal-actions {
+.seo-meters {
+    display: grid;
+    gap: var(--sp-3);
+}
+
+.seo-meter {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr) 140px;
+    align-items: center;
+    gap: var(--sp-4);
+}
+
+.seo-meter-label {
     display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-}
-
-.confirm-modal-actions .btn {
-    min-width: 120px;
-    padding: 0.625rem 1.25rem;
-    font-weight: 500;
-    border-radius: var(--radius-sm);
-}
-
-.confirm-modal-actions .btn-outline-secondary {
-    border: 2px solid var(--border);
-    color: var(--text-muted);
-    background: var(--surface-1);
-}
-
-.confirm-modal-actions .btn-outline-secondary:hover {
-    background: var(--surface-2);
-    border-color: var(--border-strong);
+    flex-direction: column;
+    font-size: var(--fs-sm);
     color: var(--text-2);
 }
 
-.confirm-modal-actions .btn-primary {
-    background: var(--accent);
-    border: none;
-    box-shadow: var(--elev-2);
+/* The weight is what makes a category worth fixing — 25% of the score moves
+   five times as far as 5% does for the same effort. */
+.seo-meter-weight {
+    font-size: var(--fs-2xs);
+    color: var(--text-faint);
 }
 
-.confirm-modal-actions .btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--elev-2);
-}
-
-/* Copy Toast Notification */
-.copy-toast {
-    position: fixed;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%) translateY(100px);
-    background: var(--success);
-    color: var(--text-on-accent);
-    padding: 0.875rem 1.5rem;
+/* No `overflow: hidden` — the tick deliberately overhangs the track, and
+   clipping it would take its ring with it. */
+.seo-meter-track {
+    display: block;
+    position: relative;
+    height: 8px;
     border-radius: var(--radius-pill);
+    background: var(--accent-tint);
+}
+
+.seo-meter-fill {
+    display: block;
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    transition: width var(--dur-slow) var(--ease-standard);
+}
+
+/* The reference mark, and it can land anywhere on the bar. A single flat colour
+   fails on one side or the other — over the --accent fill in dark mode the
+   accent is itself a pale blue, so a light neutral all but vanishes. It takes
+   the sparkline dot's trick instead: a strong core inside a ring of the surface
+   colour, which separates it from whatever it happens to sit on. */
+.seo-meter-tick {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--text-strong);
+    box-shadow: 0 0 0 1px var(--surface-1);
+    transform: translateX(-1px);
+}
+
+.seo-meter-figures {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
-    font-weight: 500;
-    font-size: 0.9rem;
-    box-shadow: var(--elev-3);
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    z-index: 1200;
+    justify-content: flex-end;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
 }
 
-.copy-toast.show {
-    transform: translateX(-50%) translateY(0);
-    opacity: 1;
-    visibility: visible;
+.seo-meter-figures strong {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
 }
 
-.copy-toast i {
-    font-size: 1.1rem;
+.seo-meter-gain.is-up {
+    color: var(--success);
+}
+
+.seo-meter-gain.is-down {
+    color: var(--danger);
+}
+
+/* ==================== LISTS ==================== */
+
+.seo-lists {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--sp-4);
+}
+
+.seo-list-card {
+    padding: var(--sp-5);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+
+.seo-list {
+    display: grid;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.seo-list li {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: var(--sp-3);
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.seo-list li>i {
+    margin-top: 2px;
+    font-size: 14px;
+}
+
+.seo-list-done li>i {
+    color: var(--success);
+}
+
+.seo-list-todo li>i {
+    color: var(--warning);
+}
+
+/* Severity is a word before it is a hue: the glyph and the label both say it,
+   so nothing depends on telling amber from red. */
+.seo-issue-severity {
+    display: block;
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.seo-list li.is-high>i,
+.seo-list li.is-high .seo-issue-severity {
+    color: var(--danger);
+}
+
+.seo-list li.is-medium>i,
+.seo-list li.is-medium .seo-issue-severity {
+    color: var(--warning);
+}
+
+.seo-list li.is-low>i,
+.seo-list li.is-low .seo-issue-severity {
+    color: var(--info);
+}
+
+.seo-change-detail {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+.seo-change-detail strong {
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+}
+
+/* ==================== PRIMARY KEYWORD ==================== */
+
+.seo-primary {
+    display: grid;
+    gap: var(--sp-4);
+    padding: var(--sp-5) var(--sp-6);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    margin-bottom: var(--sp-6);
+}
+
+.seo-primary-lead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-3);
+}
+
+.seo-primary-label {
+    flex-basis: 100%;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.seo-primary-value {
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.seo-primary-note {
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+.seo-primary .seo-metric {
+    background: var(--surface-1);
+}
+
+/* ==================== KEYWORD TABLE ==================== */
+/* It sheds nothing and scrolls inside its own container instead: the whole
+   point of the table is comparing columns, so dropping one at a narrow width
+   would drop the comparison. */
+
+.seo-table-scroll {
+    overflow-x: auto;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+
+.seo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-sm);
+}
+
+.seo-table th {
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--surface-3);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.seo-table td {
+    padding: var(--sp-3) var(--sp-4);
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-1);
+    font-variant-numeric: tabular-nums;
+}
+
+.seo-table tbody tr:hover td {
+    background: var(--surface-3);
+}
+
+.seo-table .is-num {
+    text-align: right;
+}
+
+.seo-table-keyword {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    font-variant-numeric: normal;
+    min-width: 12rem;
+}
+
+.seo-table-empty td {
+    padding: var(--sp-10) var(--sp-4);
+    text-align: center;
+    color: var(--text-faint);
+}
+
+/* Difficulty says the word as well as showing the hue, and carries a track so
+   the number has a scale to sit against. */
+.seo-difficulty {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    white-space: nowrap;
+}
+
+.seo-difficulty-track {
+    display: block;
+    width: 44px;
+    height: 5px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-4);
+    overflow: hidden;
+}
+
+.seo-difficulty-fill {
+    display: block;
+    height: 100%;
+    border-radius: var(--radius-pill);
+}
+
+.seo-difficulty-word {
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+}
+
+.seo-difficulty.is-easy .seo-difficulty-fill {
+    background: var(--success);
+}
+
+.seo-difficulty.is-easy .seo-difficulty-word {
+    color: var(--success);
+}
+
+.seo-difficulty.is-medium .seo-difficulty-fill {
+    background: var(--warning);
+}
+
+.seo-difficulty.is-medium .seo-difficulty-word {
+    color: var(--warning);
+}
+
+.seo-difficulty.is-hard .seo-difficulty-fill {
+    background: var(--danger);
+}
+
+.seo-difficulty.is-hard .seo-difficulty-word {
+    color: var(--danger);
+}
+
+.seo-comp {
+    display: inline-block;
+    padding: 2px var(--sp-3);
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    text-transform: capitalize;
+}
+
+.seo-comp.is-low {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.seo-comp.is-medium {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+.seo-comp.is-high {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+/* Permanently visible rather than hover-revealed: a hover-only control is
+   unreachable on touch, and the whole row used to be a click target with
+   nothing on screen to say so. */
+.seo-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-1) var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-1);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.seo-copy:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.seo-copy:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+/* ==================== COMPARISON ==================== */
+
+.seo-outcome {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
+    padding: var(--sp-5);
+    border: 1px solid var(--success-border);
+    border-radius: var(--radius-md);
+    background: var(--success-soft);
+    margin-bottom: var(--sp-5);
+}
+
+.seo-outcome-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: var(--radius-pill);
+    background: var(--surface-1);
+    color: var(--success);
+    font-size: 20px;
+}
+
+.seo-outcome-title {
+    margin: 0 0 2px;
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.seo-outcome-copy p {
+    margin: 0;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.seo-titles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-6);
+}
+
+.seo-copy-field {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+.seo-copy-field input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.seo-copy-field .app-btn {
+    flex-shrink: 0;
+    width: 42px;
+    padding: 0;
+    justify-content: center;
+}
+
+/* ==================== CONFIRM MODAL ==================== */
+
+.seo-confirm-target {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.seo-confirm-copy {
+    margin: 0;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.seo-confirm-copy strong {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 900px) {
+
+    /* The figures column carries the numbers, so it survives; the label
+       collapses to two lines before the track loses its scale. */
+    .seo-meter {
+        grid-template-columns: 108px minmax(0, 1fr);
+        row-gap: var(--sp-2);
+    }
+
+    .seo-meter-figures {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 700px) {
+    .seo-controls,
+    .seo-body {
+        padding-left: var(--sp-4);
+        padding-right: var(--sp-4);
+    }
+
+    .seo-verbs {
+        width: 100%;
+    }
+
+    .seo-verbs .app-btn:not(.seo-refresh) {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .seo-result-head {
+        padding: var(--sp-4);
+        gap: var(--sp-4);
+    }
+
+    /* Stacked, the action can no longer be pushed right — it becomes a full
+       width row of its own instead of a 40px stub beside the grade. */
+    .seo-head-action {
+        margin-left: 0;
+        width: 100%;
+        justify-content: center;
+    }
 }

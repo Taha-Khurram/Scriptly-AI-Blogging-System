@@ -1,203 +1,311 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Leads | ScriptlyAI{% endblock %}
+{% block title %}Leads | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/leads.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/leads.css') }}?v=2">
 {% endblock %}
 
+{#
+  One row definition, used for the server-rendered first page. leads.js builds
+  the identical structure for every page, filter and search after it — the two
+  have to stay in step, so both are kept deliberately small.
+
+  Every field the message dialog needs rides on the row as a data attribute.
+  The old page published the whole first page as a `window.__initialLeads`
+  global from a <script> in the extra_js block and kept a parallel `leadsCache`
+  object in JS; the dialog read from that instead of from the DOM, so a row
+  rendered by one path and a dialog opened from the other could disagree.
+#}
+{% macro lead_row(lead) %}
+{% set unread = not lead.read %}
+{% set name = lead.name or 'Unknown sender' %}
+{% set subject = lead.subject or '' %}
+<div class="data-row{{ ' is-unread' if unread }}" id="lead-row-{{ lead.id }}" data-id="{{ lead.id }}"
+  data-name="{{ name }}" data-email="{{ lead.email or '' }}" data-subject="{{ subject }}"
+  data-message="{{ lead.message or '' }}" data-when="{{ lead.created_at or '' }}"
+  data-read="{{ 'false' if unread else 'true' }}"
+  data-search="{{ (name ~ ' ' ~ (lead.email or '') ~ ' ' ~ subject) | lower }}">
+
+  <span class="row-mark" aria-hidden="true">{{ (name | trim)[0] | upper if name | trim else '?' }}</span>
+
+  <button type="button" class="row-open" data-action="view" title="Open the message from {{ name }}">
+    <span class="row-title{{ ' is-placeholder' if not subject }}">{{ subject or 'No subject' }}</span>
+    <span class="row-meta">
+      <span>{{ name }}</span>
+      {% if lead.email %}
+      <span class="row-sep" aria-hidden="true">·</span>
+      <span>{{ lead.email }}</span>
+      {% endif %}
+      {% if lead.created_at %}
+      <span class="row-sep row-meta-when" aria-hidden="true">·</span>
+      <time class="row-meta-when" datetime="{{ lead.created_at }}" data-relative>{{ lead.created_at[:10] }}</time>
+      {% endif %}
+      {% if unread %}
+      <span class="row-sep row-meta-unread" aria-hidden="true">·</span>
+      <span class="row-meta-unread">Unread</span>
+      {% endif %}
+    </span>
+  </button>
+
+  {% if unread %}
+  <span class="status-pill status-unread">Unread</span>
+  {% else %}
+  {# Holds the track open so the date column lines up down the page. Both
+     blanks carry a class rather than being bare spans, because the media
+     queries have to be able to drop them along with the cells they stand in
+     for — display:none removes a grid item from placement, an empty span
+     does not, and the row's trail would wrap onto a second line. #}
+  <span class="status-pill-blank"></span>
+  {% endif %}
+
+  {% if lead.created_at %}
+  <time class="row-time" datetime="{{ lead.created_at }}" data-relative>{{ lead.created_at[:10] }}</time>
+  {% else %}
+  <span class="row-time-blank"></span>
+  {% endif %}
+
+  <div class="row-trail">
+    {# A button rather than an <a href="mailto:">, so the address and the
+       "Re: …" subject are assembled in one place — leads.js — instead of once
+       here and again there with different escaping. #}
+    {% if lead.email %}
+    <button type="button" class="row-action" data-action="reply" title="Reply by email"
+      aria-label="Reply to {{ name }} by email">
+      <i class="bi bi-reply" aria-hidden="true"></i>
+    </button>
+    {% endif %}
+
+    <div class="dropdown">
+      <button type="button" class="btn-dropdown-trigger" data-bs-toggle="dropdown" aria-expanded="false"
+        aria-label="More actions for the message from {{ name }}">
+        <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><button type="button" class="dropdown-item" data-action="view">
+            <i class="bi bi-envelope-open" aria-hidden="true"></i> Open message
+          </button></li>
+        {% if lead.email %}
+        <li><button type="button" class="dropdown-item" data-action="reply">
+            <i class="bi bi-reply" aria-hidden="true"></i> Reply by email
+          </button></li>
+        <li><button type="button" class="dropdown-item" data-action="copy-email">
+            <i class="bi bi-envelope" aria-hidden="true"></i> Copy email address
+          </button></li>
+        {% endif %}
+        {% if unread %}
+        <li><button type="button" class="dropdown-item" data-action="mark-read">
+            <i class="bi bi-check2-all" aria-hidden="true"></i> Mark as read
+          </button></li>
+        {% endif %}
+        <li>
+          <hr class="dropdown-divider">
+        </li>
+        <li><button type="button" class="dropdown-item text-danger" data-action="delete">
+            <i class="bi bi-trash3" aria-hidden="true"></i> Delete lead
+          </button></li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
 {% block content %}
+{% set s = stats or {} %}
+{% set total = s.total | default(0) | int %}
+{% set unread = s.unread | default(0) | int %}
+{% set read = s.read | default(0) | int %}
+
 <div class="dashboard-layout">
 
   {% include 'partials/sidebar.html' %}
 
+  {#
+     Both dialogs and the page script live inside .dashboard-main, like every
+     other screen. PJAX swaps only that element's innerHTML — the two overlays
+     and the initial-data <script> used to sit outside the layout wrapper, so
+     after any in-app navigation the message dialog was gone from the document
+     and clicking a lead did nothing until a hard reload.
+  #}
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <div class="header-welcome-text">Administration</div>
-        <h1 class="header-title">Leads</h1>
-      </div>
-    </header>
 
-    <div class="dashboard-content-wrapper animate-fade-up">
+    {# search_id is what leads.js binds its debounced query to, so the header
+       field *is* this page's search rather than a second one below it.
+       Filtering here hits the API, which searches name, email and subject
+       across every page rather than only the rows on screen. #}
+    {% call page_header(
+    title='Leads',
+    eyebrow='Contact form',
+    search=true,
+    search_placeholder='Search leads',
+    search_id='leadsSearch') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    {% endcall %}
 
-      <!-- Stats Cards -->
-      <div class="leads-stats-row">
-        <div class="stat-card">
-          <div class="stat-icon stat-total"><i class="bi bi-person-lines-fill"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="stat-total">{{ stats.total }}</span>
-            <span class="stat-label">Total Leads</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-unread"><i class="bi bi-envelope-fill"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="stat-unread">{{ stats.unread }}</span>
-            <span class="stat-label">Unread</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-read"><i class="bi bi-envelope-open-fill"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="stat-read">{{ stats.read }}</span>
-            <span class="stat-label">Read</span>
-          </div>
-        </div>
+    <div class="leads-stats reveal">
+      <div class="stat-card">
+        <span class="stat-icon stat-all"><i class="bi bi-inbox" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">{{ 'Lead' if total == 1 else 'Leads' }}</span>
+          <span class="stat-count" data-stat-total>{{ total }}</span>
+        </span>
       </div>
 
-      <!-- Filter Bar -->
-      <div class="leads-filters">
-        <div class="leads-filter-tabs">
-          <button class="filter-tab active" data-filter="all">All</button>
-          <button class="filter-tab" data-filter="unread"><i class="bi bi-envelope-fill"></i> Unread</button>
-          <button class="filter-tab" data-filter="read"><i class="bi bi-envelope-open"></i> Read</button>
-        </div>
-        <div class="leads-filter-controls">
-          <div class="filter-search-wrap">
-            <i class="bi bi-search"></i>
-            <input type="text" id="searchInput" class="filter-search" placeholder="Search leads...">
-          </div>
-        </div>
+      <div class="stat-card">
+        <span class="stat-icon stat-new"><i class="bi bi-envelope-fill" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Unread</span>
+          <span class="stat-count" data-stat-unread>{{ unread }}</span>
+        </span>
+        {# A ratio, not a series, so this slot is a meter: how much of the inbox
+           is still waiting on you. It is the one number on this screen that
+           implies an action. #}
+        <span class="stat-meter" data-meter{{ ' hidden' if total == 0 else '' }}>
+          <span class="stat-meter-track">
+            <span class="stat-meter-fill" data-meter-fill
+              style="width: {{ (unread * 100 // total) if total else 0 }}%"></span>
+          </span>
+          <span class="stat-meter-note" data-meter-note>
+            {{ (unread * 100 // total) if total else 0 }}% of the inbox
+          </span>
+        </span>
       </div>
 
-      <!-- Leads List -->
-      <div class="leads-container">
-        <div class="leads-list-header">
-          <div class="col-lead-status"></div>
-          <div class="col-lead-name">Name</div>
-          <div class="col-lead-email">Email</div>
-          <div class="col-lead-subject">Subject</div>
-          <div class="col-lead-date">Date</div>
-          <div class="col-lead-actions">Actions</div>
-        </div>
-        <div id="leadsList">
+      <div class="stat-card">
+        <span class="stat-icon stat-seen"><i class="bi bi-envelope-open" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Read</span>
+          <span class="stat-count" data-stat-read>{{ read }}</span>
+        </span>
+      </div>
+    </div>
+
+    <section class="surface-card filter-bar leads-filter reveal" style="--reveal-delay: 60ms"
+      aria-label="Filter leads">
+      <div class="seg-tabs" role="group" aria-label="Filter by state">
+        <button type="button" class="seg-tab is-active" data-filter="all">
+          All <span class="seg-count" data-count-all>{{ total }}</span>
+        </button>
+        <button type="button" class="seg-tab" data-filter="unread">
+          Unread <span class="seg-count" data-count-unread>{{ unread }}</span>
+        </button>
+        <button type="button" class="seg-tab" data-filter="read">
+          Read <span class="seg-count" data-count-read>{{ read }}</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="surface-card leads-card reveal" style="--reveal-delay: 120ms" aria-labelledby="leadsHeading">
+      <header class="card-head">
+        <h2 class="card-title" id="leadsHeading">
+          Inbox <span class="card-count" data-list-count>{{ initial_total | default(0) }}</span>
+        </h2>
+        {# Filled by leads.js: "Page 2 of 4", the applied filter, or the search. #}
+        <span class="card-note" data-list-note>
+          {% if initial_total_pages and initial_total_pages > 1 %}Page 1 of {{ initial_total_pages }}{% endif %}
+        </span>
+      </header>
+
+      <div class="leads-list">
+        <div id="leadsList" class="data-rows" aria-live="polite" aria-busy="false"
+          data-page="{{ initial_page | default(1) }}" data-total="{{ initial_total | default(0) }}"
+          data-total-pages="{{ initial_total_pages | default(1) }}">
           {% if initial_leads %}
-            {% for lead in initial_leads %}
-            <div class="lead-row {{ 'unread' if not lead.read else '' }}" data-id="{{ lead.id }}" onclick="viewLeadById('{{ lead.id }}')">
-              <div class="col-lead-status">
-                <div class="lead-status-dot"></div>
-              </div>
-              <div class="col-lead-name">
-                <span class="lead-name">{{ lead.name or 'Unknown' }}</span>
-              </div>
-              <div class="col-lead-email">
-                <span class="lead-email">{{ lead.email or '' }}</span>
-              </div>
-              <div class="col-lead-subject">
-                <span class="lead-subject">{{ lead.subject or 'No subject' }}</span>
-              </div>
-              <div class="col-lead-date">
-                <span class="lead-date">{{ lead.created_at[:10] if lead.created_at else '' }}</span>
-              </div>
-              <div class="col-lead-actions" onclick="event.stopPropagation()">
-                <div class="lead-dropdown">
-                  <button class="lead-dots-btn" onclick="toggleDropdown(event, '{{ lead.id }}')">
-                    <i class="bi bi-three-dots-vertical"></i>
-                  </button>
-                  <div class="lead-dropdown-menu" id="dropdown-{{ lead.id }}">
-                    <button class="dropdown-item" onclick="viewLeadById('{{ lead.id }}')">
-                      <i class="bi bi-eye"></i> View
-                    </button>
-                    <button class="dropdown-item dropdown-item-danger" onclick="showDeleteConfirm('{{ lead.id }}')">
-                      <i class="bi bi-trash"></i> Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {% endfor %}
+          {% for lead in initial_leads %}{{ lead_row(lead) }}{% endfor %}
           {% else %}
-            <div class="leads-empty">
-              <div class="leads-empty-icon"><i class="bi bi-person-lines-fill"></i></div>
-              <div class="leads-empty-title">No leads yet</div>
-              <div class="leads-empty-text">Contact form submissions will appear here.</div>
-            </div>
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-inbox" aria-hidden="true"></i></span>
+            <p>Nothing yet. When a visitor fills in the contact form on your site, their message
+              arrives here.</p>
+          </div>
           {% endif %}
         </div>
       </div>
 
-      <!-- Pagination -->
-      <div class="leads-pagination" id="leadsPagination">
-        {% if initial_total_pages > 1 %}
-        <button class="page-btn" disabled><i class="bi bi-chevron-left"></i></button>
-        {% for i in range(1, [initial_total_pages + 1, 6]|min) %}
-        <button class="page-btn {{ 'active' if i == 1 else '' }}" onclick="goToPage({{ i }})">{{ i }}</button>
-        {% endfor %}
-        {% if initial_total_pages > 5 %}
-        <span style="color:var(--text-faint);padding:0 0.3rem;">...</span>
-        <button class="page-btn" onclick="goToPage({{ initial_total_pages }})">{{ initial_total_pages }}</button>
-        {% endif %}
-        <button class="page-btn {{ 'disabled' if initial_total_pages <= 1 else '' }}" onclick="goToPage(2)" {{ 'disabled' if initial_total_pages <= 1 else '' }}><i class="bi bi-chevron-right"></i></button>
-        {% endif %}
-      </div>
+      {# Left empty on purpose. The rows are worth rendering server-side — they
+         are the content — but a pager is chrome, and two implementations of the
+         same page window drift. leads.js fills this from the counts on
+         #leadsList as soon as it runs, and .pager:empty is display:none, so
+         nothing shifts. #}
+      <nav class="pager" data-pager aria-label="Lead pages"></nav>
+    </section>
 
+    {# ==================== MESSAGE ==================== #}
+    <div class="modal fade" id="leadModal" tabindex="-1" aria-hidden="true" aria-labelledby="leadModalTitle">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="leadModalTitle" data-modal-subject>Message</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="app-modal-body">
+            <div class="lead-facts">
+              <div class="lead-fact">
+                <span class="lead-fact-label">From</span>
+                <span class="lead-fact-value" data-modal-name></span>
+              </div>
+              <div class="lead-fact">
+                <span class="lead-fact-label">Email</span>
+                <a class="lead-fact-value" data-modal-email href="#"></a>
+              </div>
+              <div class="lead-fact">
+                <span class="lead-fact-label">Received</span>
+                <span class="lead-fact-value" data-modal-when></span>
+              </div>
+            </div>
+
+            <span class="lead-message-label">Message</span>
+            <div class="lead-message" data-modal-message></div>
+          </div>
+
+          {# Reply is the primary action, and it is the one the old dialog did
+             not offer: it gave you Close and Delete. #}
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="app-btn is-danger" data-modal-delete>Delete</button>
+            <a class="app-btn is-primary" data-modal-reply href="#">
+              <i class="bi bi-reply" aria-hidden="true"></i> Reply
+            </a>
+          </footer>
+        </div>
+      </div>
     </div>
+
+    {# ==================== DELETE ==================== #}
+    <div class="modal fade" id="deleteLeadModal" tabindex="-1" aria-hidden="true" aria-labelledby="deleteLeadTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="deleteLeadTitle">Delete lead</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="app-modal-body">
+            <p class="delete-copy">
+              The message from <strong data-delete-name></strong> is erased from Scriptly, including
+              their address and everything they wrote. Nothing is emailed to them either way.
+            </p>
+          </div>
+
+          <footer class="app-modal-foot">
+            <span class="app-modal-note">Cannot be undone.</span>
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-danger" data-delete-confirm>Delete lead</button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/pages/leads.js') }}?v=4"></script>
   </main>
 </div>
-
-<!-- View Lead Modal -->
-<div class="lead-modal-overlay" id="viewLeadOverlay" onclick="closeViewModal(event)">
-  <div class="lead-modal" onclick="event.stopPropagation()">
-    <div class="lead-modal-header">
-      <div class="lead-modal-icon view-icon"><i class="bi bi-envelope-paper-fill"></i></div>
-      <h4 class="lead-modal-title" id="modalLeadSubject">Message</h4>
-      <button class="lead-modal-close" onclick="closeViewModal()"><i class="bi bi-x-lg"></i></button>
-    </div>
-    <div class="lead-modal-body">
-      <div class="lead-meta-grid">
-        <div class="lead-meta-item">
-          <span class="lead-meta-label"><i class="bi bi-person"></i> From</span>
-          <span class="lead-meta-value" id="modalLeadName"></span>
-        </div>
-        <div class="lead-meta-item">
-          <span class="lead-meta-label"><i class="bi bi-envelope"></i> Email</span>
-          <span class="lead-meta-value" id="modalLeadEmail"></span>
-        </div>
-        <div class="lead-meta-item">
-          <span class="lead-meta-label"><i class="bi bi-calendar3"></i> Date</span>
-          <span class="lead-meta-value" id="modalLeadDate"></span>
-        </div>
-      </div>
-      <div class="lead-message-box">
-        <span class="lead-message-label">Message</span>
-        <div class="lead-message-content" id="modalLeadMessage"></div>
-      </div>
-    </div>
-    <div class="lead-modal-footer">
-      <button class="lead-btn lead-btn-ghost" onclick="closeViewModal()">Close</button>
-      <button class="lead-btn lead-btn-danger" id="modalDeleteBtn">
-        <i class="bi bi-trash"></i> Delete
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="lead-modal-overlay" id="deleteLeadOverlay" onclick="closeDeleteModal(event)">
-  <div class="lead-modal lead-modal-sm" onclick="event.stopPropagation()">
-    <div class="lead-modal-header">
-      <div class="lead-modal-icon danger-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
-      <h4 class="lead-modal-title">Delete Lead</h4>
-      <button class="lead-modal-close" onclick="closeDeleteModal()"><i class="bi bi-x-lg"></i></button>
-    </div>
-    <div class="lead-modal-body">
-      <p class="delete-confirm-text">Are you sure you want to delete this lead? This action cannot be undone.</p>
-    </div>
-    <div class="lead-modal-footer">
-      <button class="lead-btn lead-btn-ghost" onclick="closeDeleteModal()">Cancel</button>
-      <button class="lead-btn lead-btn-danger" id="confirmDeleteBtn">
-        <i class="bi bi-trash"></i> Delete
-      </button>
-    </div>
-  </div>
-</div>
-
-{% endblock %}
-
-{% block extra_js %}
-<script>
-  window.__initialLeads = {{ initial_leads | tojson }};
-</script>
-<script src="{{ url_for('static', filename='js/pages/leads.js') }}?v=3"></script>
 {% endblock %}

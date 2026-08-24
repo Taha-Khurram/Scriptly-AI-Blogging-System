@@ -40,6 +40,12 @@ _MEMORY_MAX_ENTRIES = 5000
 # does not add a connection timeout to every single request.
 _REDIS_RETRY_SECONDS = 30
 
+# A persistent backend has no equivalent of "the process restarted", so an
+# entry written with no TTL would never be reclaimed. Callers all pass one (or
+# get Cache's default); this is the belt-and-braces value for anything that
+# does not.
+_NO_TTL_FALLBACK_SECONDS = 300
+
 _MISS = object()
 
 
@@ -103,6 +109,129 @@ class MemoryBackend:
         with self._lock:
             return {'backend': 'memory', 'entries': len(self._data),
                     'max_entries': self._max_entries}
+
+
+class SqliteBackend:
+    """Shared store on the local SQLite database, no service required.
+
+    Replaces ``MemoryBackend`` as the default. The in-process dict is only
+    correct for a single worker: with N workers each keeps its own copy, so the
+    hit rate divides by N and -- the part that is an actual bug rather than a
+    slowdown -- **invalidation does not propagate**. Publishing a post clears
+    ``published_blogs:<owner>`` in the worker that handled the request and
+    leaves every other worker serving the pre-publish list until its TTL runs
+    out. The user sees the change appear and disappear depending on which
+    worker answers.
+
+    This is the same file the sessions and rate-limit counters live in, so it
+    is shared across every thread and worker process on the host (SQLite WAL),
+    survives a reload, and adds no infrastructure.
+
+    Values are pickled for the same reason the Redis backend pickles them: the
+    cache holds Firestore documents -- nested dicts containing
+    ``DatetimeWithNanoseconds`` and other SDK types -- which JSON cannot
+    round-trip without a lossy custom encoder. Only this application writes
+    these rows, and they live in a file the application owns.
+
+    Not shared across *separate instances*, same as the rest of the store. A
+    second instance would keep its own cache; correctness is unaffected because
+    every entry has a TTL, but invalidation would again be per instance.
+    """
+
+    def __init__(self, store):
+        self._store = store
+
+    def get(self, key):
+        try:
+            row = self._store.read_one(
+                'SELECT value, expires_at FROM cache_entries WHERE key = ?',
+                (key,),
+            )
+        except Exception:
+            logger.warning('Cache read failed for %s', key, exc_info=True)
+            return _MISS
+
+        if row is None:
+            return _MISS
+        if row[1] <= time.time():
+            # Expired but not yet swept. Treated as absent; the sweeper will
+            # remove it, so there is no need to pay a write on a read path.
+            return _MISS
+        try:
+            return pickle.loads(row[0])
+        except Exception:
+            # Written by an older code version whose classes have changed
+            # shape. Drop it and report a miss.
+            logger.warning('Discarding undecodable cache entry: %s', key)
+            self.delete(key)
+            return _MISS
+
+    def set(self, key, value, ttl=None):
+        try:
+            payload = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+        except Exception as exc:
+            logger.warning('Value for %s is not cacheable: %s', key, exc)
+            return
+        # A missing TTL would mean a row that the sweeper never reclaims, so
+        # entries without one are given the default rather than living forever.
+        expires_at = time.time() + (ttl if ttl else _NO_TTL_FALLBACK_SECONDS)
+        try:
+            self._store.write(
+                'INSERT INTO cache_entries (key, value, expires_at) '
+                'VALUES (?, ?, ?) '
+                'ON CONFLICT(key) DO UPDATE SET '
+                '  value = excluded.value, expires_at = excluded.expires_at',
+                (key, payload, expires_at),
+            )
+        except Exception:
+            # A cache is an optimisation. Failing to write one must never fail
+            # the request whose work already succeeded.
+            logger.warning('Cache write failed for %s', key, exc_info=True)
+
+    def delete(self, key):
+        try:
+            self._store.write('DELETE FROM cache_entries WHERE key = ?', (key,))
+        except Exception:
+            logger.warning('Cache delete failed for %s', key, exc_info=True)
+
+    def clear(self):
+        try:
+            self._store.write('DELETE FROM cache_entries')
+        except Exception:
+            logger.warning('Cache clear failed', exc_info=True)
+
+    def clear_prefix(self, prefix):
+        """Invalidate every key beginning with ``prefix``.
+
+        ``LIKE ? || '%'`` uses the primary-key index, so this is a range scan
+        rather than a table scan. ``ESCAPE`` is set because a prefix built from
+        an id could legitimately contain ``%`` or ``_``, which would otherwise
+        be read as wildcards and delete more than asked.
+        """
+        escaped = (
+            prefix.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        )
+        try:
+            self._store.write(
+                "DELETE FROM cache_entries WHERE key LIKE ? ESCAPE '\\'",
+                (escaped + '%',),
+            )
+        except Exception:
+            logger.warning('Cache prefix clear failed: %s', prefix, exc_info=True)
+
+    def stats(self):
+        try:
+            row = self._store.read_one(
+                'SELECT COUNT(*), COALESCE(SUM(LENGTH(value)), 0) '
+                'FROM cache_entries'
+            )
+            return {'backend': 'sqlite', 'entries': row[0],
+                    'value_bytes': row[1], 'path': self._store.path}
+        except Exception as exc:
+            return {'backend': 'sqlite', 'error': str(exc)}
+
+    def healthy(self):
+        return self._store.healthy()
 
 
 class RedisBackend:
@@ -275,30 +404,56 @@ class Cache:
     def configure(self, *, redis_url=None, default_ttl=300, key_prefix='scriptly'):
         """Choose the backend. Called once from the app factory.
 
-        A failure to reach Redis is logged and tolerated: the app keeps the
-        in-memory backend and stays up. Losing the shared cache degrades
-        performance; refusing to boot would be an outage.
+        Order of preference:
+
+        1. **Redis**, when ``REDIS_URL`` is set. Shared across instances, so it
+           remains the right answer for a multi-instance deployment.
+        2. **SQLite**, the default. Shared across every thread and worker
+           process on the host, needs no service, and -- crucially -- makes
+           invalidation propagate between workers.
+        3. **Memory**, only if the SQLite store has not been configured. That
+           means something is being constructed outside the application factory
+           (a script, a bare unit test), where a process-local cache is the
+           correct scope anyway.
+
+        A failure to reach Redis is logged and tolerated: the app falls through
+        to SQLite and stays up. Losing the shared cache degrades performance;
+        refusing to boot would be an outage.
         """
         self._default_ttl = default_ttl
+
         if redis_url:
             try:
                 self._backend = RedisBackend(
                     redis_url, key_prefix=key_prefix, fallback=MemoryBackend()
                 )
-                logger.info('Cache backend: Redis (shared across workers)')
+                logger.info('Cache backend: Redis (shared across instances)')
+                self._configured = True
+                return
             except Exception as exc:
                 logger.error(
-                    'Redis at %s is unreachable (%s); using in-process cache. '
-                    'Multiple workers will NOT share cached state.',
-                    _safe_url(redis_url), exc,
+                    'Redis at %s is unreachable (%s); falling back to the '
+                    'local SQLite store.', _safe_url(redis_url), exc,
                 )
-                self._backend = MemoryBackend()
+
+        from app.core.store import store as sqlite_store
+
+        if sqlite_store.configured:
+            self._backend = SqliteBackend(sqlite_store)
+            logger.info(
+                'Cache backend: SQLite at %s (shared across this instance\'s '
+                'workers and threads)', sqlite_store.path,
+            )
         else:
-            logger.warning(
-                'REDIS_URL is not set; using in-process cache. This is only '
-                'correct for a single worker.'
+            # Not reachable through create_app, which configures the store
+            # first. Kept so importing the singleton outside an app context
+            # still yields a working cache.
+            logger.info(
+                'Cache backend: in-process (the SQLite store is not '
+                'configured, so this is not an application context).'
             )
             self._backend = MemoryBackend()
+
         self._configured = True
 
     # --- Public API (unchanged from the original SimpleCache) -------------
@@ -368,13 +523,27 @@ class Cache:
 
     @property
     def is_shared(self):
-        """True when the backend is visible to other workers."""
+        """True when the backend is visible to this instance's other workers.
+
+        The property that matters for correctness: with an unshared cache,
+        invalidation does not propagate and one worker keeps serving content
+        another worker has already replaced.
+        """
+        if isinstance(self._backend, RedisBackend):
+            return not self._backend.degraded
+        return isinstance(self._backend, SqliteBackend)
+
+    @property
+    def is_shared_across_instances(self):
+        """True only for Redis. SQLite is shared per host, not per fleet."""
         return isinstance(self._backend, RedisBackend) and not self._backend.degraded
 
     def healthy(self):
         """Whether the configured backend is currently serving."""
         if isinstance(self._backend, RedisBackend):
             return not self._backend.degraded
+        if isinstance(self._backend, SqliteBackend):
+            return self._backend.healthy()
         return True
 
 

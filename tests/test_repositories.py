@@ -164,6 +164,10 @@ class TestComposition:
             'get_app_settings', 'get_blog_by_id', 'get_blogs_by_status',
             'get_dashboard_data', 'get_published_blogs',
             'get_published_count', 'get_user_by_id',
+            # The count() aggregations that replaced "fetch the documents and
+            # call len() on them" on the dashboard and site-settings screens.
+            # They are reads on the hot path, so they get the same protection.
+            'count_blogs_by_status', 'count_team_blogs_by_status',
         }
 
 

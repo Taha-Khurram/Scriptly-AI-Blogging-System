@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, session
 from app.firebase.firestore_service import FirestoreService
 from app.core.security import admin_required
+from app.utils.parallel import run_parallel_simple
 
 activity_bp = Blueprint('activity', __name__)
 db_service = FirestoreService()
@@ -8,19 +9,39 @@ db_service = FirestoreService()
 @activity_bp.route('/activity-log')
 @admin_required
 def activity_page():
-    admin_id = session.get('user_id')
-    stats = db_service.get_activity_stats(admin_id)
+    """The audit trail: a stats row, the first page of entries, and the user filter.
 
-    result = db_service.get_all_activity_for_admin(
-        admin_id=admin_id,
-        type_filter='all',
-        user_filter='all',
-        search='',
-        date_from='',
-        date_to='',
-        page=1,
-        per_page=10
-    )
+    These three reads are independent, so they are issued together. Run back to
+    back they cost the sum of their round trips -- and a Firestore round trip
+    from this application measures 0.5-3.5 s, which is what made this page one
+    of the slowest in the dashboard. ``get_my_sub_users`` is memoised per
+    request (see ``app.repositories._helpers.request_cached``), so the team
+    lookup that all three of these need happens exactly once even though they
+    now run concurrently.
+    """
+    admin_id = session.get('user_id')
+
+    # Resolve the team first: the three queries below all derive from it, and
+    # doing it here means they share one memoised result instead of racing to
+    # populate it three times.
+    sub_users = db_service.get_my_sub_users(admin_id)
+
+    results = run_parallel_simple([
+        (db_service.get_activity_stats, (admin_id,)),
+        (lambda: db_service.get_all_activity_for_admin(
+            admin_id=admin_id,
+            type_filter='all',
+            user_filter='all',
+            search='',
+            date_from='',
+            date_to='',
+            page=1,
+            per_page=10,
+        ), ()),
+    ], max_workers=2)
+
+    stats = results[0] or {}
+    result = results[1] or {}
 
     activities = result.get('activities', [])
     for act in activities:
@@ -28,9 +49,11 @@ def activity_page():
         if ts and hasattr(ts, 'isoformat'):
             act['timestamp'] = ts.isoformat()
 
-    sub_users = db_service.get_my_sub_users(admin_id)
-    admin_user = db_service.get_user_by_id(admin_id)
-    users = [{"uid": admin_id, "name": admin_user.get("name", "Admin") if admin_user else "Admin"}]
+    # The admin's own label comes from the session, not from a third Firestore
+    # read. It is the same value every other screen in the dashboard displays
+    # for the signed-in user, and this dropdown wants a label, not a fresh
+    # authoritative record.
+    users = [{"uid": admin_id, "name": session.get('user_name') or "Admin"}]
     for u in sub_users:
         users.append({"uid": u.get("uid"), "name": u.get("name", u.get("email", "User"))})
 

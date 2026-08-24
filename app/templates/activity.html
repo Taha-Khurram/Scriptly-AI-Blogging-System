@@ -1,199 +1,349 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Activity Log | ScriptlyAI{% endblock %}
+{% block title %}Activity | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/activity.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/activity.css') }}?v=2">
 {% endblock %}
 
+{#
+  One entry in the audit trail, for the server-rendered first page. activity.js
+  builds the identical structure for every page, filter and search after it, so
+  the two have to stay in step — both are kept deliberately small.
+
+  The type mapping is the same one the repository filters on
+  (ActivityRepository.get_all_activity_for_admin) and the same one activity.js
+  renders from, so a row cannot land under a heading the tab beside it would
+  not have matched.
+#}
+{% set TYPE_LABEL = {
+'blog': 'Content', 'user': 'People', 'comment': 'Comment',
+'settings': 'Settings', 'newsletter': 'Newsletter', 'category': 'Category'
+} %}
+{% set TYPE_ICON = {
+'blog': 'file-post', 'user': 'person', 'comment': 'chat-dots',
+'settings': 'gear', 'newsletter': 'envelope', 'category': 'tags'
+} %}
+{% set BLOG_TYPES = ['blog', 'generated', 'edited', 'published', 'deleted', 'status_change', 'seo_optimized'] %}
+
+{% macro activity_row(entry) %}
+{% set raw = entry.target_type or entry.type or '' %}
+{% set kind = 'blog' if raw in BLOG_TYPES else (raw if raw in TYPE_LABEL else 'other') %}
+{% set who = entry.user_name or 'Someone' %}
+{% set what = entry.target_name or entry.blog_title or '' %}
+<div class="data-row">
+  <span class="row-mark" aria-hidden="true">{{ (who | trim)[0] | upper if who | trim else '?' }}</span>
+
+  {# The sentence is the row. The old table gave the actor, the verb and the
+     object a column each and truncated the object at 25 characters, so the
+     three halves of one statement were read across three tracks and the half
+     that said *what happened to* was the half that got cut. #}
+  <span class="row-main">
+    <span class="row-title">
+      <strong class="log-actor">{{ who }}</strong>
+      <span class="log-action">{{ entry.action_text or 'made a change' }}</span>
+    </span>
+    <span class="row-meta">
+      {% if what %}
+      <span class="log-target">{{ what }}</span>
+      {% else %}
+      <span class="log-target is-none">No target recorded</span>
+      {% endif %}
+      {# Restated here because the pill beside the row is dropped on a narrow
+         canvas. Always rendered, revealed by CSS — a class that is only
+         sometimes in the markup cannot be switched on by a media query. #}
+      <span class="row-sep row-meta-type" aria-hidden="true">·</span>
+      <span class="row-meta-type">{{ TYPE_LABEL.get(kind, 'Other') }}</span>
+    </span>
+  </span>
+
+  <span class="type-pill type-{{ kind }}">
+    <i class="bi bi-{{ TYPE_ICON.get(kind, 'activity') }}" aria-hidden="true"></i>
+    {{ TYPE_LABEL.get(kind, 'Other') }}
+  </span>
+
+  <time class="row-time" datetime="{{ entry.timestamp or '' }}" data-relative>
+    {{ entry.timestamp[:10] if entry.timestamp else '' }}
+  </time>
+</div>
+{% endmacro %}
+
 {% block content %}
+{% set s = stats or {} %}
+{% set total = s.total | default(0) | int %}
+{% set blog = s.blog | default(0) | int %}
+{% set people = s.user | default(0) | int %}
+{% set rest = (s.comment | default(0) | int) + (s.settings | default(0) | int)
++ (s.newsletter | default(0) | int) + (s.category | default(0) | int) %}
+
 <div class="dashboard-layout">
 
   {% include 'partials/sidebar.html' %}
 
+  {#
+    The date dialog and the page script live inside .dashboard-main, like every
+    other screen. PJAX swaps only that element's innerHTML — the dialog used to
+    sit outside the layout wrapper and the script in the extra_js block, so
+    after any in-app navigation the date filter was gone from the document and
+    the page worked only because PJAX happens to re-run every inline script it
+    finds anywhere in the response.
+  #}
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <div class="header-welcome-text">Administration</div>
-        <h1 class="header-title">Activity Log</h1>
-      </div>
-    </header>
 
-    <div class="dashboard-content-wrapper animate-fade-up">
+    {# search_id is what activity.js binds its debounced query to, so the header
+       field *is* this page's search rather than a second one below it. It hits
+       the API, which searches the action, the target and the actor across every
+       page rather than only the rows on screen. #}
+    {% call page_header(
+    title='Activity',
+    eyebrow='Administration',
+    search=true,
+    search_placeholder='Search the log',
+    search_id='activitySearch') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    {% endcall %}
 
-      <!-- Stats Cards -->
-      <div class="activity-stats-row">
-        <div class="stat-card">
-          <div class="stat-icon stat-total"><i class="bi bi-activity"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="stat-total">{{ stats.total }}</span>
-            <span class="stat-label">Total Activities</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-blog"><i class="bi bi-file-post"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="stat-blog">{{ stats.blog }}</span>
-            <span class="stat-label">Blog Actions</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-user"><i class="bi bi-person"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="stat-user">{{ stats.user }}</span>
-            <span class="stat-label">User Actions</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-other"><i class="bi bi-gear"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="stat-other">{{ stats.comment + stats.settings + stats.newsletter + stats.category }}</span>
-            <span class="stat-label">Other Actions</span>
-          </div>
-        </div>
+    {#
+      Total is the denominator, so it is the one tile without a meter. The other
+      three are shares of it — which is the only thing that makes a raw count of
+      "settings changes" mean anything.
+    #}
+    <div class="activity-stats reveal">
+      <div class="stat-card">
+        <span class="stat-icon stat-all"><i class="bi bi-activity" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Recorded</span>
+          <span class="stat-count" data-stat-total>{{ total }}</span>
+        </span>
       </div>
 
-      <!-- Filter Bar -->
-      <div class="activity-filters">
-        <div class="activity-filter-tabs">
-          <button class="filter-tab active" data-filter="all">All</button>
-          <button class="filter-tab" data-filter="blog"><i class="bi bi-file-post"></i> Blog</button>
-          <button class="filter-tab" data-filter="user"><i class="bi bi-person"></i> User</button>
-          <button class="filter-tab" data-filter="comment"><i class="bi bi-chat-dots"></i> Comment</button>
-          <button class="filter-tab" data-filter="settings"><i class="bi bi-gear"></i> Settings</button>
-          <button class="filter-tab" data-filter="newsletter"><i class="bi bi-envelope"></i> Newsletter</button>
-          <button class="filter-tab" data-filter="category"><i class="bi bi-tags"></i> Category</button>
-        </div>
-        <div class="activity-filter-controls">
-          <select id="userFilter" class="filter-select">
-            <option value="all">All Users</option>
+      <div class="stat-card">
+        <span class="stat-icon stat-content"><i class="bi bi-file-post" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Content</span>
+          <span class="stat-count" data-stat-blog>{{ blog }}</span>
+        </span>
+        <span class="stat-meter"{{ ' hidden' if total == 0 else '' }}>
+          <span class="stat-meter-track">
+            <span class="stat-meter-fill" style="width: {{ (blog * 100 // total) if total else 0 }}%"></span>
+          </span>
+          <span class="stat-meter-note">{{ (blog * 100 // total) if total else 0 }}% of the log</span>
+        </span>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-icon stat-people"><i class="bi bi-person" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">People</span>
+          <span class="stat-count" data-stat-user>{{ people }}</span>
+        </span>
+        <span class="stat-meter"{{ ' hidden' if total == 0 else '' }}>
+          <span class="stat-meter-track">
+            <span class="stat-meter-fill" style="width: {{ (people * 100 // total) if total else 0 }}%"></span>
+          </span>
+          <span class="stat-meter-note">{{ (people * 100 // total) if total else 0 }}% of the log</span>
+        </span>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-icon stat-rest"><i class="bi bi-sliders" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Everything else</span>
+          <span class="stat-count" data-stat-rest>{{ rest }}</span>
+        </span>
+        <span class="stat-meter"{{ ' hidden' if total == 0 else '' }}>
+          <span class="stat-meter-track">
+            <span class="stat-meter-fill" style="width: {{ (rest * 100 // total) if total else 0 }}%"></span>
+          </span>
+          <span class="stat-meter-note">{{ (rest * 100 // total) if total else 0 }}% of the log</span>
+        </span>
+      </div>
+    </div>
+
+    {#
+      What happened is the primary dimension, so it stays a permanently visible
+      segmented control; who did it and when are filter pills that render their
+      own current value rather than a bare control you have to open to read.
+      "Clear all" only exists while something is actually applied.
+    #}
+    <section class="surface-card filter-bar activity-filter reveal" style="--reveal-delay: 60ms"
+      aria-label="Filter the activity log">
+      <div class="seg-tabs" role="group" aria-label="Filter by what changed">
+        <button type="button" class="seg-tab is-active" data-filter="all">All</button>
+        <button type="button" class="seg-tab" data-filter="blog">
+          <i class="bi bi-file-post" aria-hidden="true"></i> Content
+        </button>
+        <button type="button" class="seg-tab" data-filter="user">
+          <i class="bi bi-person" aria-hidden="true"></i> People
+        </button>
+        <button type="button" class="seg-tab" data-filter="comment">
+          <i class="bi bi-chat-dots" aria-hidden="true"></i> Comments
+        </button>
+        <button type="button" class="seg-tab" data-filter="settings">
+          <i class="bi bi-gear" aria-hidden="true"></i> Settings
+        </button>
+        <button type="button" class="seg-tab" data-filter="newsletter">
+          <i class="bi bi-envelope" aria-hidden="true"></i> Newsletter
+        </button>
+        <button type="button" class="seg-tab" data-filter="category">
+          <i class="bi bi-tags" aria-hidden="true"></i> Categories
+        </button>
+      </div>
+
+      <div class="filter-bar-controls">
+        {# A listbox we own rather than a native select popup: the browser draws
+           that one itself, so it cannot take our surfaces or radius and renders
+           white-on-blue on a dark theme. The <select> stays as the value holder
+           so `.value` and `change` still work exactly as before. #}
+        <div class="select-pill" data-select-pill>
+          <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
+            aria-expanded="false" aria-labelledby="userFilterLabel">
+            <i class="bi bi-person" aria-hidden="true"></i>
+            <span class="visually-hidden" id="userFilterLabel">Filter by person</span>
+            <span class="filter-pill-label" aria-hidden="true">Anyone</span>
+            <span class="filter-pill-value" data-user-value aria-hidden="true" hidden></span>
+            <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+          </button>
+
+          <div class="menu is-end" role="listbox" aria-labelledby="userFilterLabel" hidden>
+            <button type="button" class="menu-item" role="option" data-value="all">
+              <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+              <span class="menu-label">Anyone</span>
+            </button>
+            {% for user in initial_users %}
+            <button type="button" class="menu-item" role="option" data-value="{{ user.uid }}">
+              <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+              <span class="menu-label">{{ user.name }}</span>
+            </button>
+            {% endfor %}
+          </div>
+
+          <select id="userFilter" tabindex="-1" aria-hidden="true">
+            <option value="all">Anyone</option>
             {% for user in initial_users %}
             <option value="{{ user.uid }}">{{ user.name }}</option>
             {% endfor %}
           </select>
-          <div class="filter-search-wrap">
-            <i class="bi bi-search"></i>
-            <input type="text" id="searchInput" class="filter-search" placeholder="Search activities...">
-          </div>
-          <button class="filter-date-btn" id="dateFilterBtn" onclick="openDateModal()">
-            <i class="bi bi-calendar3"></i> <span id="dateFilterLabel">Date Range</span>
-          </button>
         </div>
-      </div>
 
-      <!-- Activity List -->
-      <div class="activity-container">
-        <div class="activity-list-header">
-          <div class="col-activity-user">User</div>
-          <div class="col-activity-action">Action</div>
-          <div class="col-activity-target">Target</div>
-          <div class="col-activity-type">Type</div>
-          <div class="col-activity-time">Time</div>
-        </div>
-        <div id="activityList">
+        <button type="button" class="filter-pill" data-date-open>
+          <i class="bi bi-calendar3" aria-hidden="true"></i>
+          <span data-date-label>Any time</span>
+          <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+        </button>
+
+        <button type="button" class="filter-clear" data-clear-filters hidden>
+          <i class="bi bi-x-lg" aria-hidden="true"></i> Clear all
+        </button>
+      </div>
+    </section>
+
+    <section class="surface-card activity-card reveal" style="--reveal-delay: 120ms"
+      aria-labelledby="activityHeading">
+      <header class="card-head">
+        <h2 class="card-title" id="activityHeading">
+          History <span class="card-count" data-list-count>{{ initial_total | default(0) }}</span>
+        </h2>
+        {# Filled by activity.js: "Page 2 of 7", the applied filters, the search. #}
+        <span class="card-note" data-list-note></span>
+      </header>
+
+      <div class="activity-list">
+        <div id="activityList" class="data-rows" aria-live="polite" aria-busy="false"
+          data-page="{{ initial_page | default(1) }}" data-total="{{ initial_total | default(0) }}"
+          data-per-page="{{ initial_per_page | default(10) }}">
           {% if initial_activities %}
-            {% for activity in initial_activities %}
-            {% set type_key = activity.target_type or activity.type or '' %}
-            <div class="activity-row">
-              <div class="col-activity-user">
-                <div class="activity-user-cell">
-                  <div class="activity-avatar">{{ (activity.user_name or 'U')[0]|upper }}</div>
-                  <span class="activity-user-name">{{ activity.user_name or 'Unknown' }}</span>
-                </div>
-              </div>
-              <div class="col-activity-action">
-                <span class="activity-action-text">{{ activity.action_text or '' }}</span>
-              </div>
-              <div class="col-activity-target">
-                <span class="activity-target-text" title="{{ activity.target_name or activity.blog_title or '' }}">{{ (activity.target_name or activity.blog_title or '')[:25] }}{{ '...' if (activity.target_name or activity.blog_title or '')|length > 25 else '' }}</span>
-              </div>
-              <div class="col-activity-type">
-                {% if type_key in ['blog', 'generated', 'edited', 'published', 'deleted', 'status_change', 'seo_optimized'] %}
-                <span class="activity-type-badge badge-type-blog"><i class="bi bi-file-post"></i> Blog</span>
-                {% elif type_key == 'user' %}
-                <span class="activity-type-badge badge-type-user"><i class="bi bi-person"></i> User</span>
-                {% elif type_key == 'comment' %}
-                <span class="activity-type-badge badge-type-comment"><i class="bi bi-chat-dots"></i> Comment</span>
-                {% elif type_key == 'settings' %}
-                <span class="activity-type-badge badge-type-settings"><i class="bi bi-gear"></i> Settings</span>
-                {% elif type_key == 'newsletter' %}
-                <span class="activity-type-badge badge-type-newsletter"><i class="bi bi-envelope"></i> Newsletter</span>
-                {% elif type_key == 'category' %}
-                <span class="activity-type-badge badge-type-category"><i class="bi bi-tags"></i> Category</span>
-                {% else %}
-                <span class="activity-type-badge badge-type-settings"><i class="bi bi-activity"></i> Other</span>
-                {% endif %}
-              </div>
-              <div class="col-activity-time">
-                <span class="activity-time-text">{{ activity.timestamp[:10] if activity.timestamp else '' }}</span>
-              </div>
-            </div>
-            {% endfor %}
+          {% for entry in initial_activities %}{{ activity_row(entry) }}{% endfor %}
           {% else %}
-            <div class="activity-empty">
-              <i class="bi bi-clock-history"></i>
-              <p>No activity found.</p>
-            </div>
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
+            <p>Nothing recorded yet. Every publish, invitation and settings change your team
+              makes is written down here.</p>
+          </div>
           {% endif %}
         </div>
       </div>
 
-      <!-- Pagination -->
-      <div class="activity-pagination" id="activityPagination">
-        {% if initial_total > initial_per_page %}
-        {% set total_pages = (initial_total / initial_per_page)|round(0, 'ceil')|int %}
-        <button class="page-btn disabled" disabled><i class="bi bi-chevron-left"></i></button>
-        {% for i in range(1, [total_pages + 1, 6]|min) %}
-        <button class="page-btn {{ 'active' if i == 1 else '' }}" onclick="goToPage({{ i }})">{{ i }}</button>
-        {% endfor %}
-        {% if total_pages > 5 %}
-        <span class="page-dots">...</span>
-        <button class="page-btn" onclick="goToPage({{ total_pages }})">{{ total_pages }}</button>
-        {% endif %}
-        <button class="page-btn" onclick="goToPage(2)"><i class="bi bi-chevron-right"></i></button>
-        {% endif %}
-      </div>
+      {# Left empty on purpose. The rows are worth rendering server-side — they
+         are the content — but a pager is chrome, and two implementations of the
+         same page window drift. activity.js fills this from the counts on
+         #activityList as soon as it runs, and .pager:empty is display:none. #}
+      <nav class="pager" data-pager aria-label="Activity pages"></nav>
+    </section>
 
+    {#
+      Date range. Presets come first because that is what most sessions
+      actually want; the grid is the escape hatch beside them. A live summary
+      states what Apply will do, and Apply stays disabled while only half a
+      range is in — the same dialog All Blogs uses, and now the same stylesheet
+      (dashboard.css §12) rather than a second, thinner copy of it with two
+      native date inputs in the middle.
+    #}
+    <div class="modal fade" id="dateRangeModal" tabindex="-1" aria-hidden="true" aria-labelledby="dateRangeTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content date-modal">
+
+          <header class="date-modal-head">
+            <h2 class="date-modal-title" id="dateRangeTitle">Date range</h2>
+            <button type="button" class="date-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="date-modal-body">
+            <div class="date-presets" role="group" aria-label="Quick ranges">
+              <button type="button" class="date-preset" data-preset="today">Today</button>
+              <button type="button" class="date-preset" data-preset="week">Last 7 days</button>
+              <button type="button" class="date-preset" data-preset="month">Last 30 days</button>
+              <button type="button" class="date-preset" data-preset="quarter">Last 90 days</button>
+              <button type="button" class="date-preset" data-preset="year">This year</button>
+              <button type="button" class="date-preset" data-preset="all">All time</button>
+            </div>
+
+            <div class="date-custom">
+              <div class="cal" data-calendar>
+                <div class="cal-head">
+                  <button type="button" class="cal-nav" data-cal-prev aria-label="Previous month">
+                    <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                  </button>
+                  <span class="cal-title" data-cal-title aria-live="polite"></span>
+                  <button type="button" class="cal-nav" data-cal-next aria-label="Next month">
+                    <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                  </button>
+                </div>
+
+                <div class="cal-dow" aria-hidden="true">
+                  <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
+                  <span>Th</span><span>Fr</span><span>Sa</span>
+                </div>
+
+                <div class="cal-grid" data-cal-grid aria-label="Choose a date range"></div>
+              </div>
+            </div>
+
+            {# The value holders. Everything else in the dialog is a control
+               over these two. #}
+            <input type="hidden" data-date-from>
+            <input type="hidden" data-date-to>
+          </div>
+
+          <footer class="date-modal-foot">
+            <p class="date-summary" data-date-summary role="status">Showing all time</p>
+            <div class="date-actions">
+              <button type="button" class="date-btn is-ghost" data-date-clear>Clear</button>
+              <button type="button" class="date-btn is-primary" data-date-apply>Apply</button>
+            </div>
+          </footer>
+
+        </div>
+      </div>
     </div>
+
+    <script src="{{ url_for('static', filename='js/pages/activity.js') }}?v=3"></script>
   </main>
 </div>
-
-<!-- Date Range Modal -->
-<div class="modal fade" id="dateRangeModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content custom-modal">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title"><i class="bi bi-calendar3"></i> Select Date Range</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="custom-modal-body">
-        <div class="date-range-field">
-          <label class="form-label">From</label>
-          <input type="date" id="dateFrom" class="form-control">
-        </div>
-        <div class="date-range-field">
-          <label class="form-label">To</label>
-          <input type="date" id="dateTo" class="form-control">
-        </div>
-        <div class="date-range-presets">
-          <button class="preset-btn" onclick="setDatePreset('today')">Today</button>
-          <button class="preset-btn" onclick="setDatePreset('week')">Last 7 days</button>
-          <button class="preset-btn" onclick="setDatePreset('month')">Last 30 days</button>
-          <button class="preset-btn" onclick="setDatePreset('all')">All Time</button>
-        </div>
-      </div>
-      <div class="custom-modal-footer">
-        <button class="btn-modal btn-modal-secondary" onclick="clearDateFilter()">Clear</button>
-        <button class="btn-modal btn-modal-primary" onclick="applyDateFilter()">
-          <i class="bi bi-check-lg"></i> Apply
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-{% endblock %}
-
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/activity.js') }}?v=2"></script>
 {% endblock %}

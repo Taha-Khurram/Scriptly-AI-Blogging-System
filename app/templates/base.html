@@ -26,6 +26,12 @@
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/logo.png') }}">
     {% endif %}
 
+    <!-- Session inactivity window, published so the browser's countdown and
+         the server's timeout are the same number rather than two constants
+         that drift apart. Read by the inactivity block in app.js. -->
+    <meta name="session-timeout" content="{{ session_timeout_seconds | default(600) }}">
+    <meta name="session-warning" content="{{ session_warning_seconds | default(60) }}">
+
     <!-- Light/dark surface hint for the browser chrome -->
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#F0F4F9" media="(prefers-color-scheme: light)">

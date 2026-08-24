@@ -15,6 +15,10 @@ existing call sites are unchanged.
 ``self.db`` (the Firestore client) and the collection names come from
 ``FirestoreService.__init__``.
 """
+from copy import deepcopy
+
+from app.repositories._helpers import owner_listing
+from app.utils.cache import cache
 from app.utils.date_utils import utcnow
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -24,8 +28,85 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _created_at_key(comment):
+    """Sort key for a comment's creation time, tolerant of a missing value.
+
+    ``created_at`` is written as ``SERVER_TIMESTAMP``, so a document read back
+    in the same moment it was created can legitimately have no value yet, and
+    older rows may predate the field. Sorting in Python rather than with
+    ``order_by`` is what keeps those documents visible at all -- a Firestore
+    ``order_by`` silently excludes every document missing the ordered field,
+    which would make a comment disappear from moderation instead of sorting
+    last.
+    """
+    value = comment.get('created_at')
+    if value is None:
+        return 0.0
+    if hasattr(value, 'timestamp'):
+        try:
+            return value.timestamp()
+        except (ValueError, OSError):
+            return 0.0
+    return 0.0
+
+
+COMMENTS_CACHE_PREFIX = 'comments_by_owner'
+
+
+def _invalidate_comments():
+    """Drop every cached comment listing.
+
+    Prefix-wide rather than per owner: the mutating methods are given a comment
+    id, not a site owner, and reading the document back just to learn the owner
+    would add a round trip to every moderation action. Clearing all of them
+    costs other owners one re-fetch, and moderation actions are infrequent --
+    whereas a stale listing means a moderator deletes a comment and watches it
+    reappear, which is the one outcome worth ruling out entirely.
+    """
+    cache.clear_prefix(COMMENTS_CACHE_PREFIX)
+
+
 class CommentRepository:
     """Visitor comments and their AI/admin moderation state."""
+
+    @owner_listing(COMMENTS_CACHE_PREFIX)
+    def _owner_comments(self, site_owner_id):
+        """Every comment for one site owner, newest first. One round trip.
+
+        Both the stats cards and the moderation table need this same set, and
+        each used to fetch it independently -- two full scans of the same
+        collection, back to back, to render one page. At 0.5-3.5 s per round
+        trip that second scan was pure latency for an answer the request
+        already had, so it is now read once and shared for the request.
+
+        Also cached across requests for a short window, because the status tabs,
+        the search box and the pager all re-derive their view from this same set
+        -- every one of those clicks used to pay for another full scan.
+
+        When this collection grows past a few thousand documents per owner,
+        replace the two consumers with four parallel ``count()`` aggregations
+        for the cards and an ``order_by('created_at').limit(per_page)`` page
+        query. Both need composite indexes, and the ordered query needs a
+        ``created_at`` backfill first, or documents without the field drop out
+        of the list entirely.
+        """
+        try:
+            docs = list(
+                self.db.collection('comments')
+                .where(filter=FieldFilter('site_owner_id', '==', site_owner_id))
+                .stream()
+            )
+        except Exception:
+            logger.exception("Error fetching comments for owner")
+            return []
+
+        comments = []
+        for doc in docs:
+            data = doc.to_dict()
+            data['id'] = doc.id
+            comments.append(data)
+        comments.sort(key=_created_at_key, reverse=True)
+        return comments
 
     def create_comment(self, comment_data):
         """Save a new comment to Firestore. Returns document ID."""
@@ -51,6 +132,7 @@ class CommentRepository:
                 'updated_at': utcnow()
             }
             doc_ref = self.db.collection('comments').add(comment)
+            _invalidate_comments()
             return doc_ref[1].id
         except Exception:
             logger.exception("Error creating comment")
@@ -85,45 +167,36 @@ class CommentRepository:
             return []
 
     def get_comments_for_dashboard(self, site_owner_id, status_filter=None, ai_filter=None, page=1, per_page=20):
-        """Get all comments for the dashboard moderation view."""
+        """Get all comments for the dashboard moderation view.
+
+        Reads through :meth:`_owner_comments`, so calling this alongside
+        :meth:`get_comment_stats` in one request costs one round trip rather
+        than two. The status filter is applied in Python for the same reason the
+        sort is: it used to be a *different Firestore query* per filter value,
+        which meant switching the filter tab paid a fresh round trip to
+        re-fetch documents the page already had.
+        """
         try:
-            query = self.db.collection('comments').where(
-                filter=FieldFilter('site_owner_id', '==', site_owner_id)
-            )
+            comments = self._owner_comments(site_owner_id)
 
             if status_filter and status_filter != 'all':
                 if status_filter == 'edited':
-                    query = query.where(filter=FieldFilter('ai_action', '==', 'edited'))
+                    comments = [c for c in comments if c.get('ai_action') == 'edited']
                 else:
-                    query = query.where(filter=FieldFilter('status', '==', status_filter))
+                    comments = [c for c in comments if c.get('status') == status_filter]
 
-            docs = list(query.stream())
-            # Sort client-side to avoid requiring composite indexes
-            def _sort_key(doc):
-                val = doc.to_dict().get('created_at')
-                if val is None:
-                    return 0
-                if hasattr(val, 'timestamp'):
-                    return val.timestamp()
-                if hasattr(val, 'isoformat'):
-                    return val.timestamp() if hasattr(val, 'timestamp') else 0
-                return 0
-            docs.sort(key=_sort_key, reverse=True)
-            total = len(docs)
-
-            # Paginate
+            total = len(comments)
             start = (page - 1) * per_page
-            end = start + per_page
-            page_docs = docs[start:end]
 
-            comments = []
-            for doc in page_docs:
-                data = doc.to_dict()
-                data['id'] = doc.id
-                comments.append(data)
+            # Deep-copied, not sliced by reference. The caller normalises
+            # timestamps in place -- including inside each `admin_edits` entry
+            # -- and these dicts are now shared with anything else in this
+            # request that reads through _owner_comments. One page of documents
+            # is a cheap copy; handing out mutable shared state is not.
+            page_items = deepcopy(comments[start:start + per_page])
 
             return {
-                'comments': comments,
+                'comments': page_items,
                 'total': total,
                 'page': page,
                 'per_page': per_page,
@@ -169,6 +242,7 @@ class CommentRepository:
                 'admin_edits': firestore.ArrayUnion([edit_entry]),
                 'updated_at': utcnow()
             })
+            _invalidate_comments()
             return True
         except Exception:
             logger.exception("Error updating comment")
@@ -192,6 +266,7 @@ class CommentRepository:
                 update_data['removed_reason'] = None
 
             self.db.collection('comments').document(comment_id).update(update_data)
+            _invalidate_comments()
             return True
         except Exception:
             logger.exception("Error updating comment status")
@@ -201,39 +276,25 @@ class CommentRepository:
         """Hard delete a comment document from Firestore."""
         try:
             self.db.collection('comments').document(comment_id).delete()
+            _invalidate_comments()
             return True
         except Exception:
             logger.exception("Error deleting comment")
             return False
 
     def get_comment_stats(self, site_owner_id):
-        """Get comment counts for dashboard stats cards."""
+        """Get comment counts for dashboard stats cards.
+
+        Counted from :meth:`_owner_comments`, which the moderation table also
+        reads, so the stats cards no longer cost a round trip of their own.
+        """
         try:
-            docs = list(
-                self.db.collection('comments')
-                .where(filter=FieldFilter('site_owner_id', '==', site_owner_id))
-                .stream()
-            )
-
-            total = len(docs)
-            published = 0
-            ai_edited = 0
-            removed = 0
-
-            for doc in docs:
-                data = doc.to_dict()
-                if data.get('status') == 'published':
-                    published += 1
-                if data.get('ai_action') == 'edited':
-                    ai_edited += 1
-                if data.get('status') == 'removed':
-                    removed += 1
-
+            comments = self._owner_comments(site_owner_id)
             return {
-                'total': total,
-                'published': published,
-                'ai_edited': ai_edited,
-                'removed': removed
+                'total': len(comments),
+                'published': sum(1 for c in comments if c.get('status') == 'published'),
+                'ai_edited': sum(1 for c in comments if c.get('ai_action') == 'edited'),
+                'removed': sum(1 for c in comments if c.get('status') == 'removed'),
             }
         except Exception:
             logger.exception("Error fetching comment stats")

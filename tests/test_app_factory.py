@@ -203,7 +203,13 @@ class TestHealthEndpoints:
 
     def test_healthz_covers_every_component(self, client):
         checks = client.get('/healthz').get_json()['checks']
-        assert set(checks) == {'firestore', 'cache', 'ai', 'tasks', 'storage'}
+        # 'store' is the SQLite database holding sessions and rate-limit
+        # counters. It is a *critical* check: unreadable, every request is
+        # anonymous and nobody can stay signed in, so the instance should be
+        # drained rather than left serving login redirects.
+        assert set(checks) == {
+            'firestore', 'store', 'cache', 'ai', 'tasks', 'storage',
+        }
         for name, result in checks.items():
             assert result['status'] in ('ok', 'degraded', 'fail'), name
             assert 'duration_ms' in result, name

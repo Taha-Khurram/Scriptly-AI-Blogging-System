@@ -15,7 +15,15 @@ existing call sites are unchanged.
 ``self.db`` (the Firestore client) and the collection names come from
 ``FirestoreService.__init__``.
 """
-from app.repositories._helpers import _parse_filter_date, _sanitize_blog_content
+from app.repositories._helpers import (
+    BLOG_ARTICLE_FIELDS,
+    BLOG_CARD_FIELDS,
+    BLOG_LIST_FIELDS,
+    BLOG_QUEUE_FIELDS,
+    _parse_filter_date,
+    _sanitize_blog_content,
+    apply_projection,
+)
 from app.utils.cache import cache
 from app.utils.date_utils import ensure_aware, utcnow
 from app.utils.retry import retry_on_unavailable
@@ -169,15 +177,22 @@ class BlogRepository:
             return False
 
     @retry_on_unavailable
-    def get_blogs_by_status(self, status, user_id):
-        """Filters blogs by status AND author."""
+    def get_blogs_by_status(self, status, user_id, fields=BLOG_LIST_FIELDS):
+        """Filters blogs by status AND author.
+
+        Projected by default, because every caller is a list or a count. Pass
+        ``fields=None`` for the whole document if a caller ever needs the body.
+        """
         try:
-            docs = self.db.collection(self.collection_name)\
-                .where(filter=FieldFilter('author_id', '==', user_id))\
-                .where(filter=FieldFilter('status', '==', status.upper())).stream()
-            
+            query = apply_projection(
+                self.db.collection(self.collection_name)
+                .where(filter=FieldFilter('author_id', '==', user_id))
+                .where(filter=FieldFilter('status', '==', status.upper())),
+                fields,
+            )
+
             blogs = []
-            for doc in docs:
+            for doc in query.stream():
                 data = doc.to_dict()
                 data['id'] = doc.id
                 blogs.append(data)
@@ -186,44 +201,62 @@ class BlogRepository:
             logger.exception(f"Error fetching blogs by status {status}")
             return []
 
+    @retry_on_unavailable
+    def count_blogs_by_status(self, status, user_id):
+        """How many of this author's blogs are in ``status``.
+
+        A ``count()`` aggregation, not ``len(get_blogs_by_status(...))``. Both
+        are one round trip, but the aggregation is evaluated in Firestore and
+        returns a single integer instead of the documents, and it is billed per
+        1000 documents scanned rather than per document read. Use this wherever
+        only the number is displayed.
+        """
+        try:
+            query = (self.db.collection(self.collection_name)
+                     .where(filter=FieldFilter('author_id', '==', user_id))
+                     .where(filter=FieldFilter('status', '==', status.upper()))
+                     .count())
+            return query.get()[0][0].value
+        except Exception:
+            logger.exception(f"Error counting blogs by status {status}")
+            return 0
+
     def get_approval_queue(self, admin_id):
         """
         Returns pending blogs for an admin's approval queue:
         - Blogs submitted by the admin themselves
         - Blogs submitted by users created by this admin
+
+        Projected to :data:`BLOG_QUEUE_FIELDS`. The queue screen lists a title,
+        author, category and the two timestamps; ``approval.js`` loads the body
+        through ``/api/get_blog/<id>`` when a reviewer opens a submission, so
+        the list has never needed it. The team id list comes from the memoised
+        ``get_team_user_ids`` rather than a second users query of its own.
         """
         try:
-            # Step 1: Get users created by this admin
-            users_ref = self.db.collection("users")
-            user_docs = users_ref.where("created_by", "==", admin_id).stream()
-            user_ids = [user.id for user in user_docs]
+            user_ids = self.get_team_user_ids(admin_id)
 
-            # Include admin themselves
-            user_ids.append(admin_id)
-
-            # Step 2: Fetch pending blogs for these users (batched if needed)
-            blogs_ref = self.db.collection("blogs")
+            # Firestore allows 30 values in an `in` filter; batching at 30
+            # rather than 10 is a third of the round trips for a large team.
             pending_blogs = []
-
-            batch_size = 10  # Firestore 'in' query limit
-            for i in range(0, len(user_ids), batch_size):
-                batch_ids = user_ids[i:i + batch_size]
-                docs = (
-                    blogs_ref
-                    .where("author_id", "in", batch_ids)
-                    .where("status", "==", "UNDER_REVIEW")
-                    .order_by("updated_at", direction=firestore.Query.DESCENDING)
-                    .stream()
+            for i in range(0, len(user_ids), 30):
+                batch_ids = user_ids[i:i + 30]
+                query = apply_projection(
+                    self.db.collection(self.collection_name)
+                    .where(filter=FieldFilter("author_id", "in", batch_ids))
+                    .where(filter=FieldFilter("status", "==", "UNDER_REVIEW"))
+                    .order_by("updated_at", direction=firestore.Query.DESCENDING),
+                    BLOG_QUEUE_FIELDS,
                 )
-                for doc in docs:
+                for doc in query.stream():
                     data = doc.to_dict()
                     data["id"] = doc.id
                     pending_blogs.append(data)
 
             return pending_blogs
 
-        except Exception as e:
-            logger.exception("Approval Queue Error:", e)
+        except Exception:
+            logger.exception("Approval Queue Error")
             return []
 
     def get_total_blogs_count(self, user_id):
@@ -237,34 +270,72 @@ class BlogRepository:
             return 0
 
     def get_paginated_drafts(self, user_id, page=1, per_page=10):
+        """One page of the author's drafts, plus the exact total.
+
+        Already paged server-side, but it was still fetching whole documents for
+        the ten rows it returns -- and a draft is the largest kind of blog
+        document, carrying the markdown source, the rendered body and the
+        embedding vector. ``drafts.js`` loads the body from
+        ``/api/get_blog/<id>`` when a row is opened, so the list never needed
+        it. The page query and the count are independent, so they go out
+        together instead of one after the other.
+        """
         try:
-            skip = (page - 1) * per_page
-            query = self.db.collection(self.collection_name)\
-                           .where(filter=FieldFilter('author_id', '==', user_id))\
-                           .where(filter=FieldFilter('status', '==', 'DRAFT'))\
-                           .order_by('updated_at', direction=firestore.Query.DESCENDING)\
-                           .offset(skip)\
-                           .limit(per_page)
-            
-            drafts = []
-            for doc in query.stream():
-                data = doc.to_dict()
-                data['id'] = doc.id
-                drafts.append(data)
+            base = (self.db.collection(self.collection_name)
+                    .where(filter=FieldFilter('author_id', '==', user_id))
+                    .where(filter=FieldFilter('status', '==', 'DRAFT')))
 
-            total_count_query = self.db.collection(self.collection_name)\
-                                           .where(filter=FieldFilter('author_id', '==', user_id))\
-                                           .where(filter=FieldFilter('status', '==', 'DRAFT'))\
-                                           .count()
-            total_count = total_count_query.get()[0][0].value
+            def fetch_page():
+                query = apply_projection(
+                    base.order_by('updated_at', direction=firestore.Query.DESCENDING),
+                    BLOG_LIST_FIELDS,
+                ).offset((page - 1) * per_page).limit(per_page)
+                rows = []
+                for doc in query.stream():
+                    data = doc.to_dict()
+                    data['id'] = doc.id
+                    rows.append(data)
+                return rows
 
-            return drafts, total_count
+            def fetch_count():
+                return base.count().get()[0][0].value
+
+            from app.utils.parallel import run_parallel_simple
+
+            drafts, total_count = run_parallel_simple(
+                [(fetch_page, ()), (fetch_count, ())], max_workers=2
+            )
+            return drafts or [], total_count or 0
         except Exception:
             logger.exception("Error fetching paginated drafts")
             return [], 0
 
     def get_all_blogs_filtered(self, user_ids, status_filter='all', category_filter='all',
-                                search='', date_from='', date_to='', page=1, per_page=10):
+                                search='', date_from='', date_to='', page=1, per_page=10,
+                                author_names=None):
+        """The all-blogs table: every team post, filtered and paged.
+
+        ``author_names`` is an optional ``{uid: display name}`` map. Callers
+        that have already loaded the team -- and every caller has, because the
+        team is where ``user_ids`` came from -- should pass it. Without it this
+        method re-reads one user document per team member to recover names those
+        documents already contained, which is a round trip each for data the
+        caller was holding.
+
+        Projected to :data:`BLOG_LIST_FIELDS`. The table renders a title,
+        author, category, status and date; the edit dialog fetches the body
+        separately through ``/api/get_blog/<id>`` when a row is opened. Before
+        the projection this streamed every full document -- including each
+        post's rendered body and its semantic-search embedding vector -- to
+        render ten rows of five fields, measured at 6.6 s for 58 documents.
+
+        The filtering, sorting and paging still happen in Python rather than in
+        Firestore. That is deliberate and not the bottleneck: free-text search
+        across title/category/author, an optional category filter and a date
+        range cannot be expressed as one Firestore query without a composite
+        index per combination, and with the projection applied the whole
+        working set is a few tens of kilobytes.
+        """
         try:
             from app.utils.parallel import run_parallel_simple
 
@@ -276,21 +347,37 @@ class BlogRepository:
                     return (uid, u.get('name') or u.get('email', '').split('@')[0] or 'Unknown')
                 return (uid, 'Unknown')
 
-            user_tasks = [(fetch_user_name, (uid,)) for uid in user_ids]
-            user_results = run_parallel_simple(user_tasks, max_workers=min(len(user_ids), 10))
-            user_name_map = {uid: name for uid, name in user_results if uid}
+            def fetch_blogs():
+                found = []
+                for i in range(0, len(user_ids), 30):
+                    batch_ids = user_ids[i:i + 30]
+                    query = apply_projection(
+                        self.db.collection(self.collection_name)
+                        .where(filter=FieldFilter("author_id", "in", batch_ids)),
+                        BLOG_LIST_FIELDS,
+                    )
+                    for doc in query.stream():
+                        data = doc.to_dict()
+                        data['id'] = doc.id
+                        found.append(data)
+                return found
 
-            all_blogs = []
-            for i in range(0, len(user_ids), 30):
-                batch_ids = user_ids[i:i+30]
-                docs = (self.db.collection(self.collection_name)
-                        .where(filter=FieldFilter("author_id", "in", batch_ids))
-                        .stream())
-                for doc in docs:
-                    data = doc.to_dict()
-                    data['id'] = doc.id
-                    data['author_name'] = user_name_map.get(data.get('author_id'), 'Unknown')
-                    all_blogs.append(data)
+            # Only look up names the caller could not supply. When it supplied
+            # all of them this is a single query; otherwise the remaining
+            # lookups run alongside the scan rather than before it.
+            supplied = dict(author_names or {})
+            missing = [uid for uid in user_ids if uid not in supplied]
+
+            tasks = [(fetch_blogs, ())]
+            tasks += [(fetch_user_name, (uid,)) for uid in missing]
+            results = run_parallel_simple(tasks, max_workers=min(len(tasks), 10))
+
+            all_blogs = results[0] or []
+            for pair in results[1:]:
+                if pair and pair[0]:
+                    supplied[pair[0]] = pair[1]
+            for data in all_blogs:
+                data['author_name'] = supplied.get(data.get('author_id'), 'Unknown')
 
             all_blogs.sort(key=lambda x: x.get('updated_at') or x.get('created_at') or datetime.min, reverse=True)
 
@@ -411,6 +498,30 @@ class BlogRepository:
             logger.exception("Error getting published blogs count")
             return 0
 
+    @retry_on_unavailable
+    def count_team_blogs_by_status(self, user_ids, status):
+        """Exact number of the team's blogs in ``status``.
+
+        The dashboard shows these as headline figures, and it used to derive
+        them from ``len()`` of the list it had just streamed -- which is why
+        those lists could not be bounded without the numbers going wrong. A
+        ``count()`` aggregation separates the two concerns: the number is exact
+        and costs one round trip that transfers a single integer, so the list
+        beside it is free to be capped at the handful of rows actually rendered.
+        """
+        try:
+            total = 0
+            for i in range(0, len(user_ids), 30):
+                query = (self.db.collection(self.collection_name)
+                         .where(filter=FieldFilter('author_id', 'in', user_ids[i:i + 30]))
+                         .where(filter=FieldFilter('status', '==', status))
+                         .count())
+                total += query.get()[0][0].value
+            return total
+        except Exception:
+            logger.exception("Error counting team blogs by status %s", status)
+            return 0
+
     def get_user_published_count(self, user_id):
         """Get count of published blogs authored by this specific user only."""
         try:
@@ -474,7 +585,7 @@ class BlogRepository:
             return False
 
     @retry_on_unavailable
-    def get_published_blogs(self, user_id, limit=20):
+    def get_published_blogs(self, user_id, limit=20, fields=None):
         """
         Fetches published blogs for the public site.
         Returns blogs ordered by updated_at descending.
@@ -482,8 +593,19 @@ class BlogRepository:
         Falls back to author_id for backwards compatibility with older blogs.
         Uses in-memory cache with 2-minute TTL to reduce Firestore queries.
         Runs both queries in parallel for faster response times.
+
+        ``fields`` defaults to ``None``, meaning the whole document, because the
+        public article pages render the body and must have it. Callers that only
+        list posts -- the published-post picker in site settings, the newsletter
+        composer, the sitemap -- should pass :data:`BLOG_LIST_FIELDS`, which
+        leaves the body and the semantic-search embedding vector on the server.
+        The projection is part of the cache key, so a list-shaped result can
+        never be served to a caller that asked for full documents.
         """
-        cache_key = f"published_blogs:{user_id}:{limit}"
+        projection = tuple(fields) if fields else None
+        cache_key = 'published_blogs:%s:%s:%s' % (
+            user_id, limit, ','.join(projection) if projection else 'full',
+        )
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
@@ -491,43 +613,47 @@ class BlogRepository:
         try:
             from app.utils.parallel import run_parallel_simple
 
-            def _fetch_by_site_owner():
+            # One implementation, two owner fields. The two branches were
+            # byte-identical apart from the field they filter on, which meant
+            # any change to the content coercion or the slug backfill had to be
+            # made twice and stayed correct only by luck.
+            def _fetch_by(owner_field):
                 results = []
                 query = self.db.collection(self.collection_name)\
-                    .where(filter=FieldFilter('site_owner_id', '==', user_id))\
+                    .where(filter=FieldFilter(owner_field, '==', user_id))\
                     .where(filter=FieldFilter('status', '==', 'PUBLISHED'))
+                query = apply_projection(query, projection)
+                # Deliberately *not* ordered or limited server-side, even
+                # though both branches are merged and then truncated to
+                # `limit`. Adding `.order_by('updated_at').limit(limit)` needs a
+                # (site_owner_id, status, updated_at) composite index that does
+                # not exist -- the author_id equivalent does, which is what
+                # makes the mistake easy. Firestore answers the unindexed query
+                # with FAILED_PRECONDITION, the caller swallows it, and the
+                # site_owner_id branch silently returns nothing: measured here,
+                # 21 published posts disappeared from the public site while the
+                # page still rendered a 200. The projection below is where the
+                # win is anyway (750-820 ms against 4.6-8.0 s), and it needs no
+                # index. Ordering stays in Python, as it was.
                 for doc in query.stream():
                     data = doc.to_dict()
                     data['id'] = doc.id
-                    raw_content = data.get('content', '')
-                    if isinstance(raw_content, dict):
-                        data['content'] = raw_content
-                    else:
-                        data['content'] = {'body': str(raw_content) if raw_content else ''}
-                    data = self._ensure_blog_slug(data, doc.id)
-                    results.append(data)
-                return results
-
-            def _fetch_by_author():
-                results = []
-                query = self.db.collection(self.collection_name)\
-                    .where(filter=FieldFilter('author_id', '==', user_id))\
-                    .where(filter=FieldFilter('status', '==', 'PUBLISHED'))
-                for doc in query.stream():
-                    data = doc.to_dict()
-                    data['id'] = doc.id
-                    raw_content = data.get('content', '')
-                    if isinstance(raw_content, dict):
-                        data['content'] = raw_content
-                    else:
-                        data['content'] = {'body': str(raw_content) if raw_content else ''}
+                    # Only coerce content when it was actually requested: a
+                    # projection without it would otherwise manufacture an
+                    # empty body and hide the fact that it was never fetched.
+                    if projection is None or 'content' in projection:
+                        raw_content = data.get('content', '')
+                        if isinstance(raw_content, dict):
+                            data['content'] = raw_content
+                        else:
+                            data['content'] = {'body': str(raw_content) if raw_content else ''}
                     data = self._ensure_blog_slug(data, doc.id)
                     results.append(data)
                 return results
 
             parallel_results = run_parallel_simple([
-                (_fetch_by_site_owner, ()),
-                (_fetch_by_author, ()),
+                (_fetch_by, ('site_owner_id',)),
+                (_fetch_by, ('author_id',)),
             ], max_workers=2)
 
             site_owner_blogs = parallel_results[0] or []
@@ -554,26 +680,37 @@ class BlogRepository:
             logger.exception("Error fetching published blogs")
             return []
 
-    def get_published_blog_by_id(self, blog_id):
+    def get_published_blog_by_id(self, blog_id, fields=None):
         """
         Fetches a single published blog by ID.
         Returns None if blog doesn't exist or is not published.
         Auto-generates slug if missing.
         """
         try:
-            doc = self.db.collection(self.collection_name).document(blog_id).get()
+            doc_ref = self.db.collection(self.collection_name).document(blog_id)
+            # DocumentReference.get takes field_paths, which is the single-document
+            # equivalent of Query.select. A caller that only needs a teaser card
+            # should pass BLOG_CARD_FIELDS: this one document read measured
+            # 3986 ms unprojected on the public homepage, because a blog document
+            # carries the whole post plus its semantic-search embedding vector.
+            # `status` must be in any projection -- the publish check below reads
+            # it -- and BLOG_LIST_FIELDS includes it.
+            doc = doc_ref.get(field_paths=list(fields)) if fields else doc_ref.get()
             if doc.exists:
                 data = doc.to_dict()
                 # Only return if published
                 if data.get('status') != 'PUBLISHED':
                     return None
                 data['id'] = doc.id
-                # Process content for display
-                raw_content = data.get('content', '')
-                if isinstance(raw_content, dict):
-                    data['content'] = raw_content
-                else:
-                    data['content'] = {'body': str(raw_content) if raw_content else ''}
+                # Only synthesise a content map when content was requested; a
+                # projection that omitted it must not be handed back an empty
+                # body that looks like a post with nothing in it.
+                if fields is None or 'content' in fields:
+                    raw_content = data.get('content', '')
+                    if isinstance(raw_content, dict):
+                        data['content'] = raw_content
+                    else:
+                        data['content'] = {'body': str(raw_content) if raw_content else ''}
                 # Ensure slug exists (auto-migrate if needed)
                 data = self._ensure_blog_slug(data, doc.id)
                 return data
@@ -582,19 +719,28 @@ class BlogRepository:
             logger.exception(f"Error fetching published blog {blog_id}")
             return None
 
-    def get_published_blog_by_slug(self, user_id, slug):
+    def get_published_blog_by_slug(self, user_id, slug, fields=BLOG_ARTICLE_FIELDS):
         """
         Fetches a published blog by slug.
         Also checks old_slugs for 301 redirect handling.
         Returns dict with 'blog', 'redirect' (bool), and 'new_slug' (if redirect).
+
+        Projected to :data:`BLOG_ARTICLE_FIELDS` by default. This is the public
+        article page -- the most-requested page on the site -- and it was reading
+        whole blog documents, 59% of which is the semantic-search embedding
+        vector plus the formatting and outline maps that no template touches.
+        ``old_slugs`` stays in the projection because the redirect branch below
+        filters on it. Pass ``fields=None`` for the whole document.
         """
         try:
             # Try current slug first
-            query = self.db.collection(self.collection_name)\
-                .where(filter=FieldFilter('site_owner_id', '==', user_id))\
-                .where(filter=FieldFilter('slug', '==', slug))\
-                .where(filter=FieldFilter('status', '==', 'PUBLISHED'))\
-                .limit(1)
+            query = apply_projection(
+                self.db.collection(self.collection_name)
+                .where(filter=FieldFilter('site_owner_id', '==', user_id))
+                .where(filter=FieldFilter('slug', '==', slug))
+                .where(filter=FieldFilter('status', '==', 'PUBLISHED')),
+                fields,
+            ).limit(1)
             docs = list(query.stream())
             if docs:
                 data = docs[0].to_dict()
@@ -608,11 +754,13 @@ class BlogRepository:
                 return {'blog': data, 'redirect': False}
 
             # Check old_slugs for 301 redirect
-            query = self.db.collection(self.collection_name)\
-                .where(filter=FieldFilter('site_owner_id', '==', user_id))\
-                .where(filter=FieldFilter('old_slugs', 'array_contains', slug))\
-                .where(filter=FieldFilter('status', '==', 'PUBLISHED'))\
-                .limit(1)
+            query = apply_projection(
+                self.db.collection(self.collection_name)
+                .where(filter=FieldFilter('site_owner_id', '==', user_id))
+                .where(filter=FieldFilter('old_slugs', 'array_contains', slug))
+                .where(filter=FieldFilter('status', '==', 'PUBLISHED')),
+                fields,
+            ).limit(1)
             docs = list(query.stream())
             if docs:
                 data = docs[0].to_dict()

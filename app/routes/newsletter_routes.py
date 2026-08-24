@@ -265,13 +265,20 @@ def get_subscribers():
         return jsonify({"error": "Unauthorized"}), 401
 
     try:
+        from app.utils.parallel import run_parallel_simple
+
         firestore = FirestoreService()
-        subscribers = firestore.get_newsletter_subscribers(user_id, limit=500)
-        count = firestore.get_subscriber_count(user_id)
+        # The list and the count are independent queries; run back to back they
+        # cost the sum of two Firestore round trips (0.5-3.5 s each here) to
+        # answer one request.
+        subscribers, count = run_parallel_simple([
+            (firestore.get_newsletter_subscribers, (user_id, 500)),
+            (firestore.get_subscriber_count, (user_id,)),
+        ], max_workers=2)
 
         return jsonify({
-            "subscribers": subscribers,
-            "count": count
+            "subscribers": subscribers or [],
+            "count": count or 0
         })
 
     except Exception as e:
@@ -612,11 +619,19 @@ def get_status():
         return jsonify({"error": "Unauthorized"}), 401
 
     try:
+        from app.utils.parallel import run_parallel_simple
+
         firestore = FirestoreService()
         email_service = EmailService()
 
-        subscriber_count = firestore.get_subscriber_count(user_id)
-        email_status = email_service.test_connection()
+        # A Firestore count and an SMTP credential check share nothing. The
+        # SMTP check is cached, so on a warm cache this is one round trip; on a
+        # cold one the two overlap instead of adding up.
+        subscriber_count, email_status = run_parallel_simple([
+            (firestore.get_subscriber_count, (user_id,)),
+            (email_service.test_connection, ()),
+        ], max_workers=2)
+        email_status = email_status or {'valid': False, 'error': 'check failed'}
 
         return jsonify({
             "subscriber_count": subscriber_count,

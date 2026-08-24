@@ -1,681 +1,362 @@
 /* ==========================================================================
-   Leads Dashboard Styles
+   Leads — the contact-form inbox
+
+   Composed from the shared primitives in dashboard.css: §12's .stat-card /
+   .filter-bar / .surface-card / .card-head / .data-row / .status-pill /
+   .list-empty / .seg-tabs / .pager, and §14's .app-modal / .app-field /
+   .app-btn. A lead is the same kind of record as a draft, a person or a
+   comment — a mark, a title, a line of meta and a trailing control — so it
+   now reads like one.
+
+   What used to live here was a parallel implementation of all of that:
+   .leads-stats-row restating the stat tile, .leads-filters / .filter-tab,
+   .leads-container with a .leads-list-header of column captions above flex
+   .lead-rows, .lead-dropdown / .lead-dots-btn / .lead-dropdown-menu (a
+   hand-rolled menu with its own open/close state and its own document click
+   handler), .leads-pagination / .page-btn, and — the biggest piece —
+   .lead-modal-overlay / .lead-modal / .lead-btn: a second modal system with
+   its own backdrop, its own show/hide class and no focus trap or Esc key,
+   living beside the Bootstrap one the rest of the app uses.
+
+   The row led with the sender's name and pushed what they actually wrote into
+   a truncated middle column. An inbox is read by subject, so the subject is
+   now the row title and the sender is its meta.
+
+   What is genuinely specific to this screen and stays:
+     - the column template (an unread flag and a date each get a column)
+     - the unread treatment
+     - the message dialog's facts grid and message block
+     - the ⋮ menu, restated because this page loads none of the listing
+       stylesheets that also define it
    ========================================================================== */
 
-/* ==================== STATS ROW ==================== */
-.leads-stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.25rem;
-    margin-bottom: 2rem;
-}
-
-.leads-stats-row .stat-card {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 1.25rem 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    transition: all 0.2s ease;
-}
-
-.leads-stats-row .stat-card:hover {
-    box-shadow: var(--shadow-card);
-    transform: translateY(-2px);
-}
-
-.leads-stats-row .stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    flex-shrink: 0;
-}
-
-.leads-stats-row .stat-total { background: var(--accent-tint); color: var(--primary-color); }
-.leads-stats-row .stat-unread { background: var(--info-soft); color: var(--info); }
-.leads-stats-row .stat-read { background: var(--success-soft); color: var(--success); }
-
-.leads-stats-row .stat-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.leads-stats-row .stat-count {
-    font-size: 1.5rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    line-height: 1.2;
-}
-
-.leads-stats-row .stat-label {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    font-weight: 500;
-}
-
-/* ==================== FILTER SECTION ==================== */
-.leads-filters {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.leads-filter-tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
-}
-
-.leads-filter-tabs .filter-tab {
-    padding: 0.5rem 1.25rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface-1);
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.leads-filter-tabs .filter-tab:hover {
-    background: var(--surface-2);
-    color: var(--text-2);
-    border-color: var(--border-strong);
-}
-
-.leads-filter-tabs .filter-tab.active {
-    background: var(--primary-color);
-    color: var(--text-on-accent);
-    border-color: var(--primary-color);
-    box-shadow: var(--elev-2);
-}
-
-.leads-filter-controls {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.leads-filters .filter-search-wrap {
-    position: relative;
-    flex: 1;
-    min-width: 200px;
-    max-width: 400px;
-}
-
-.leads-filters .filter-search-wrap i {
-    position: absolute;
-    left: 0.85rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-faint);
-    font-size: 0.85rem;
-}
-
-.leads-filters .filter-search {
-    width: 100%;
-    padding: 0.55rem 0.85rem 0.55rem 2.25rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-body);
-    font-size: 0.82rem;
-    color: var(--text-2);
-    transition: all 0.2s ease;
-}
-
-.leads-filters .filter-search:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--focus-ring);
-    background: var(--surface-1);
-}
-
-/* ==================== LEADS TABLE ==================== */
-.leads-container {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    overflow: visible;
-}
-
-.leads-list-header {
-    display: flex;
-    padding: 1rem 2rem;
-    background: var(--bg-body);
-    border-bottom: 1px solid var(--border-subtle);
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--secondary-color);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.col-lead-status { flex: 0.3; min-width: 0; padding-right: 0.5rem; }
-.col-lead-name { flex: 2; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-lead-email { flex: 2.5; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-lead-subject { flex: 3; min-width: 0; overflow: hidden; padding-right: 1rem; }
-.col-lead-date { flex: 1.5; min-width: 0; padding-right: 1rem; }
-.col-lead-actions { flex: 0.8; min-width: 0; text-align: center; }
-
-/* ==================== LEAD ROW ==================== */
-.lead-row {
-    display: flex;
-    align-items: center;
-    padding: 0.9rem 2rem;
-    border-bottom: 1px solid var(--border-subtle);
-    transition: all 0.15s ease;
-    cursor: pointer;
-}
-
-.lead-row:hover {
-    background: var(--bg-body);
-}
-
-.lead-row:last-child {
-    border-bottom: none;
-}
-
-.lead-row.unread {
-    background: var(--info-soft);
-    border-left: 3px solid var(--info);
-}
+/* --- Stats -------------------------------------------------------------- */
 
-.lead-row.unread:hover {
-    background: var(--info-soft);
+.leads-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
 }
 
-.lead-status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--surface-4);
-    flex-shrink: 0;
-}
-
-.lead-row.unread .lead-status-dot {
-    background: var(--info);
-    box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
-.lead-name {
-    font-weight: 500;
-    font-size: 0.85rem;
-    color: var(--text-strong);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.lead-row.unread .lead-name {
-    font-weight: 500;
-}
-
-.lead-email {
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.lead-subject {
-    font-size: 0.82rem;
-    color: var(--text-2);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.lead-row.unread .lead-subject {
-    color: var(--text-strong);
-    font-weight: 500;
-}
-
-.lead-date {
-    font-size: 0.78rem;
-    color: var(--text-faint);
-    white-space: nowrap;
-}
-
-.lead-actions {
-    display: flex;
-    justify-content: center;
-}
-
-/* ==================== 3-DOT DROPDOWN ==================== */
-.lead-dropdown {
-    position: relative;
-    display: flex;
-    justify-content: center;
-}
-
-.lead-dots-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-sm);
-    border: none;
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-size: 1rem;
-    color: var(--text-faint);
-}
-
-.lead-dots-btn:hover {
-    background: var(--surface-3);
-    color: var(--text-2);
-}
-
-.lead-dropdown-menu {
-    position: absolute;
-    right: 0;
-    top: 100%;
-    margin-top: 4px;
-    background: var(--surface-1);
-    border-radius: var(--radius-sm);
-    box-shadow: var(--elev-2);
-    border: 1px solid var(--border);
-    min-width: 160px;
-    padding: 0.4rem;
-    z-index: 100;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-4px) scale(0.95);
-    transition: all 0.15s ease;
-}
-
-.lead-dropdown-menu.show {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0) scale(1);
-}
-
-.lead-dropdown-menu .dropdown-item {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    width: 100%;
-    padding: 0.55rem 0.85rem;
-    border: none;
-    background: none;
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-2);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: all 0.12s ease;
-    text-align: left;
-}
-
-.lead-dropdown-menu .dropdown-item:hover {
-    background: var(--surface-3);
-    color: var(--text-strong);
-}
-
-.lead-dropdown-menu .dropdown-item-danger {
-    color: var(--danger);
-}
-
-.lead-dropdown-menu .dropdown-item-danger:hover {
-    background: var(--danger-soft);
-    color: var(--danger);
-}
-
-/* ==================== EMPTY STATE ==================== */
-.leads-empty {
-    text-align: center;
-    padding: 3rem 1rem;
-}
-
-.leads-empty-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: var(--accent-tint);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 1rem;
-    font-size: 1.5rem;
-    color: var(--primary-color);
-}
+/* Medallion hues. What a tile *means* is a page-level decision, so these stay
+   here while the tile itself lives in dashboard.css §12. */
+.stat-all { background: var(--accent-tint); color: var(--accent); }
+.stat-new { background: var(--info-soft); color: var(--info); }
+.stat-seen { background: var(--success-soft); color: var(--success); }
 
-.leads-empty-title {
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    margin-bottom: 0.3rem;
-}
-
-.leads-empty-text {
-    font-size: 0.85rem;
-    color: var(--text-faint);
-}
+/* --- Filter bar --------------------------------------------------------- */
 
-/* ==================== PAGINATION ==================== */
-.leads-pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 1.5rem 0 0.5rem;
+.leads-filter {
+  padding: var(--sp-4);
 }
 
-.leads-pagination .page-btn {
-    width: 34px;
-    height: 34px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
+/* --- Rows --------------------------------------------------------------- */
 
-.leads-pagination .page-btn:hover {
-    border-color: var(--primary-color);
-    color: var(--primary-color);
+.leads-card {
+  padding-bottom: var(--sp-6);
+  /* the ⋮ menu escapes the card */
+  overflow: visible;
 }
 
-.leads-pagination .page-btn.active {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: var(--text-on-accent);
-    box-shadow: var(--elev-2);
+.leads-list {
+  padding: var(--sp-4) var(--sp-4) 0;
 }
 
-.leads-pagination .page-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
+/* Whether a message has been read, and when it arrived, each get a column of
+   their own rather than another line of meta. An inbox is scanned down these
+   two, and that only works when they line up.
 
-/* ==================== CUSTOM MODAL ==================== */
-.lead-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--scrim);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.2s ease;
-    padding: 1rem;
+   Fixed tracks rather than `auto`, because .data-rows is a grid of grids —
+   each row sizes its own columns, so an `auto` flag column would sit at a
+   different offset on every row and there would be nothing to scan down. */
+.leads-list .data-row {
+  grid-template-columns: 36px minmax(0, 1fr) 96px 112px auto;
 }
 
-.lead-modal-overlay.active {
-    opacity: 1;
-    visibility: visible;
+/* `start` keeps the pill only as wide as its own label inside its track. */
+.leads-list .data-row .status-pill {
+  justify-self: start;
 }
 
-.lead-modal {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    width: 100%;
-    max-width: 520px;
-    box-shadow: var(--elev-3);
-    transform: translateY(10px) scale(0.97);
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    overflow: hidden;
+.leads-list .data-row .row-time {
+  justify-self: start;
 }
 
-.lead-modal-overlay.active .lead-modal {
-    transform: translateY(0) scale(1);
-}
+/* --- Unread ------------------------------------------------------------
+   Carried by three channels at once — the mark takes the accent, the subject
+   goes to full strength, and the pill says the word — because "there is
+   something here you have not dealt with" is the one thing this screen exists
+   to tell you, and a single dot is easy to miss in a full list.
 
-.lead-modal-sm {
-    max-width: 380px;
-}
+   Read rows are the ones that recede. Nothing is drawn in the flag column for
+   them: a pill on every row saying "Read" would be a column of noise hiding
+   the handful that need attention. The empty cell keeps the column aligned.
+   ------------------------------------------------------------------------ */
 
-.lead-modal-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--border-subtle);
+.leads-list .data-row.is-unread .row-mark {
+  background: var(--accent-soft);
+  color: var(--accent-on-soft);
 }
 
-.lead-modal-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    flex-shrink: 0;
+.leads-list .data-row:not(.is-unread) .row-title {
+  color: var(--text-2);
 }
 
-.lead-modal-icon.view-icon {
-    background: var(--accent-tint);
-    color: var(--primary-color);
+.status-pill.status-unread {
+  background: var(--accent-soft);
+  color: var(--accent-on-soft);
 }
 
-.lead-modal-icon.danger-icon {
-    background: var(--danger-soft);
-    color: var(--danger);
+/* A lead with no subject line still needs a title, and "No subject" is a
+   placeholder rather than something the sender wrote. Scoped under .leads-list
+   so it outweighs the read-row rule above, which is three classes deep. */
+.leads-list .row-title.is-placeholder {
+  font-weight: var(--fw-regular);
+  color: var(--text-faint);
 }
 
-.lead-modal-title {
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--text-strong);
-    margin: 0;
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+/* --- Loading state ------------------------------------------------------
+   The list arrives over fetch on every filter, search and page change, so the
+   card has a third state between empty and full. Same shape as .list-empty,
+   without the icon medallion.
+   ------------------------------------------------------------------------ */
 
-.lead-modal-close {
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-sm);
-    border: none;
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: var(--text-faint);
-    transition: all 0.15s ease;
-    font-size: 0.9rem;
-    flex-shrink: 0;
+.leads-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-12) var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
 }
 
-.lead-modal-close:hover {
-    background: var(--surface-3);
-    color: var(--text-2);
+.leads-state p {
+  margin: 0;
 }
 
-.lead-modal-body {
-    padding: 1.5rem;
-}
+/* --- Message dialog ----------------------------------------------------
+   The subject is the dialog's title, so it is not repeated in the body. What
+   is left is who sent it, when, and what they said.
+   ------------------------------------------------------------------------ */
 
-.lead-meta-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1.25rem;
+.lead-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-5);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
 }
 
-.lead-meta-grid .lead-meta-item:last-child {
-    grid-column: 1 / -1;
+.lead-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.lead-meta-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+.lead-fact-label {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-.lead-meta-label {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
+.lead-fact-value {
+  font-size: var(--fs-sm);
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.lead-meta-value {
-    font-size: 0.88rem;
-    color: var(--text-strong);
-    font-weight: 500;
+/* The address is a mailto, because the reason to read it here is to answer
+   it. The old dialog printed it as plain text and put a Delete button beside
+   it — the only two things you could do with a sales enquiry were read it and
+   destroy it. */
+a.lead-fact-value {
+  color: var(--accent);
+  text-decoration: none;
 }
 
-.lead-message-box {
-    position: relative;
+a.lead-fact-value:hover {
+  text-decoration: underline;
 }
 
 .lead-message-label {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 0.5rem;
-    display: block;
+  display: block;
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-.lead-message-content {
-    font-size: 0.88rem;
-    color: var(--text-1);
-    line-height: 1.7;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    max-height: 250px;
-    overflow-y: auto;
-    padding: 1rem;
-    background: var(--surface-2);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
+/* `pre-wrap`, because a contact form is a plain textarea: the paragraph breaks
+   the sender typed are the only structure the message has. */
+.lead-message {
+  padding: var(--sp-4);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--text-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.lead-modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.6rem;
-    padding: 1rem 1.5rem;
-    border-top: 1px solid var(--border-subtle);
-    background: var(--surface-2);
+/* --- Delete dialog ----------------------------------------------------- */
+
+.delete-copy strong {
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
 }
 
-.lead-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.55rem 1.1rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.82rem;
-    font-weight: 500;
-    border: none;
-    cursor: pointer;
-    transition: all 0.15s ease;
+/* --- Row menu -----------------------------------------------------------
+   The same treatment the drafts, all-blogs and users listings give their ⋮
+   menus, restated because this page loads none of those stylesheets.
+   ------------------------------------------------------------------------ */
+
+.btn-dropdown-trigger {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: var(--transition-base);
 }
 
-.lead-btn-ghost {
-    background: var(--surface-1);
-    color: var(--text-muted);
-    border: 1px solid var(--border);
+.btn-dropdown-trigger:hover {
+  background: var(--surface-3);
+  color: var(--text-strong);
 }
 
-.lead-btn-ghost:hover {
-    background: var(--surface-2);
-    border-color: var(--border-strong);
-    color: var(--text-2);
+.dropdown-menu {
+  border: none;
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2);
+  padding: var(--sp-2);
+  min-width: 208px;
 }
 
-.lead-btn-danger {
-    background: var(--danger);
-    color: var(--text-on-accent);
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-1);
+  transition: var(--transition-base);
 }
 
-.lead-btn-danger:hover {
-    background: var(--danger);
-    box-shadow: var(--elev-2);
+.dropdown-item:hover {
+  background: var(--surface-2);
+  color: var(--text-strong);
 }
 
-.lead-btn-danger:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-    box-shadow: none;
+.dropdown-item i {
+  width: 20px;
+  text-align: center;
+  font-size: 1rem;
 }
 
-.lead-btn .spinner-border {
-    width: 14px;
-    height: 14px;
-    border-width: 2px;
+.dropdown-item.text-danger {
+  color: var(--danger);
 }
 
-.delete-confirm-text {
-    font-size: 0.88rem;
-    color: var(--text-2);
-    line-height: 1.6;
-    margin: 0;
+.dropdown-item.text-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
-/* ==================== RESPONSIVE ==================== */
-@media (max-width: 1024px) {
-    .leads-stats-row {
-        grid-template-columns: repeat(3, 1fr);
-    }
+.dropdown-divider {
+  margin: var(--sp-1) 0;
+  border-color: var(--border-subtle);
 }
 
-@media (max-width: 768px) {
-    .leads-stats-row {
-        grid-template-columns: 1fr;
-    }
+/* Both of these are rendered on every row and revealed by CSS only once the
+   column they stand in for has been dropped — see the media queries below.
+   Always in the markup, so nothing has to re-render on resize. */
+.row-meta-when,
+.row-meta-unread {
+  display: none;
+}
 
-    .leads-list-header {
-        display: none;
-    }
+/* --- Responsive --------------------------------------------------------- */
 
-    .lead-row {
-        flex-wrap: wrap;
-        padding: 1rem 1.25rem;
-        gap: 0.4rem;
-    }
+@media (max-width: 860px) {
+  /* The date column goes first: it is the least of the three things a row
+     says, and it reappears in the meta line in the same breath.
 
-    .col-lead-status { display: none; }
-    .col-lead-name { flex: 1 1 100%; }
-    .col-lead-email { flex: 1 1 100%; }
-    .col-lead-subject { flex: 1 1 100%; }
-    .col-lead-date { flex: 1 1 50%; }
-    .col-lead-actions { flex: 1 1 50%; }
+     Each blank has to go with the cell it stands in for. `display: none` takes
+     a grid item out of placement, but an empty <span> left behind still claims
+     a cell — so a read lead with no date would have five items for four tracks
+     and its ⋮ menu would wrap onto a second line. */
+  .leads-list .data-row {
+    grid-template-columns: 36px minmax(0, 1fr) 96px auto;
+  }
 
-    .leads-filter-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
+  .leads-list .data-row > .row-time,
+  .leads-list .data-row > .row-time-blank {
+    display: none;
+  }
 
-    .leads-filters .filter-search-wrap {
-        max-width: 100%;
-    }
+  .leads-list .data-row .row-meta-when {
+    display: inline;
+  }
+}
+
+@media (max-width: 620px) {
+  .leads-list .data-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: var(--sp-3);
+  }
+
+  .leads-card .row-mark {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* The flag column goes, but not the flag: it moves into the meta line,
+     where the accent mark beside it is still saying the same thing. */
+  .leads-list .data-row .status-pill,
+  .leads-list .data-row > .status-pill-blank {
+    display: none;
+  }
+
+  .leads-list .data-row.is-unread .row-meta-unread {
+    display: inline;
+  }
+
+  /* Wrapping, not truncating. Every piece of the meta line is a fixed short
+     string — a name, an address, a date, the word "Unread" — and squeezing
+     four of them into one phone-width line leaves each ellipsed to two or
+     three characters, which says nothing at all. */
+  .leads-list .row-meta {
+    flex-wrap: wrap;
+  }
+
+  /* <time> is not a <span>, so .row-meta > span's nowrap does not reach it and
+     "7 hours ago" broke across two lines mid-phrase. */
+  .leads-list .row-meta time {
+    white-space: nowrap;
+  }
+
+  /* A hover shortcut plus a menu is more than a phone row can carry, and the
+     menu offers everything the shortcut does. */
+  .leads-card .row-action {
+    display: none;
+  }
 }

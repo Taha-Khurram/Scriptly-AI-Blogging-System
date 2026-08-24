@@ -4,6 +4,9 @@ from app.firebase.firestore_service import FirestoreService
 from app.services.email_service import EmailService
 from app.utils.validators import is_valid_gmail
 from app.core.security import admin_required
+from app.core.sessions import current_sid, revoke_user_sessions
+from app.repositories.users import invalidate_team
+from app.utils.cache import cache
 
 from app.core.logging import get_logger
 
@@ -29,11 +32,20 @@ def manage_users():
 def list_sub_users():
     """Fetches users and pending invitations for the logged-in Admin."""
     try:
+        from app.utils.parallel import run_parallel_simple
+
         admin_id = session.get('user_id')
-        users = db_service.get_my_sub_users(admin_id)
+
+        # The team and the pending invitations are separate collections and
+        # separate queries. Run one after the other they cost two Firestore
+        # round trips in series, and a round trip here is 0.5-3.5 s.
+        users, invitations = run_parallel_simple([
+            (db_service.get_my_sub_users, (admin_id,)),
+            (db_service.get_invitations_by_admin, (admin_id,)),
+        ], max_workers=2)
 
         safe_users = []
-        for u in users:
+        for u in (users or []):
             clean_u = {}
             for k, v in u.items():
                 if hasattr(v, 'isoformat'):
@@ -44,7 +56,7 @@ def list_sub_users():
                     clean_u[k] = v
             safe_users.append(clean_u)
 
-        invitations = db_service.get_invitations_by_admin(admin_id)
+        invitations = invitations or []
 
         response = jsonify({"success": True, "users": safe_users, "invitations": invitations})
         response.headers['Cache-Control'] = 'no-cache, no-store'
@@ -161,6 +173,23 @@ def update_user_role():
 
     try:
         db_service.db.collection("users").document(user_id).update({"role": new_role})
+        # The cached team carries each member's role, so the list this
+        # screen just rendered is now stale in exactly the field it shows.
+        invalidate_team(session.get('user_id'))
+        # Drop the cached user record, or the next sign-in would be served the
+        # old role from cache rather than re-read from Firestore.
+        cache.delete(f'user:{user_id}')
+        # End their live sessions. The role is carried *in* the session, so
+        # without this a demoted admin keeps administrative access until their
+        # session expires -- up to SESSION_TIMEOUT_MINUTES, eight hours by
+        # default. Signing them out is what makes the demotion take effect now;
+        # they sign back in and pick up the new role. `except_sid` spares the
+        # acting admin so changing your own role does not log you out.
+        revoked = revoke_user_sessions(user_id, except_sid=current_sid())
+        logger.info(
+            'Role changed; sessions revoked',
+            extra={'user_id': user_id, 'new_role': new_role, 'revoked': revoked},
+        )
         db_service.log_activity(
             user_id=session.get('user_id'),
             user_name=session.get('user_name', 'Admin'),
@@ -198,6 +227,17 @@ def delete_user():
             pass
 
         db_service.db.collection("users").document(user_id).delete()
+        invalidate_team(admin_id)
+        cache.delete(f'user:{user_id}')
+        # Deleting the Firebase Auth account stops them getting a *new*
+        # session, but does nothing to the one they are holding: nothing on the
+        # request path re-checks Firebase once a Flask session exists. Without
+        # this, a deleted user keeps working until their session expires.
+        revoked = revoke_user_sessions(user_id)
+        logger.info(
+            'User deleted; sessions revoked',
+            extra={'user_id': user_id, 'revoked': revoked},
+        )
 
         db_service.log_activity(
             user_id=admin_id,

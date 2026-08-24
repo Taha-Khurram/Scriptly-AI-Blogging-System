@@ -168,6 +168,24 @@ class NewsletterRepository:
             logger.exception("Error logging newsletter")
             return False
 
+    def count_newsletter_history(self, user_id):
+        """How many newsletters this user has sent.
+
+        The newsletter screen showed this figure as ``len(get_newsletter_history())``,
+        which fetched up to twenty full history documents to produce one number
+        -- and silently capped the number at twenty, so an account that had sent
+        more would under-report. A ``count()`` aggregation is one round trip
+        that returns an integer and is exact.
+        """
+        try:
+            query = (self.db.collection('newsletter_history')
+                     .where(filter=FieldFilter('user_id', '==', user_id))
+                     .count())
+            return query.get()[0][0].value
+        except Exception:
+            logger.exception("Error counting newsletter history")
+            return 0
+
     def get_newsletter_history(self, user_id, limit=20):
         """Get newsletter send history."""
         try:

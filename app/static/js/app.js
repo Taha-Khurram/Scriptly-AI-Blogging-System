@@ -1912,35 +1912,161 @@ document.addEventListener("DOMContentLoaded", () => {
 // Session Inactivity Timeout
 // --------------------------------------------------------------------------
 
-(function() {
-    const TIMEOUT_MS = 15 * 60 * 1000;
-    const WARN_MS = 2 * 60 * 1000;
-    let timeoutTimer, warningTimer;
-
-    function resetTimers() {
-        clearTimeout(timeoutTimer);
-        clearTimeout(warningTimer);
-
-        warningTimer = setTimeout(() => {
-            if (window.showToast) {
-                showToast({
-                    type: 'warning',
-                    title: 'Session Expiring',
-                    message: 'Your session will expire in 2 minutes due to inactivity.',
-                    duration: 10000
-                });
-            }
-        }, TIMEOUT_MS - WARN_MS);
-
-        timeoutTimer = setTimeout(() => {
-            window.location.href = '/login?expired=1';
-        }, TIMEOUT_MS);
+(function () {
+    // Both numbers come from the server (see base.html), so the countdown here
+    // and the timeout there are the same value. This was hardcoded to 15
+    // minutes while the server allowed 480, so the browser signed people out
+    // at a moment the server did not recognise and neither could be changed
+    // without the other silently disagreeing.
+    function metaSeconds(name, fallback) {
+        const el = document.querySelector(`meta[name="${name}"]`);
+        const n = el ? parseInt(el.getAttribute('content'), 10) : NaN;
+        return (Number.isFinite(n) && n > 0) ? n : fallback;
     }
 
-    ['click', 'keydown', 'scroll', 'mousemove'].forEach(evt =>
-        document.addEventListener(evt, resetTimers, { passive: true })
-    );
-    resetTimers();
+    const TIMEOUT_MS = metaSeconds('session-timeout', 600) * 1000;
+    const WARN_MS = Math.min(metaSeconds('session-warning', 60) * 1000,
+                             Math.floor(TIMEOUT_MS / 2));
+
+    // Heartbeat at most this often. A third of the window means any activity
+    // keeps the session alive with ~3 requests per window, while a genuinely
+    // idle tab sends none and is allowed to expire — which is the entire point
+    // of an inactivity timeout, and why this is driven by interaction rather
+    // than by a bare interval.
+    const HEARTBEAT_MS = Math.max(30000, Math.floor(TIMEOUT_MS / 3));
+
+    let timeoutTimer = null, warningTimer = null;
+    let lastBeat = 0;
+    let stopped = false;
+
+    function scheduleFrom(remainingMs) {
+        clearTimeout(timeoutTimer);
+        clearTimeout(warningTimer);
+        if (stopped) return;
+
+        warningTimer = setTimeout(warn, Math.max(0, remainingMs - WARN_MS));
+        timeoutTimer = setTimeout(() => {
+            window.location.href = '/login?expired=1';
+        }, Math.max(0, remainingMs));
+    }
+
+    function warn() {
+        // Nothing in the editor autosaves, so being signed out mid-post loses
+        // the draft. The warning therefore carries an action rather than just
+        // announcing what is about to happen.
+        const seconds = Math.round(WARN_MS / 1000);
+        if (window.showToast) {
+            showToast({
+                type: 'warning',
+                title: 'Session expiring',
+                message: `You will be signed out in ${seconds} seconds. `
+                       + `Click anywhere to stay signed in.`,
+                duration: Math.max(WARN_MS - 2000, 5000)
+            });
+        }
+        // A click anywhere counts as activity and triggers a heartbeat, so the
+        // instruction above is literally true; force the next interaction to
+        // beat rather than be throttled out.
+        lastBeat = 0;
+    }
+
+    async function heartbeat() {
+        lastBeat = Date.now();
+        try {
+            const res = await fetch('/api/session/heartbeat', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (res.status === 401) {
+                // The global fetch wrapper handles the redirect for a
+                // session_expired body; stop our own timers either way so we
+                // do not race it.
+                stopped = true;
+                return;
+            }
+            const data = await res.json();
+            if (data && data.expires_in) {
+                // Resync to what the server actually granted, rather than
+                // trusting a local assumption about the window.
+                scheduleFrom(data.expires_in * 1000);
+            }
+        } catch (e) {
+            // Offline or a transient failure. Keep the existing countdown: it
+            // is the conservative choice, and the next interaction retries.
+        }
+    }
+
+    function onActivity() {
+        if (stopped) return;
+        const now = Date.now();
+        if (now - lastBeat >= HEARTBEAT_MS) {
+            heartbeat();
+        } else {
+            // Between heartbeats, keep the local countdown honest: the server
+            // expiry is still lastBeat + TIMEOUT, not now + TIMEOUT.
+            scheduleFrom(Math.max(0, lastBeat + TIMEOUT_MS - now));
+        }
+    }
+
+    const ACTIVITY_EVENTS = ['click', 'keydown', 'scroll', 'mousemove', 'touchstart'];
+
+    function bind(target) {
+        if (!target || target.__sessionActivityBound) return;
+        try {
+            ACTIVITY_EVENTS.forEach(evt =>
+                target.addEventListener(evt, onActivity, { passive: true })
+            );
+            target.__sessionActivityBound = true;
+        } catch (e) { /* a document we are not allowed to touch */ }
+    }
+
+    bind(document);
+
+    // TinyMCE renders the editor into an iframe, and events inside an iframe do
+    // not bubble to the parent document. Without this, someone writing a post
+    // is invisible to every listener above and to the server both -- so a
+    // ten-minute window would expire them mid-sentence. This is the case that
+    // makes a short timeout safe rather than hostile.
+    function bindFrames() {
+        document.querySelectorAll('iframe').forEach(frame => {
+            let doc = null;
+            try {
+                doc = frame.contentDocument;      // throws for cross-origin
+            } catch (e) { return; }
+            if (doc) bind(doc);
+        });
+    }
+
+    function bindEditors() {
+        bindFrames();
+        // TinyMCE's own hook catches editors created after this runs, which is
+        // every one of them: the editor is initialised when a dialog opens.
+        if (window.tinymce && typeof window.tinymce.on === 'function'
+            && !window.tinymce.__sessionActivityHooked) {
+            try {
+                window.tinymce.on('AddEditor', e => {
+                    if (!e.editor || typeof e.editor.on !== 'function') return;
+                    e.editor.on('init', () => bind(e.editor.getDoc && e.editor.getDoc()));
+                    e.editor.on('keydown click', onActivity);
+                });
+                window.tinymce.__sessionActivityHooked = true;
+            } catch (err) { /* older or partial TinyMCE build */ }
+        }
+    }
+
+    bindEditors();
+    // PJAX replaces .dashboard-main, so a new page brings new iframes and, on
+    // the pages that use it, a newly loaded TinyMCE.
+    document.addEventListener('pjax:complete', bindEditors);
+    // A dialog can create an editor well after navigation finishes; a slow
+    // sweep is cheaper than trying to hook every dialog-open path.
+    setInterval(bindEditors, 10000);
+
+    // Start the countdown from a full window: the page load itself was a
+    // request, so the server has just stamped the session.
+    lastBeat = Date.now();
+    scheduleFrom(TIMEOUT_MS);
 
     // ----------------------------------------------------------------------
     // fetch() wrapper: CSRF header on writes, plus session-expiry handling

@@ -2742,6 +2742,33 @@ pre {
     font-variant-numeric: tabular-nums;
 }
 
+/* The second line of a card head: what is being shown, when the title alone
+   does not say it -- "Page 2 of 4", the applied filter, the search that is in
+   force. A --text-faint aside to the title's statement, never a heading of its
+   own.
+
+   There was no shared definition: drafts.css, seo-tools.css, optimization.css
+   and formatting-tools.css each carried one, leads.css used the class without
+   defining it at all, and the note there rendered at body size in body colour.
+   The four page rules are left where they are -- they load after this file and
+   win at equal specificity, so nothing on those screens moves -- but this is
+   the definition a new screen gets, and the one Leads now gets.
+
+   Deliberately only type and colour. Three of those four screens use the slot
+   for a wrapping sentence with a 62ch measure, and they set no `white-space` of
+   their own -- so a `nowrap` here would reach straight through and flatten a
+   paragraph into one unbroken line. A note that is a page counter asks for
+   nowrap and tabular figures where it is used, not here. */
+.card-note {
+    min-width: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+.card-note:empty {
+    display: none;
+}
+
 .card-link {
     display: inline-flex;
     align-items: center;
@@ -2993,8 +3020,35 @@ pre {
     white-space: nowrap;
 }
 
-/* Below ~440px the trend is the first thing to go — the figure and its delta
-   are the tile's job, the picture is the enhancement. */
+/* The trend is the first thing to go when a tile runs out of room — the figure
+   and its delta are the tile's job, the picture is the enhancement.
+
+   Keyed to the *tile*, not the viewport. Every screen that uses these lays them
+   out as `repeat(auto-fit, minmax(210px, 1fr))`, so a 1200px canvas showing
+   three tiles and a 620px one showing two arrive at almost the same tile width
+   — and the viewport query below only fires on the second. The first was
+   leaving a 116px trend in a 200px tile with --fs-h1 digits beside it, and the
+   figure overflowed its own track and printed straight through the meter.
+   .stat-info already carries `min-width: 0`, so the track was willing to
+   shrink; a 28px numeral simply does not fit in what was left.
+
+   `container-type: inline-size` is safe here: a tile is a `1fr` grid item, so
+   its width comes from the track, never from its contents.
+
+   The viewport query is kept underneath as the fallback for anything without
+   container-query support — narrow viewport, narrow tile, same outcome. */
+.stat-card {
+    container-type: inline-size;
+}
+
+@container (max-width: 320px) {
+
+    .stat-trend,
+    .stat-meter {
+        display: none;
+    }
+}
+
 @media (max-width: 440px) {
 
     .stat-trend,
@@ -3630,6 +3684,280 @@ pre {
     background: none;
 }
 
+/* --- Date range dialog --------------------------------------------------
+   A presets rail on the left, a range calendar on the right, and a footer that
+   states what Apply will do. Native <input type="date"> is gone: its popup is
+   drawn by the browser (so it cannot take our surfaces) and it picks a single
+   date, which made a *range* two disconnected pickers.
+
+   Lived in all_blogs.css until the activity log became its second user. The
+   grid itself is the .cal block above; what is here is the dialog around it
+   and the range vocabulary (.is-start / .is-end / .is-in-range / .is-preview /
+   .is-picking) that a single-day picker does not need.
+   ------------------------------------------------------------------------ */
+
+#dateRangeModal .modal-dialog {
+    max-width: 640px;
+}
+
+.date-modal {
+    border: none;
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    box-shadow: var(--elev-3);
+    overflow: hidden;
+}
+
+.date-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    padding: var(--sp-5) var(--sp-6);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.date-modal-title {
+    margin: 0;
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+}
+
+.date-modal-close {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.date-modal-close:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+/* Rail + calendar. The rail is fixed so "Last 90 days" never wraps and the
+   grid keeps a stable width as the month changes. */
+.date-modal-body {
+    display: grid;
+    grid-template-columns: 176px minmax(0, 1fr);
+    align-items: stretch;
+}
+
+/* --- Presets rail ------------------------------------------------------ */
+.date-presets {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--sp-4) var(--sp-3);
+    border-right: 1px solid var(--border-subtle);
+    background: var(--surface-2);
+}
+
+.date-preset {
+    padding: var(--sp-3);
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: none;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.date-preset:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.date-preset:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+/* Set when the grid already matches this preset, so reopening shows which
+   range is in force rather than a rail of identical rows. */
+.date-preset.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-on-soft);
+}
+
+.date-custom {
+    padding: var(--sp-5) var(--sp-6);
+}
+
+/* --- Calendar, range vocabulary -----------------------------------------
+   The grid itself — .cal / .cal-head / .cal-nav / .cal-dow / .cal-cell /
+   .cal-day and the outside / today / selected states — is in dashboard.css §12
+   now that the schedule's publish-time picker is its second user. What is left
+   here is only what makes it a *range* picker: the band is drawn on the **cell**
+   and the endpoints on the button inside it, which is what lets the highlight
+   run continuously across a week while the ends stay circular.
+   ----------------------------------------------------------------------- */
+
+/* An endpoint is already filled — the today ring on top of it just reads as a
+   double border. */
+.cal-cell.is-start .cal-day,
+.cal-cell.is-end .cal-day {
+    box-shadow: none;
+}
+
+/* The band. Painted on the cell so adjacent days join up; the half-rounded
+   ends stop it bleeding past the selection. */
+.cal-cell.is-in-range,
+.cal-cell.is-preview {
+    background: var(--accent-tint);
+}
+
+.cal-cell.is-start {
+    border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+}
+
+.cal-cell.is-end {
+    border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+}
+
+.cal-cell.is-start.is-end {
+    border-radius: var(--radius-pill);
+}
+
+.cal-cell.is-start .cal-day,
+.cal-cell.is-end .cal-day {
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-weight: var(--fw-medium);
+}
+
+.cal-cell.is-start .cal-day:hover,
+.cal-cell.is-end .cal-day:hover {
+    background: var(--accent-hover);
+}
+
+/* Mid-selection: the row reads as "click again to close the range". */
+.cal.is-picking .cal-day {
+    cursor: crosshair;
+}
+
+/* --- Footer ------------------------------------------------------------ */
+.date-modal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-6);
+    border-top: 1px solid var(--border-subtle);
+    background: var(--surface-2);
+}
+
+/* The summary sits beside the buttons rather than above them: it is the label
+   for what Apply is about to do. */
+.date-summary {
+    margin: 0;
+    min-width: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A backwards range is no longer reachable — the picker swaps the endpoints —
+   so the only special state left is "half a range, still waiting". */
+.date-summary.is-hint {
+    color: var(--accent);
+}
+
+.date-actions {
+    display: flex;
+    gap: var(--sp-2);
+    flex-shrink: 0;
+}
+
+.date-btn {
+    height: 40px;
+    padding: 0 var(--sp-5);
+    border: 0;
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.date-btn.is-ghost {
+    background: none;
+    color: var(--text-muted);
+}
+
+.date-btn.is-ghost:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.date-btn.is-primary {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.date-btn.is-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.date-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.date-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Below this the rail has no room beside the grid, so it becomes a row of
+   chips above it — the same options, laid out the way they were before. */
+@media (max-width: 560px) {
+    .date-modal-body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .date-presets {
+        flex-direction: row;
+        flex-wrap: wrap;
+        border-right: 0;
+        border-bottom: 1px solid var(--border-subtle);
+        padding: var(--sp-4);
+    }
+
+    .date-preset {
+        flex: 1 1 auto;
+        border-radius: var(--radius-pill);
+        text-align: center;
+        background: var(--surface-1);
+    }
+
+    .date-modal-foot {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .date-actions {
+        justify-content: flex-end;
+    }
+}
+
 /* --- Entrance ---------------------------------------------------------- */
 /* `backwards`, not `both`. Both would keep the final keyframe applied forever,
    and that keyframe sets `transform` — which gives every revealed card a
@@ -3856,7 +4184,22 @@ pre {
 }
 
 /* --- Buttons ----------------------------------------------------------- */
+/* inline-flex and centred here rather than per page: five templates use
+   `<a class="app-btn">` for an action that navigates (Reconnect, Open original,
+   Reply, Back to drafts, Browse gallery), and an anchor gets none of a button's
+   built-in centring — so a fixed-height pill with a mailto in it sat with its
+   label pushed to the top. gallery.css had already patched exactly this for its
+   own preview button; the fix belongs to the primitive.
+
+   `gap` comes with it and is not optional: buttons here separate their icon
+   from their label with a literal space in the markup, and a flex container
+   discards whitespace-only text nodes between its items — so inline-flex
+   without a gap would jam every existing icon against its label. */
 .app-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
     height: 40px;
     padding: 0 var(--sp-5);
     border: 0;
@@ -3865,6 +4208,7 @@ pre {
     font-size: var(--fs-sm);
     font-weight: var(--fw-medium);
     white-space: nowrap;
+    text-decoration: none;
     cursor: pointer;
     transition: var(--transition-base);
 }
@@ -3891,6 +4235,20 @@ pre {
 .app-btn.is-danger {
     background: var(--danger-soft);
     color: var(--danger);
+}
+
+/* A second action in a footer that already has a primary one. `.is-ghost` reads
+   as "cancel" and cannot be used twice in the same row without the two looking
+   like the same offer; this one is filled, so it is visibly a button, and
+   neutral, so it does not compete with the primary beside it. */
+.app-btn.is-quiet {
+    background: var(--surface-3);
+    color: var(--text-2);
+}
+
+.app-btn.is-quiet:hover:not(:disabled) {
+    background: var(--surface-4);
+    color: var(--text-strong);
 }
 
 .app-btn:disabled {

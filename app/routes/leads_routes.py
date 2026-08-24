@@ -8,9 +8,15 @@ db_service = FirestoreService()
 @leads_bp.route('/leads')
 @admin_required
 def leads_page():
-    admin_id = session.get('user_id')
-    stats = db_service.get_contact_stats(admin_id)
+    """The stats row and the first page of contact submissions.
 
+    Both read through ``ContactRepository._owner_submissions``, which is
+    memoised for the request, so this page now costs one Firestore round trip
+    where it previously cost two full scans of the same collection.
+    """
+    admin_id = session.get('user_id')
+
+    stats = db_service.get_contact_stats(admin_id)
     result = db_service.get_contact_submissions(
         user_id=admin_id,
         page=1,

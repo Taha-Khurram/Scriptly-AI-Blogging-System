@@ -287,20 +287,39 @@ def enforce_session_timeout(app):
 
         timeout = current_app.config['PERMANENT_SESSION_LIFETIME']
         raw_last_activity = session.get('last_activity')
+        now = datetime.now(timezone.utc)
 
         # An absent timestamp is the first request of a new session and is
         # fine. A *present but unusable* one is not: it means the session
         # cannot be shown to be fresh, and the only safe reading of "cannot
         # prove" is "expired". Trusting it instead would make a session with a
         # corrupted or tampered timestamp immortal.
+        last_activity = None
         if raw_last_activity is not None:
             last_activity = _parse_last_activity(raw_last_activity)
             if last_activity is None:
                 return _expire_session('unparsable last_activity')
-            if datetime.now(timezone.utc) - last_activity > timeout:
+            if now - last_activity > timeout:
                 return _expire_session('inactivity timeout')
 
-        session['last_activity'] = datetime.now(timezone.utc).isoformat()
+        # Re-stamp, but not on every request. Writing this marks the session
+        # modified, and with server-side sessions a modified session is a write
+        # to the store -- so an unthrottled re-stamp means a disk write per
+        # request purely to move a timestamp by milliseconds. The same interval
+        # the session interface uses for its own touch, so the two agree.
+        #
+        # The idle timeout is not weakened by the throttle: the store's own
+        # ``expires_at`` is the authority and slides on the same schedule, and
+        # the slack is at most SESSION_TOUCH_SECONDS against a window measured
+        # in hours. What this value still buys is the structured
+        # ``session_expired`` response above, which an anonymous session
+        # arriving from the store cannot produce.
+        touch_seconds = current_app.config.get('SESSION_TOUCH_SECONDS', 60)
+        if (
+            last_activity is None
+            or (now - last_activity).total_seconds() >= touch_seconds
+        ):
+            session['last_activity'] = now.isoformat()
         return None
 
 

@@ -1,491 +1,843 @@
 /**
- * Comment Moderation Dashboard - comments.js
- * Handles comment listing, filtering, modals, editing, and deletion
+ * Comments — the moderation queue: read what was written, take it down, put it
+ * back, edit it or destroy it.
+ *
+ * Was ten globals (loadComments, goToPage, openCommentModal, saveCommentEdit,
+ * removeComment, restoreComment, deleteComment, confirmDelete, refreshStats,
+ * escapeHtml) wired to the rows through `onclick="removeComment('<id>')"`
+ * strings, plus its own `formatDate` and `escapeHtml` shadowing the ones every
+ * other page defines. Actions are now delegated off the page root and read
+ * their target from data attributes on the row.
+ *
+ * Rows are the shared .data-row, so nothing here builds a table. The first
+ * page is rendered by Jinja (see the comment_row macro in comments.html) and
+ * this file renders the identical structure for every page and filter after
+ * it — the two have to stay in step.
+ *
+ * PJAX re-injects this file on every visit to /comments, so nothing holds a
+ * reference across navigations and every document-level listener goes through
+ * an AbortController the next run aborts.
  */
 
-var currentFilter = 'all';
-var currentPage = 1;
-var currentCommentId = null;
-var perPage = 15;
-var initialLoadDone = false;
+(function commentsPage() {
+    'use strict';
 
-function initComments() {
-    setupFilterTabs();
-    setupModalTabs();
-    const tbody = document.getElementById('comments-table-body');
-    if (tbody && tbody.querySelector('.draft-row')) {
-        initialLoadDone = true;
-    } else {
-        loadComments();
+    if (window.__commentsAbort) {
+        try { window.__commentsAbort.abort(); } catch (e) { /* already gone */ }
     }
-}
+    const controller = new AbortController();
+    const signal = controller.signal;
+    window.__commentsAbort = controller;
 
-// Fires on full page load and on every Pjax navigation (page scripts are
-// re-executed on nav, and the DOMContentLoaded patch in app.js re-runs this).
-document.addEventListener('DOMContentLoaded', initComments);
+    const $ = (sel, root) => (root || document).querySelector(sel);
+    const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
-// ==================== FILTER TABS ====================
+    const root = $('.dashboard-main');
+    const list = $('#commentsList');
+    if (!root || !list) return;
 
-function setupFilterTabs() {
-    document.querySelectorAll('.filter-tab').forEach(tab => {
-        tab.addEventListener('click', function () {
-            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            currentFilter = this.dataset.filter;
-            currentPage = 1;
-            loadComments();
-        });
-    });
-}
+    const state = {
+        filter: 'all',
+        page: parseInt(list.dataset.page, 10) || 1,
+        perPage: parseInt(list.dataset.perPage, 10) || 10,
+        total: parseInt(list.dataset.total, 10) || 0,
+        query: '',
+        current: null,        // the comment open in the dialog
+        pendingDelete: null   // { id, text }
+    };
 
-// ==================== MODAL TABS ====================
+    // ----------------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------------
 
-function setupModalTabs() {
-    document.querySelectorAll('.comment-modal-tabs .tab-item').forEach(tab => {
-        tab.addEventListener('click', function () {
-            document.querySelectorAll('.comment-modal-tabs .tab-item').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('#commentModal .tab-content').forEach(c => c.classList.remove('active'));
-            this.classList.add('active');
-            document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-
-            // Show/hide save button based on active tab
-            const saveBtn = document.getElementById('modal-save-edit');
-            saveBtn.style.display = this.dataset.tab === 'edit' ? '' : 'none';
-        });
-    });
-}
-
-// ==================== LOAD COMMENTS ====================
-
-async function loadComments() {
-    const tbody = document.getElementById('comments-table-body');
-    tbody.innerHTML = `
-        <div class="text-center py-4 text-secondary">
-            <div class="spinner-border spinner-border-sm"></div> Loading comments...
-        </div>`;
-
-    try {
-        const params = new URLSearchParams({ page: currentPage, per_page: perPage });
-        if (currentFilter !== 'all') params.set('status', currentFilter);
-
-        const res = await fetch('/api/comments?' + params.toString());
-        const data = await res.json();
-
-        if (data.success && data.comments && data.comments.length > 0) {
-            tbody.innerHTML = data.comments.map(renderCommentRow).join('');
-            renderPagination(data.total, data.page, data.per_page);
-        } else {
-            tbody.innerHTML = `
-                <div class="text-center py-5">
-                    <div class="mb-3 text-muted opacity-50"><i class="bi bi-chat-text fs-1"></i></div>
-                    <p class="text-secondary fw-bold mb-0">No comments found.</p>
-                </div>`;
-            document.getElementById('comment-pagination').innerHTML = '';
-        }
-    } catch (err) {
-        console.error('Error loading comments:', err);
-        tbody.innerHTML = `
-            <div class="text-center py-4 text-danger">
-                <i class="bi bi-exclamation-circle"></i> Failed to load comments.
-            </div>`;
+    // Escapes all five characters Jinja's autoescape does, not just the three
+    // the `div.textContent -> div.innerHTML` trick covers: comment text, names
+    // and email addresses all land in attributes here, and every one of them
+    // is supplied by an anonymous visitor.
+    function esc(str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&#34;')
+            .replace(/'/g, '&#39;');
     }
-}
 
-// ==================== RENDER TABLE ROW ====================
-
-function renderCommentRow(comment) {
-    const name = escapeHtml(comment.commenter_name || 'Anonymous');
-    const initial = name.charAt(0).toUpperCase();
-    const email = escapeHtml(comment.commenter_email || '');
-    const text = escapeHtml(truncate(comment.display_text || comment.original_text || '', 25));
-    const blogTitle = escapeHtml(truncate(comment.blog_title || 'Unknown Post', 25));
-    const date = comment.created_at ? formatDate(comment.created_at) : '';
-
-    const statusBadge = getStatusBadge(comment.status);
-
-    return `
-    <div class="draft-row" id="comment-row-${comment.id}">
-        <div class="col-commenter">
-            <div class="commenter-info">
-                <div class="commenter-avatar">${initial}</div>
-                <div>
-                    <div class="commenter-name">${name}</div>
-                    <div class="commenter-date">${date}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-comment" title="${escapeHtml(comment.display_text || '')}">${text}</div>
-        <div class="col-post">${blogTitle}</div>
-        <div class="col-status">${statusBadge}</div>
-        <div class="col-actions">
-            <div class="dropdown">
-                <button class="btn-dropdown-trigger" data-bs-toggle="dropdown">
-                    <i class="bi bi-three-dots-vertical"></i>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="#" onclick="openCommentModal('${comment.id}'); return false;">
-                        <i class="bi bi-eye"></i> View Details
-                    </a></li>
-                    ${comment.status === 'published' ? `
-                    <li><a class="dropdown-item" href="#" onclick="removeComment('${comment.id}'); return false;">
-                        <i class="bi bi-eye-slash"></i> Remove from Site
-                    </a></li>` : ''}
-                    ${comment.status === 'removed' ? `
-                    <li><a class="dropdown-item" href="#" onclick="restoreComment('${comment.id}'); return false;">
-                        <i class="bi bi-arrow-counterclockwise"></i> Restore
-                    </a></li>` : ''}
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteComment('${comment.id}'); return false;">
-                        <i class="bi bi-trash"></i> Delete Permanently
-                    </a></li>
-                </ul>
-            </div>
-        </div>
-    </div>`;
-}
-
-// ==================== BADGES ====================
-
-function getAiBadge(action) {
-    switch (action) {
-        case 'approved':
-            return '<span class="badge-ai badge-ai-approved"><i class="bi bi-check-lg"></i> Approved</span>';
-        case 'edited':
-            return '<span class="badge-ai badge-ai-edited"><i class="bi bi-pencil"></i> Edited</span>';
-        case 'removed':
-            return '<span class="badge-ai badge-ai-removed"><i class="bi bi-shield-x"></i> Removed</span>';
-        default:
-            return '<span class="badge-ai badge-ai-approved"><i class="bi bi-check-lg"></i> Approved</span>';
-    }
-}
-
-function getStatusBadge(status) {
-    switch (status) {
-        case 'published':
-            return '<span class="status-badge status-published"><i class="bi bi-circle-fill"></i> Published</span>';
-        case 'removed':
-            return '<span class="status-badge status-removed"><i class="bi bi-circle-fill"></i> Removed</span>';
-        default:
-            return '<span class="status-badge status-published"><i class="bi bi-circle-fill"></i> ' + escapeHtml(status || 'Unknown') + '</span>';
-    }
-}
-
-// ==================== PAGINATION ====================
-
-function renderPagination(total, page, perPage) {
-    const container = document.getElementById('comment-pagination');
-    const totalPages = Math.ceil(total / perPage);
-    if (totalPages <= 1) { container.innerHTML = ''; return; }
-
-    let html = '';
-    html += `<button class="page-btn ${page <= 1 ? 'disabled' : ''}" onclick="goToPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>
-        <i class="bi bi-chevron-left"></i>
-    </button>`;
-
-    for (let i = 1; i <= totalPages; i++) {
-        if (i === 1 || i === totalPages || (i >= page - 1 && i <= page + 1)) {
-            html += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
-        } else if (i === page - 2 || i === page + 2) {
-            html += `<span class="page-dots">...</span>`;
+    function toast(type, title, message) {
+        if (typeof window.showToast === 'function') {
+            window.showToast({ type, title, message });
         }
     }
 
-    html += `<button class="page-btn ${page >= totalPages ? 'disabled' : ''}" onclick="goToPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>
-        <i class="bi bi-chevron-right"></i>
-    </button>`;
+    // The same wording drafts.js and home.js use for their rows, so a
+    // timestamp reads the same wherever it appears.
+    function relative(value) {
+        const then = new Date(value);
+        if (isNaN(then.getTime())) return '';
 
-    container.innerHTML = html;
-}
+        const secs = (Date.now() - then.getTime()) / 1000;
+        if (secs < 90) return 'just now';
 
-function goToPage(page) {
-    currentPage = page;
-    loadComments();
-}
+        const mins = Math.round(secs / 60);
+        if (mins < 60) return mins + ' min ago';
 
-// ==================== VIEW/EDIT MODAL ====================
+        const hours = Math.round(mins / 60);
+        if (hours < 24) return hours === 1 ? 'an hour ago' : hours + ' hours ago';
 
-async function openCommentModal(commentId) {
-    closeAllDropdowns();
-    currentCommentId = commentId;
+        const days = Math.round(hours / 24);
+        if (days === 1) return 'yesterday';
+        if (days < 7) return days + ' days ago';
+        if (days < 30) {
+            const weeks = Math.round(days / 7);
+            return weeks === 1 ? 'a week ago' : weeks + ' weeks ago';
+        }
+        return then.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    }
 
-    // Reset to details tab
-    document.querySelectorAll('.comment-modal-tabs .tab-item').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('#commentModal .tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelector('.tab-item[data-tab="details"]').classList.add('active');
-    document.getElementById('tab-details').classList.add('active');
+    function absolute(value) {
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) +
+            ' at ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
 
-    showActionLoader('Loading...');
-    try {
-        const res = await fetch(`/api/comments/${commentId}`);
+    function paintTimes(scope) {
+        $$('time[data-relative]', scope || list).forEach((el) => {
+            const text = relative(el.getAttribute('datetime'));
+            if (!text) return;
+            el.title = absolute(el.getAttribute('datetime'));
+            el.textContent = text;
+        });
+    }
+
+    function statusOf(comment) {
+        return String(comment.status || 'published').toLowerCase() === 'removed' ? 'removed' : 'published';
+    }
+
+    const AI_LABEL = { edited: 'AI edited', removed: 'AI removed' };
+
+    function aiOf(comment) {
+        return String(comment.ai_action || 'approved').toLowerCase();
+    }
+
+    // ----------------------------------------------------------------------
+    // Row rendering — mirrors the comment_row macro in comments.html
+    // ----------------------------------------------------------------------
+
+    function menuItem(action, icon, text, danger) {
+        return '<li><button type="button" class="dropdown-item' + (danger ? ' text-danger' : '') + '" ' +
+            'data-action="' + action + '">' +
+            '<i class="bi bi-' + icon + '" aria-hidden="true"></i> ' + text +
+            '</button></li>';
+    }
+
+    function commentRow(c) {
+        const st = statusOf(c);
+        const removed = st === 'removed';
+        const text = String(c.display_text || c.original_text || '');
+        const name = String(c.commenter_name || 'Anonymous');
+        const email = String(c.commenter_email || '');
+        const post = String(c.blog_title || 'Unknown post');
+        const ai = aiOf(c);
+        const aiLabel = AI_LABEL[ai] || '';
+        const stLabel = removed ? 'Removed' : 'Visible';
+        const label = esc(name);
+
+        const meta = ['<span>' + label + '</span>',
+            '<span class="row-sep" aria-hidden="true">·</span>',
+            '<span>' + esc(post) + '</span>'];
+
+        if (c.created_at) {
+            meta.push('<span class="row-sep" aria-hidden="true">·</span>');
+            meta.push('<time class="row-time" datetime="' + esc(c.created_at) + '" data-relative>' +
+                esc(String(c.created_at).slice(0, 10)) + '</time>');
+        }
+        if (aiLabel) {
+            meta.push('<span class="row-sep row-meta-ai" aria-hidden="true">·</span>');
+            meta.push('<span class="row-meta-ai">' + aiLabel + '</span>');
+        }
+        meta.push('<span class="row-sep row-meta-status" aria-hidden="true">·</span>');
+        meta.push('<span class="row-meta-status">' + stLabel + '</span>');
+
+        const mark = name.trim() ? esc(name.trim()[0].toUpperCase()) : '?';
+
+        // The verdict cell is rendered even when there is no verdict: the two
+        // pill columns are fixed tracks, and a missing child would slide the
+        // status pill left on that row alone.
+        const verdict = aiLabel
+            ? '<span class="ai-pill is-' + ai + '"><i class="bi bi-robot" aria-hidden="true"></i> ' + aiLabel + '</span>'
+            : '<span class="ai-pill-blank"></span>';
+
+        const trailAction = removed
+            ? '<button type="button" class="row-action" data-action="restore" title="Put back on the site" ' +
+              'aria-label="Put the comment from ' + label + ' back on the site">' +
+              '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>'
+            : '<button type="button" class="row-action" data-action="remove" title="Take off the site" ' +
+              'aria-label="Take the comment from ' + label + ' off the site">' +
+              '<i class="bi bi-eye-slash" aria-hidden="true"></i></button>';
+
+        const menu = [
+            menuItem('view', 'eye', 'Open comment'),
+            removed
+                ? menuItem('restore', 'arrow-counterclockwise', 'Put back on the site')
+                : menuItem('remove', 'eye-slash', 'Take off the site'),
+            menuItem('copy-email', 'envelope', 'Copy email address'),
+            '<li><hr class="dropdown-divider"></li>',
+            menuItem('delete', 'trash3', 'Delete permanently', true)
+        ];
+
+        return '<div class="data-row' + (removed ? ' is-removed' : '') + '" id="comment-row-' + esc(c.id) + '" ' +
+            'data-id="' + esc(c.id) + '" data-status="' + st + '" data-name="' + label + '" ' +
+            'data-email="' + esc(email) + '" data-text="' + esc(text) + '" ' +
+            'data-search="' + esc((text + ' ' + name + ' ' + post).toLowerCase()) + '">' +
+
+            '<span class="row-mark" aria-hidden="true">' + mark + '</span>' +
+
+            '<button type="button" class="row-open" data-action="view" ' +
+            'title="Open the comment from ' + label + '">' +
+            '<span class="row-title comment-row-text">' + (esc(text) || 'Empty comment') + '</span>' +
+            '<span class="row-meta">' + meta.join('') + '</span>' +
+            '</button>' +
+
+            verdict +
+            '<span class="status-pill status-' + (removed ? 'hidden' : 'live') + '">' + stLabel + '</span>' +
+
+            '<div class="row-trail">' + trailAction +
+            '<div class="dropdown">' +
+            '<button type="button" class="btn-dropdown-trigger" data-bs-toggle="dropdown" aria-expanded="false" ' +
+            'aria-label="More actions for the comment from ' + label + '">' +
+            '<i class="bi bi-three-dots-vertical" aria-hidden="true"></i>' +
+            '</button>' +
+            '<ul class="dropdown-menu dropdown-menu-end">' + menu.join('') + '</ul>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+    }
+
+    // ----------------------------------------------------------------------
+    // States
+    // ----------------------------------------------------------------------
+
+    const EMPTY_COPY = {
+        all: 'No comments yet. When a reader writes one on a published post it lands here, already ' +
+            'checked by the moderation filter, for you to keep or take down.',
+        published: 'Nothing is on the site at the moment.',
+        removed: 'Nothing has been taken down. Comments you remove collect here, and can be put back.',
+        edited: 'The moderation filter has not had to change anything yet.'
+    };
+
+    function loadingState() {
+        return '<div class="comments-state">' +
+            '<div class="spinner-border spinner-border-sm text-primary opacity-50" role="status"></div>' +
+            '<p>Loading comments…</p>' +
+            '</div>';
+    }
+
+    function emptyState() {
+        return '<div class="list-empty">' +
+            '<span class="list-empty-icon"><i class="bi bi-chat-square-text" aria-hidden="true"></i></span>' +
+            '<p>' + esc(EMPTY_COPY[state.filter] || EMPTY_COPY.all) + '</p>' +
+            '</div>';
+    }
+
+    function errorState(message) {
+        return '<div class="list-empty">' +
+            '<span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>' +
+            '<p>' + esc(message || 'The comments could not be loaded.') + '</p>' +
+            '<button type="button" class="app-btn is-ghost" data-action="retry">Try again</button>' +
+            '</div>';
+    }
+
+    // ----------------------------------------------------------------------
+    // Pager
+    //
+    // Owned entirely by this file — the template renders an empty <nav> — so
+    // there is one implementation of the page window rather than two that
+    // drift. A window of three around the current page, with the first and
+    // last always reachable.
+    // ----------------------------------------------------------------------
+
+    function pages() {
+        return Math.max(1, Math.ceil(state.total / state.perPage));
+    }
+
+    function paintPager() {
+        const nav = $('[data-pager]', root);
+        if (!nav) return;
+
+        const last = pages();
+        if (last <= 1) {
+            nav.innerHTML = '';
+            return;
+        }
+
+        const wanted = new Set([1, last, state.page]);
+        if (state.page - 1 > 1) wanted.add(state.page - 1);
+        if (state.page + 1 < last) wanted.add(state.page + 1);
+
+        const shown = Array.from(wanted).sort((a, b) => a - b);
+        let html = '';
+        let previous = 0;
+
+        shown.forEach((p) => {
+            if (previous && p - previous > 1) html += '<span class="pager-dots">…</span>';
+            html += '<button type="button" class="pager-btn' + (p === state.page ? ' is-active' : '') + '" ' +
+                'data-page="' + p + '"' + (p === state.page ? ' aria-current="page"' : '') + '>' + p + '</button>';
+            previous = p;
+        });
+
+        nav.innerHTML = html;
+    }
+
+    // ----------------------------------------------------------------------
+    // Painting
+    // ----------------------------------------------------------------------
+
+    const FILTER_NOTE = {
+        all: '',
+        published: 'Showing what is on the site',
+        removed: 'Showing what has been taken down',
+        edited: 'Showing comments the filter changed'
+    };
+
+    function paintHead() {
+        const count = $('[data-list-count]', root);
+        const note = $('[data-list-note]', root);
+        const last = pages();
+
+        if (count) count.textContent = String(state.total);
+        if (!note) return;
+
+        const parts = [];
+        if (last > 1) parts.push('Page ' + state.page + ' of ' + last);
+        if (FILTER_NOTE[state.filter]) parts.push(FILTER_NOTE[state.filter]);
+        note.textContent = parts.join(' · ');
+    }
+
+    function render(data) {
+        const comments = (data && data.comments) || [];
+
+        state.total = Number(data && data.total) || 0;
+        state.page = Number(data && data.page) || state.page;
+        state.perPage = Number(data && data.per_page) || state.perPage;
+
+        list.setAttribute('aria-busy', 'false');
+        list.innerHTML = comments.length ? comments.map(commentRow).join('') : emptyState();
+
+        paintTimes();
+        paintHead();
+        paintPager();
+        applyQuery();
+    }
+
+    // ----------------------------------------------------------------------
+    // Loading
+    // ----------------------------------------------------------------------
+
+    async function getJSON(url, options) {
+        const res = await fetch(url, Object.assign({ credentials: 'same-origin' }, options || {}));
+
+        // A session that has expired is answered with the login page, not with
+        // JSON, so a bare res.json() would throw a parse error instead of
+        // saying what actually happened.
+        const type = res.headers.get('content-type') || '';
+        if (!type.includes('application/json')) {
+            throw new Error('Your session has expired. Reload the page to sign in again.');
+        }
+
         const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'The server rejected that.');
+        return data;
+    }
 
-        if (data.success) {
+    async function load() {
+        list.setAttribute('aria-busy', 'true');
+        list.innerHTML = loadingState();
+
+        const params = new URLSearchParams({ page: state.page, per_page: state.perPage });
+        if (state.filter !== 'all') params.set('status', state.filter);
+
+        try {
+            render(await getJSON('/api/comments?' + params.toString()));
+        } catch (error) {
+            list.setAttribute('aria-busy', 'false');
+            list.innerHTML = errorState(error.message);
+            paintPager();
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Stats
+    //
+    // Refreshed after every write, because taking a comment down moves it
+    // between two of the tiles and one of the tab counts — leaving them stale
+    // would show a figure that contradicts the list right beside it.
+    // ----------------------------------------------------------------------
+
+    function paintStats(stats) {
+        const total = Number(stats.total) || 0;
+        const live = Number(stats.published) || 0;
+        const hidden = Number(stats.removed) || 0;
+        const edited = Number(stats.ai_edited) || 0;
+
+        const set = (sel, value) => {
+            const el = $(sel, root);
+            if (el) el.textContent = String(value);
+        };
+
+        set('[data-stat-total]', total);
+        set('[data-stat-live]', live);
+        set('[data-stat-hidden]', hidden);
+        set('[data-count-all]', total);
+        set('[data-count-published]', live);
+        set('[data-count-removed]', hidden);
+        set('[data-count-edited]', edited);
+
+        const meter = $('[data-meter]', root);
+        const fill = $('[data-meter-fill]', root);
+        const note = $('[data-meter-note]', root);
+        const share = total ? Math.round((live / total) * 100) : 0;
+
+        if (meter) meter.hidden = total === 0;
+        if (fill) fill.style.width = share + '%';
+        if (note) note.textContent = share + '% of all comments';
+    }
+
+    async function refreshStats() {
+        try {
+            const data = await getJSON('/api/comments/stats');
+            if (data.stats) paintStats(data.stats);
+        } catch (e) {
+            // Non-critical: the list beside them is the source of truth.
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Search
+    //
+    // Filters the rendered page in place. /api/comments takes no search
+    // parameter, so this deliberately does not claim to search everything —
+    // the no-results line says "on this page".
+    // ----------------------------------------------------------------------
+
+    function applyQuery() {
+        const rows = $$('.data-row', list);
+        const none = $('[data-noresults]', root);
+        if (!rows.length) {
+            if (none) none.hidden = true;
+            return;
+        }
+
+        let shown = 0;
+        rows.forEach((row) => {
+            const hit = !state.query || (row.dataset.search || '').indexOf(state.query) !== -1;
+            row.hidden = !hit;
+            if (hit) shown++;
+        });
+
+        if (none) none.hidden = shown !== 0;
+    }
+
+    document.addEventListener('page-search', (e) => {
+        state.query = ((e.detail && e.detail.value) || '').trim().toLowerCase();
+        applyQuery();
+    }, { signal });
+
+    // ----------------------------------------------------------------------
+    // Filter tabs and pager
+    // ----------------------------------------------------------------------
+
+    root.addEventListener('click', (e) => {
+        const tab = e.target.closest('.comments-filter .seg-tab');
+        if (tab) {
+            if (tab.dataset.filter === state.filter) return;
+            $$('.comments-filter .seg-tab', root).forEach((t) => {
+                t.classList.toggle('is-active', t === tab);
+            });
+            state.filter = tab.dataset.filter || 'all';
+            state.page = 1;
+            load();
+            return;
+        }
+
+        const pageBtn = e.target.closest('[data-pager] .pager-btn');
+        if (pageBtn) {
+            const page = parseInt(pageBtn.dataset.page, 10);
+            if (!page || page === state.page) return;
+            state.page = page;
+            load();
+        }
+    }, { signal });
+
+    // ----------------------------------------------------------------------
+    // Dialog
+    // ----------------------------------------------------------------------
+
+    function openModal(id) {
+        const el = document.getElementById(id);
+        if (!el || typeof bootstrap === 'undefined') return null;
+        const modal = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
+        modal.show();
+        return modal;
+    }
+
+    function closeModal(id) {
+        const el = document.getElementById(id);
+        if (!el || typeof bootstrap === 'undefined') return;
+        const modal = bootstrap.Modal.getInstance(el);
+        if (modal) modal.hide();
+    }
+
+    const detail = document.getElementById('commentModal');
+
+    function selectTab(name) {
+        if (!detail) return;
+        $$('.seg-tab', detail).forEach((tab) => {
+            const on = tab.dataset.tab === name;
+            tab.classList.toggle('is-active', on);
+            tab.setAttribute('aria-selected', on ? 'true' : 'false');
+            tab.tabIndex = on ? 0 : -1;
+        });
+        $$('[data-tab-panel]', detail).forEach((panel) => {
+            panel.hidden = panel.dataset.tabPanel !== name;
+        });
+
+        // Save belongs to the Edit tab only: a Save button on a read-only tab
+        // invites a click that cannot do anything.
+        const save = $('[data-save-edit]', detail);
+        if (save) save.hidden = name !== 'edit';
+    }
+
+    const VERDICT_COPY = {
+        approved: 'The moderation filter passed this unchanged',
+        edited: 'The moderation filter changed this',
+        removed: 'The moderation filter took this down'
+    };
+
+    function fillDetails(c) {
+        const name = String(c.commenter_name || 'Anonymous');
+        const email = String(c.commenter_email || '');
+        const removed = statusOf(c) === 'removed';
+        const ai = aiOf(c);
+
+        const set = (sel, value) => {
+            const el = $(sel, detail);
+            if (el) el.textContent = value;
+        };
+
+        set('[data-modal-mark]', name.trim() ? name.trim()[0].toUpperCase() : '?');
+        set('[data-modal-name]', name);
+        set('[data-modal-post]', c.blog_title || 'Unknown post');
+        set('[data-modal-when]', absolute(c.created_at) || 'Date unknown');
+        set('[data-modal-display-label]', removed ? 'Text on file — not shown to visitors' : 'On the site now');
+        set('[data-modal-display]', c.display_text || c.original_text || 'The comment is empty.');
+        set('[data-modal-original]', c.original_text || '');
+
+        const mail = $('[data-modal-email]', detail);
+        if (mail) {
+            mail.textContent = email || 'No email address given';
+            if (email) {
+                mail.href = 'mailto:' + email;
+                mail.removeAttribute('aria-disabled');
+            } else {
+                mail.removeAttribute('href');
+                mail.setAttribute('aria-disabled', 'true');
+            }
+        }
+
+        const status = $('[data-modal-status]', detail);
+        if (status) {
+            status.innerHTML = '<span class="status-pill status-' + (removed ? 'hidden' : 'live') + '">' +
+                (removed ? 'Removed' : 'Visible') + '</span>';
+        }
+
+        const chip = $('[data-modal-verdict-chip]', detail);
+        if (chip) {
+            chip.hidden = false;
+            set('[data-modal-verdict]', VERDICT_COPY[ai] || VERDICT_COPY.approved);
+        }
+
+        // The "as submitted" block is only worth its space when it differs from
+        // what is on the site; otherwise it is the same paragraph printed twice.
+        const originalBlock = $('[data-modal-original-block]', detail);
+        if (originalBlock) {
+            originalBlock.hidden = !c.original_text || c.original_text === c.display_text;
+        }
+
+        const moderatedBlock = $('[data-modal-moderated-block]', detail);
+        if (moderatedBlock) {
+            const worth = ai === 'edited' && c.moderated_text &&
+                c.moderated_text !== c.original_text && c.moderated_text !== c.display_text;
+            moderatedBlock.hidden = !worth;
+            if (worth) set('[data-modal-moderated]', c.moderated_text);
+        }
+    }
+
+    function logEntry(mark, markClass, title, when, reason, diff) {
+        return '<div class="mod-entry">' +
+            '<span class="mod-mark ' + markClass + '"><i class="bi bi-' + mark + '" aria-hidden="true"></i></span>' +
+            '<div class="mod-body">' +
+            '<p class="mod-title">' + title + '</p>' +
+            (when ? '<p class="mod-when">' + esc(when) + '</p>' : '') +
+            (reason ? '<p class="mod-reason">' + esc(reason) + '</p>' : '') +
+            (diff || '') +
+            '</div>' +
+            '</div>';
+    }
+
+    function diffBlock(label, cls, text) {
+        return '<div class="text-block ' + cls + '">' +
+            '<p class="text-block-label">' + label + '</p>' +
+            '<div class="text-body">' + esc(text || '') + '</div>' +
+            '</div>';
+    }
+
+    const AI_TITLE = {
+        approved: 'Passed by the moderation filter',
+        edited: 'Changed by the moderation filter',
+        removed: 'Taken down by the moderation filter'
+    };
+
+    function fillLog(c) {
+        const log = $('[data-modal-log]', detail);
+        if (!log) return;
+
+        const ai = aiOf(c);
+        const entries = [logEntry(
+            'robot', 'is-ai',
+            esc(AI_TITLE[ai] || AI_TITLE.approved),
+            c.ai_moderated_at ? absolute(c.ai_moderated_at) : 'When the comment was submitted',
+            c.ai_reason,
+            ai === 'edited' && c.moderated_text && c.moderated_text !== c.original_text
+                ? '<div class="mod-diff">' +
+                  diffBlock('Before', 'is-before', c.original_text) +
+                  diffBlock('After', 'is-after', c.moderated_text) +
+                  '</div>'
+                : ''
+        )];
+
+        (c.admin_edits || []).forEach((edit) => {
+            entries.push(logEntry(
+                'person-gear', 'is-admin',
+                'Edited by <strong>' + esc(edit.admin_name || 'an admin') + '</strong>',
+                edit.edited_at ? absolute(edit.edited_at) : '',
+                edit.reason,
+                '<div class="mod-diff">' +
+                diffBlock('Before', 'is-before', edit.previous_text) +
+                diffBlock('After', 'is-after', edit.new_text) +
+                '</div>'
+            ));
+        });
+
+        log.innerHTML = entries.join('');
+    }
+
+    async function openDetail(id) {
+        if (typeof window.closeAllDropdowns === 'function') window.closeAllDropdowns();
+        if (typeof window.showActionLoader === 'function') window.showActionLoader('Opening comment…');
+
+        try {
+            const data = await getJSON('/api/comments/' + encodeURIComponent(id));
             const c = data.comment;
-            populateDetailsTab(c);
-            populateModerationLog(c);
-            populateEditTab(c);
+            state.current = c;
 
-            const modal = new bootstrap.Modal(document.getElementById('commentModal'));
-            modal.show();
-            hideActionLoader();
-        } else {
-            hideActionLoader();
-            showToast({ type: 'error', title: 'Error', message: 'Failed to load comment details.', duration: 4000 });
+            fillDetails(c);
+            fillLog(c);
+
+            const text = $('#commentEditText');
+            const reason = $('#commentEditReason');
+            if (text) text.value = c.display_text || '';
+            if (reason) reason.value = '';
+
+            selectTab('details');
+            openModal('commentModal');
+        } catch (error) {
+            toast('error', 'Could not open it', error.message);
+        } finally {
+            if (typeof window.hideActionLoader === 'function') window.hideActionLoader();
         }
-    } catch (err) {
-        hideActionLoader();
-        console.error('Error loading comment:', err);
-        showToast({ type: 'error', title: 'Error', message: 'Failed to load comment details.', duration: 4000 });
-    }
-}
-
-function populateDetailsTab(c) {
-    const name = c.commenter_name || 'Anonymous';
-    document.getElementById('modal-commenter-avatar').textContent = name.charAt(0).toUpperCase();
-    document.getElementById('modal-commenter-name').textContent = name;
-    document.getElementById('modal-commenter-email').textContent = c.commenter_email || '';
-    document.getElementById('modal-blog-title').textContent = c.blog_title || 'Unknown Post';
-    document.getElementById('modal-created-at').textContent = c.created_at ? formatDate(c.created_at) : '';
-    document.getElementById('modal-original-text').textContent = c.original_text || '';
-    document.getElementById('modal-display-text').textContent = c.display_text || '';
-
-    // Status badge
-    document.getElementById('modal-status-badge').innerHTML = getStatusBadge(c.status);
-
-    // AI action chip — show as readable text
-    const aiChip = document.getElementById('modal-ai-action-chip');
-    const aiAction = c.ai_action || 'approved';
-    const aiLabels = { approved: 'Approved', edited: 'Edited by AI', removed: 'Removed by AI' };
-    aiChip.innerHTML = `<i class="bi bi-robot"></i> <span>${aiLabels[aiAction] || aiAction}</span>`;
-
-    const moderatedSection = document.getElementById('modal-moderated-section');
-    if (c.ai_action === 'edited' && c.moderated_text && c.moderated_text !== c.original_text) {
-        moderatedSection.style.display = '';
-        document.getElementById('modal-moderated-text').textContent = c.moderated_text;
-    } else {
-        moderatedSection.style.display = 'none';
     }
 
-    // Hide save button on details tab
-    document.getElementById('modal-save-edit').style.display = 'none';
-}
-
-function populateModerationLog(c) {
-    const logEl = document.getElementById('modal-moderation-log');
-    let html = '';
-
-    // AI action entry
-    html += `
-    <div class="log-entry">
-        <div class="log-icon log-icon-ai"><i class="bi bi-robot"></i></div>
-        <div class="log-body">
-            <div class="log-title">AI Moderation — ${getAiBadge(c.ai_action)}</div>
-            ${c.ai_reason ? `<div class="log-reason">${escapeHtml(c.ai_reason)}</div>` : ''}
-            <div class="log-date">${c.ai_moderated_at ? formatDate(c.ai_moderated_at) : 'At submission'}</div>
-        </div>
-    </div>`;
-
-    // Admin edits
-    if (c.admin_edits && c.admin_edits.length > 0) {
-        c.admin_edits.forEach(edit => {
-            html += `
-            <div class="log-entry">
-                <div class="log-icon log-icon-admin"><i class="bi bi-person-gear"></i></div>
-                <div class="log-body">
-                    <div class="log-title">Edited by <strong>${escapeHtml(edit.admin_name || 'Admin')}</strong></div>
-                    ${edit.reason ? `<div class="log-reason">${escapeHtml(edit.reason)}</div>` : ''}
-                    <div class="log-diff">
-                        <div class="diff-old"><strong>Before:</strong> ${escapeHtml(truncate(edit.previous_text || '', 200))}</div>
-                        <div class="diff-new"><strong>After:</strong> ${escapeHtml(truncate(edit.new_text || '', 200))}</div>
-                    </div>
-                    <div class="log-date">${edit.edited_at ? formatDate(edit.edited_at) : ''}</div>
-                </div>
-            </div>`;
-        });
+    if (detail) {
+        detail.addEventListener('click', (e) => {
+            const tab = e.target.closest('.seg-tab[data-tab]');
+            if (tab) selectTab(tab.dataset.tab);
+        }, { signal });
     }
 
-    logEl.innerHTML = html;
-}
+    // ----------------------------------------------------------------------
+    // Actions
+    // ----------------------------------------------------------------------
 
-function populateEditTab(c) {
-    document.getElementById('modal-edit-text').value = c.display_text || '';
-    document.getElementById('modal-edit-reason').value = '';
-}
-
-// ==================== SAVE EDIT ====================
-
-async function saveCommentEdit() {
-    const text = document.getElementById('modal-edit-text').value.trim();
-    const reason = document.getElementById('modal-edit-reason').value.trim();
-
-    if (!text) {
-        showToast({ type: 'error', title: 'Error', message: 'Comment text cannot be empty.', duration: 3000 });
-        return;
+    function busy(btn, label) {
+        if (!btn) return () => { };
+        const html = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ' + label;
+        return () => {
+            btn.disabled = false;
+            btn.innerHTML = html;
+        };
     }
 
-    const btn = document.getElementById('modal-save-edit');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+    // The shared overlay rather than an inline busy state: remove and restore
+    // are reachable from a 32px icon button with no room for a spinner and a
+    // word.
+    async function mutate(url, method, working, done, message) {
+        if (typeof window.closeAllDropdowns === 'function') window.closeAllDropdowns();
+        if (typeof window.showActionLoader === 'function') window.showActionLoader(working);
 
-    showActionLoader('Saving...');
-    try {
-        const res = await fetch(`/api/comments/${currentCommentId}/edit`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, reason })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            showToast({ type: 'success', title: 'Saved', message: 'Comment updated successfully.', duration: 3000 });
-            bootstrap.Modal.getInstance(document.getElementById('commentModal')).hide();
-            loadComments();
-            refreshStats();
-        } else {
-            showToast({ type: 'error', title: 'Error', message: data.error || 'Failed to save.', duration: 4000 });
+        try {
+            // The CSRF header is added by the fetch wrapper in app.js. The
+            // empty JSON body is not decoration: /remove reads request body
+            // through get_json(), which raises 415 on a bodyless POST under
+            // Flask 3 — the old page sent nothing and the route answered every
+            // "Remove from Site" with a 500.
+            await getJSON(url, method === 'POST'
+                ? { method, headers: { 'Content-Type': 'application/json' }, body: '{}' }
+                : { method });
+            await Promise.all([load(), refreshStats()]);
+            toast('success', done, message);
+        } catch (error) {
+            toast('error', 'Nothing changed', error.message);
+        } finally {
+            if (typeof window.hideActionLoader === 'function') window.hideActionLoader();
         }
-    } catch (err) {
-        console.error('Save edit error:', err);
-        showToast({ type: 'error', title: 'Error', message: 'Something went wrong.', duration: 4000 });
-    } finally {
-        hideActionLoader();
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check-lg"></i> Save Changes';
     }
-}
 
-// ==================== REMOVE / RESTORE ====================
-
-async function removeComment(commentId) {
-    closeAllDropdowns();
-    showActionLoader('Removing...');
-    try {
-        const res = await fetch(`/api/comments/${commentId}/remove`, { method: 'POST' });
-        const data = await res.json();
-
-        if (data.success) {
-            hideActionLoader();
-            showToast({ type: 'warning', title: 'Removed', message: 'Comment removed from public site.', duration: 3000 });
-            animateRowOut(commentId);
-            refreshStats();
-        } else {
-            hideActionLoader();
-            showToast({ type: 'error', title: 'Error', message: data.error || 'Failed to remove.', duration: 4000 });
+    async function copy(text, what) {
+        if (!text) {
+            toast('info', 'Nothing to copy', 'This commenter left no email address.');
+            return;
         }
-    } catch (err) {
-        hideActionLoader();
-        showToast({ type: 'error', title: 'Error', message: 'Something went wrong.', duration: 4000 });
-    }
-}
-
-async function restoreComment(commentId) {
-    closeAllDropdowns();
-    showActionLoader('Restoring...');
-    try {
-        const res = await fetch(`/api/comments/${commentId}/restore`, { method: 'POST' });
-        const data = await res.json();
-
-        if (data.success) {
-            hideActionLoader();
-            showToast({ type: 'success', title: 'Restored', message: 'Comment restored to public site.', duration: 3000 });
-            animateRowOut(commentId);
-            refreshStats();
-        } else {
-            hideActionLoader();
-            showToast({ type: 'error', title: 'Error', message: data.error || 'Failed to restore.', duration: 4000 });
+        try {
+            await navigator.clipboard.writeText(text);
+            toast('success', 'Copied', what + ' is on your clipboard.');
+        } catch (e) {
+            // Denied permission, or an insecure origin. Better to show the
+            // value than to claim a copy that did not happen.
+            toast('info', 'Copy it by hand', text);
         }
-    } catch (err) {
-        hideActionLoader();
-        showToast({ type: 'error', title: 'Error', message: 'Something went wrong.', duration: 4000 });
     }
-}
 
-// ==================== DELETE ====================
+    function openDelete(row) {
+        if (typeof window.closeAllDropdowns === 'function') window.closeAllDropdowns();
+        state.pendingDelete = { id: row.dataset.id || '', text: row.dataset.text || '' };
 
-function deleteComment(commentId) {
-    currentCommentId = commentId;
-    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
-    modal.show();
-}
+        const quote = $('[data-delete-quote]', root);
+        if (quote) quote.textContent = state.pendingDelete.text || 'This comment is empty.';
+        openModal('deleteCommentModal');
+    }
 
-async function confirmDelete() {
-    const btn = document.getElementById('confirm-delete-btn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Deleting...';
+    root.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn || !root.contains(btn)) return;
 
-    showActionLoader('Deleting...');
-    try {
-        const res = await fetch(`/api/comments/${currentCommentId}/delete`, { method: 'DELETE' });
-        const data = await res.json();
+        const action = btn.dataset.action;
 
-        if (data.success) {
-            bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
-            showToast({ type: 'success', title: 'Deleted', message: 'Comment permanently deleted.', duration: 3000 });
-            animateRowOut(currentCommentId);
-            refreshStats();
-        } else {
-            showToast({ type: 'error', title: 'Error', message: data.error || 'Failed to delete.', duration: 4000 });
+        if (action === 'retry') {
+            e.preventDefault();
+            load();
+            return;
         }
-    } catch (err) {
-        showToast({ type: 'error', title: 'Error', message: 'Something went wrong.', duration: 4000 });
-    } finally {
-        hideActionLoader();
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-trash"></i> Delete';
-    }
-}
 
-// ==================== STATS REFRESH ====================
+        const row = btn.closest('.data-row');
+        if (!row) return;
+        e.preventDefault();
 
-async function refreshStats() {
-    try {
-        const res = await fetch('/api/comments/stats');
-        const data = await res.json();
-        if (data.success && data.stats) {
-            document.getElementById('stat-total').textContent = data.stats.total || 0;
-            document.getElementById('stat-published').textContent = data.stats.published || 0;
-            document.getElementById('stat-removed').textContent = data.stats.removed || 0;
+        const id = row.dataset.id || '';
+
+        if (action === 'view') {
+            openDetail(id);
+        } else if (action === 'remove') {
+            mutate('/api/comments/' + encodeURIComponent(id) + '/remove', 'POST',
+                'Taking it down…', 'Taken down', 'The comment is no longer on your site.');
+        } else if (action === 'restore') {
+            mutate('/api/comments/' + encodeURIComponent(id) + '/restore', 'POST',
+                'Putting it back…', 'Back on the site', 'Readers can see the comment again.');
+        } else if (action === 'copy-email') {
+            copy(row.dataset.email || '', 'The email address');
+        } else if (action === 'delete') {
+            openDelete(row);
         }
-    } catch (err) {
-        // Silently fail — stats refresh is non-critical
+    }, { signal });
+
+    // --- Save an edit -----------------------------------------------------
+
+    const saveBtn = $('[data-save-edit]', root);
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            if (!state.current) return;
+
+            const text = ($('#commentEditText').value || '').trim();
+            const reason = ($('#commentEditReason').value || '').trim();
+
+            if (!text) {
+                toast('error', 'Nothing to save', 'A comment cannot be left empty. Take it down instead.');
+                return;
+            }
+            if (text === (state.current.display_text || '')) {
+                toast('info', 'Nothing to save', 'The text is unchanged.');
+                return;
+            }
+
+            const done = busy(saveBtn, 'Saving…');
+            try {
+                await getJSON('/api/comments/' + encodeURIComponent(state.current.id) + '/edit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, reason })
+                });
+
+                closeModal('commentModal');
+                state.current = null;
+                await load();
+                toast('success', 'Comment updated', 'Visitors now see the edited text.');
+            } catch (error) {
+                toast('error', 'Not saved', error.message);
+            } finally {
+                done();
+            }
+        }, { signal });
     }
-}
 
-// ==================== HELPERS ====================
+    // --- Delete -----------------------------------------------------------
 
-function animateRowOut(commentId) {
-    const row = document.getElementById('comment-row-' + commentId);
-    if (row) {
-        row.style.transition = 'all 0.3s ease';
-        row.style.opacity = '0';
-        row.style.transform = 'translateX(20px)';
-        setTimeout(() => {
-            row.remove();
-            // Reload if no rows remain
-            const tbody = document.getElementById('comments-table-body');
-            if (!tbody.querySelector('.draft-row')) loadComments();
-        }, 300);
+    const deleteBtn = $('[data-delete-confirm]', root);
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+            if (!state.pendingDelete) return;
+            const { id } = state.pendingDelete;
+            const done = busy(deleteBtn, 'Deleting…');
+
+            try {
+                await getJSON('/api/comments/' + encodeURIComponent(id) + '/delete', { method: 'DELETE' });
+                closeModal('deleteCommentModal');
+                state.pendingDelete = null;
+                await Promise.all([load(), refreshStats()]);
+                toast('success', 'Comment deleted', 'It is gone, along with its moderation history.');
+            } catch (error) {
+                toast('error', 'Not deleted', error.message);
+            } finally {
+                done();
+            }
+        }, { signal });
     }
-}
 
-function truncate(str, max) {
-    if (!str) return '';
-    return str.length > max ? str.substring(0, max) + '...' : str;
-}
+    // ----------------------------------------------------------------------
+    // Boot
+    //
+    // The first page is already on screen from the server, so nothing is
+    // fetched here: the timestamps are converted in place, the pager is drawn
+    // from the counts the template published on #commentsList, and the list is
+    // only re-fetched once a filter, a page or a write asks for it.
+    // ----------------------------------------------------------------------
 
-function formatDate(dateStr) {
-    try {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-             + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    } catch {
-        return '';
-    }
-}
+    paintTimes();
+    paintHead();
+    paintPager();
+    selectTab('details');
 
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
+    // syncThemeControls only runs on DOMContentLoaded, which PJAX never fires.
+    if (typeof window.syncThemeControls === 'function') window.syncThemeControls();
+})();

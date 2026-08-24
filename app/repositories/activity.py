@@ -15,6 +15,10 @@ existing call sites are unchanged.
 ``self.db`` (the Firestore client) and the collection names come from
 ``FirestoreService.__init__``.
 """
+from copy import deepcopy
+
+from app.repositories._helpers import owner_listing
+from app.utils.cache import cache
 from app.utils.date_utils import ensure_aware, utcnow
 from datetime import datetime
 from firebase_admin import firestore
@@ -23,6 +27,39 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Everything the audit-log list reads: the row itself (type, target_type,
+# target_name, action_text, blog_title, user_name, timestamp), the user filter
+# (user_id), the date filter (timestamp) and the search (action_text,
+# target_name, blog_title, user_name). Notably *not* `metadata`, an arbitrary
+# map written per entry that no consumer of this list touches, and not
+# `created_at`, which duplicates `timestamp`.
+ACTIVITY_LIST_FIELDS = (
+    'type',
+    'target_type',
+    'target_name',
+    'action_text',
+    'blog_title',
+    'user_id',
+    'user_name',
+    'timestamp',
+)
+
+# Distinct prefixes: owner_listing keys the shared cache on `prefix:owner_id`
+# alone, so two functions sharing a prefix would overwrite each other's value.
+ACTIVITY_CACHE_PREFIX = 'activity_feed'
+ACTIVITY_STATS_PREFIX = 'activity_stats'
+
+
+def _invalidate_activity():
+    """Drop the cached feed and counts. Called whenever an entry is written.
+
+    The audit trail is append-only, so the only staleness that matters is a
+    just-recorded action not appearing -- which is exactly the case a user would
+    notice, since they are the one who just performed it.
+    """
+    cache.clear_prefix(ACTIVITY_CACHE_PREFIX)
+    cache.clear_prefix(ACTIVITY_STATS_PREFIX)
 
 
 class ActivityRepository:
@@ -50,6 +87,7 @@ class ActivityRepository:
                 doc_data["metadata"] = metadata
             doc_ref = self.db.collection(self.activity_collection).document()
             doc_ref.set(doc_data)
+            _invalidate_activity()
 
             try:
                 from app.services.google_sheets_service import GoogleSheetsService
@@ -95,29 +133,46 @@ class ActivityRepository:
             logger.exception("Error fetching activities")
             return []
 
+    @owner_listing(ACTIVITY_CACHE_PREFIX)
+    def _team_activity_feed(self, admin_id):
+        """The team's most recent activity, newest first. Cached briefly.
+
+        Every filter, search, date range and page on the audit-log screen is
+        derived from this one set in Python, so before this was cached each of
+        those interactions re-ran the same 500-document scan -- the slowest XHR
+        on the dashboard at 4.3 s, paid again on every click. It is invalidated
+        by :meth:`log_activity`, so a user's own action appears immediately;
+        between writes the screen is free to filter and page instantly.
+        """
+        user_ids = self.get_team_user_ids(admin_id)
+
+        feed = []
+        # Firestore 'in' supports max 30 values, batch if needed
+        for i in range(0, len(user_ids), 30):
+            batch_ids = user_ids[i:i + 30]
+            docs = (self.db.collection(self.activity_collection)
+                    .where(filter=FieldFilter("user_id", "in", batch_ids))
+                    .order_by("timestamp", direction=firestore.Query.DESCENDING)
+                    .select(list(ACTIVITY_LIST_FIELDS))
+                    .limit(500)
+                    .stream())
+            for doc in docs:
+                data = doc.to_dict()
+                data['id'] = doc.id
+                self._normalize_activity(data)
+                feed.append(data)
+
+        feed.sort(key=lambda x: x.get('timestamp', datetime.min), reverse=True)
+        return feed
+
     def get_all_activity_for_admin(self, admin_id, type_filter='all', user_filter='all',
                                     search='', date_from='', date_to='', page=1, per_page=10):
         try:
-            sub_users = self.get_my_sub_users(admin_id)
-            user_ids = [admin_id] + [u.get('uid') for u in sub_users if u.get('uid')]
-
-            all_activities = []
-            # Firestore 'in' supports max 30 values, batch if needed
-            for i in range(0, len(user_ids), 30):
-                batch_ids = user_ids[i:i+30]
-                docs = (self.db.collection(self.activity_collection)
-                        .where(filter=FieldFilter("user_id", "in", batch_ids))
-                        .order_by("timestamp", direction=firestore.Query.DESCENDING)
-                        .limit(500)
-                        .stream())
-                for doc in docs:
-                    data = doc.to_dict()
-                    data['id'] = doc.id
-                    self._normalize_activity(data)
-                    all_activities.append(data)
-
-            # Sort combined results
-            all_activities.sort(key=lambda x: x.get('timestamp', datetime.min), reverse=True)
+            # Read through the cached feed. The team lookup it needs is itself
+            # memoised for the request -- this method, get_activity_stats and
+            # the route each derived it independently, so one page load used to
+            # pay three separate round trips for the same answer.
+            all_activities = self._team_activity_feed(admin_id)
 
             # Apply filters
             filtered = []
@@ -172,7 +227,11 @@ class ActivityRepository:
             total = len(filtered)
             total_pages = max(1, (total + per_page - 1) // per_page)
             start = (page - 1) * per_page
-            page_activities = filtered[start:start + per_page]
+            # Deep-copied before the timestamps below are rewritten in place:
+            # `filtered` holds references into the cached feed, and mutating
+            # those would leave the next reader with ISO strings where it
+            # expects datetimes -- breaking the date filter and the sort.
+            page_activities = deepcopy(filtered[start:start + per_page])
 
             # Serialize timestamps for JSON
             for a in page_activities:
@@ -194,10 +253,23 @@ class ActivityRepository:
             logger.exception("Error fetching admin activities")
             return {"activities": [], "total": 0, "page": 1, "per_page": per_page, "total_pages": 1}
 
+    @owner_listing(ACTIVITY_STATS_PREFIX)
     def get_activity_stats(self, admin_id):
+        """Counts per activity category for the stats row.
+
+        Cached alongside the feed, and invalidated with it. Unlike the feed this
+        one is unbounded -- it counts every entry the team has ever produced --
+        so it is the read that grows fastest as the audit trail accumulates.
+
+        Projected to the two fields the tally reads. An activity document also
+        carries ``action_text``, ``blog_title`` and an arbitrary ``metadata``
+        map, none of which this method looks at -- and it reads every document
+        the team has ever produced, so the projection is the difference between
+        transferring the whole audit trail and transferring two enum fields
+        per row.
+        """
         try:
-            sub_users = self.get_my_sub_users(admin_id)
-            user_ids = [admin_id] + [u.get('uid') for u in sub_users if u.get('uid')]
+            user_ids = self.get_team_user_ids(admin_id)
 
             stats = {"total": 0, "blog": 0, "user": 0, "comment": 0, "settings": 0, "newsletter": 0, "category": 0}
             blog_types = ['blog', 'generated', 'edited', 'published', 'deleted', 'status_change', 'seo_optimized']
@@ -206,6 +278,7 @@ class ActivityRepository:
                 batch_ids = user_ids[i:i+30]
                 docs = (self.db.collection(self.activity_collection)
                         .where(filter=FieldFilter("user_id", "in", batch_ids))
+                        .select(['type', 'target_type'])
                         .stream())
                 for doc in docs:
                     data = doc.to_dict()

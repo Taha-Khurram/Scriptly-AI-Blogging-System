@@ -29,6 +29,9 @@ from whitenoise import WhiteNoise
 from app.core.errors import register_error_handlers
 from app.core.extensions import apply_csrf_exemptions, init_extensions
 from app.core.logging import configure_logging
+from app.core.profiling import register_query_profiler
+from app.core.sessions import init_sessions
+from app.repositories._helpers import init_request_cache
 from app.core.security import (
     admin_required,
     api_admin_required,
@@ -77,6 +80,8 @@ def create_app(config_class=None):
     app.config['ENV_NAME'] = getattr(config_class, 'ENV_NAME', 'production')
 
     configure_logging(app)
+    # Before anything can issue a query, so the wrappers see every call.
+    register_query_profiler(app)
     app.logger.info(
         'Starting Scriptly',
         extra={'environment': app.config['ENV_NAME'],
@@ -85,6 +90,13 @@ def create_app(config_class=None):
 
     _init_infrastructure(app)
     _init_middleware(app)
+    # Before init_extensions: the CSRF token and the rate-limit key both read
+    # from the session, so the interface that loads it has to be installed
+    # first.
+    init_sessions(app)
+    # Opens the per-request repository memo store. Must be registered before
+    # any blueprint's before_request can issue a query.
+    init_request_cache(app)
     init_extensions(app)
     register_error_handlers(app)
     register_security_headers(app)
@@ -110,9 +122,21 @@ def create_app(config_class=None):
 
 def _init_infrastructure(app):
     """Configure the shared singletons and the Firebase connection."""
+    from app.core.store import (
+        default_path,
+        register_sweep,
+        store,
+        warn_if_not_shared,
+    )
     from app.services.gemini_client import gemini
     from app.utils.cache import cache
     from app.utils.task_manager import task_manager
+
+    # First: the session interface and the rate limiter both read from this,
+    # and both are constructed later in the factory.
+    store.configure(app.config.get('SQLITE_STORE_PATH') or default_path(app))
+    warn_if_not_shared(app)
+    register_sweep(app)
 
     cache.configure(
         redis_url=app.config.get('REDIS_URL'),
@@ -246,6 +270,16 @@ def _register_template_helpers(app):
             'app_config': app_settings,
             'current_year': year,
             'current_user': current_user(),
+            # Published to the page so the browser's inactivity countdown is
+            # driven by the server's actual timeout. It used to be hardcoded to
+            # 15 minutes in app.js while the server allowed 480, so the two
+            # never agreed -- and either value changing left the other wrong.
+            'session_timeout_seconds': int(
+                app.config['PERMANENT_SESSION_LIFETIME'].total_seconds()
+            ),
+            'session_warning_seconds': int(
+                app.config.get('SESSION_WARNING_SECONDS', 60)
+            ),
         }
 
 

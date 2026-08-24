@@ -1,481 +1,425 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}SEO Tools | ScriptlyAI{% endblock %}
+{% block title %}SEO Tools | {{ app_config.app_name if app_config else 'ScriptlyAI' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/seo-tools.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/seo-tools.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
+{#
+  The region codes are the SEO agent's, uppercase, with `global` as the opt-out.
+  Kept in one list rather than hand-written into both the native <select> and the
+  menu beside it, because the two must not be able to drift apart.
+#}
+{% set regions = [
+  ('PK', 'Pakistan'), ('US', 'United States'), ('UK', 'United Kingdom'),
+  ('IN', 'India'), ('AE', 'United Arab Emirates'), ('global', 'Global')
+] %}
+
 <div class="dashboard-layout">
 
-    {% include 'partials/sidebar.html' %}
+  {% include 'partials/sidebar.html' %}
 
-    <!-- MAIN CONTENT -->
-    <main class="dashboard-main">
+  {#
+    The confirmation modal and the page script live inside .dashboard-main. PJAX
+    swaps only that element's innerHTML, so a modal outside it is dropped on
+    every in-app navigation and stays broken until a hard reload.
+  #}
+  <main class="dashboard-main">
 
-        <header class="dashboard-header">
-            <div>
-                <div class="header-welcome-text">AI-Powered Optimization</div>
-                <h1 class="header-title">SEO Tools</h1>
-            </div>
-        </header>
+    {% call page_header(title='SEO Tools', eyebrow='Search optimization') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    {% endcall %}
 
-        <!-- Loading Indicator -->
-        <div id="seo-loader" class="seo-loader-container d-none">
-            <div class="d-flex align-items-center gap-3 bg-white px-4 py-3 rounded-pill shadow-card border border-light">
-                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                <span id="seo-loader-text" class="text-secondary small fw-bold">AI is analyzing your content...</span>
-            </div>
+    {# ==================== CONTROLS ==================== #}
+    <section class="surface-card reveal" aria-labelledby="seoControlsHeading">
+
+      <header class="card-head is-stacked">
+        <h2 class="card-title" id="seoControlsHeading">Work on a draft</h2>
+        <p class="card-note">
+          Research the keyword landscape for a region, score the draft as it stands, or let Scriptly
+          rewrite it for search. Only <strong>Apply optimization</strong> writes anything back.
+        </p>
+      </header>
+
+      <div class="seo-controls">
+        <div class="seo-picker seo-picker-grow">
+          <label class="seo-label" id="seoDraftLabel">Draft</label>
+          <div class="select-pill" data-select-pill>
+            <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
+              aria-expanded="false" aria-labelledby="seoDraftLabel">
+              <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+              <span class="filter-pill-label" data-pill-text>Loading drafts…</span>
+              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+            </button>
+            <select id="seoDraftSelect" data-draft-select aria-labelledby="seoDraftLabel">
+              <option value="">Select a draft</option>
+            </select>
+            <div class="menu" role="listbox" aria-labelledby="seoDraftLabel" hidden></div>
+          </div>
         </div>
 
-        <!-- Analyze Drafts Section -->
-        <div class="seo-card animate-fade-up mb-4">
-            <h3><i class="bi bi-file-earmark-text"></i> SEO Tools for Drafts</h3>
-            <p class="text-muted mb-3">Select a draft from your collection to research keywords, analyze SEO, or apply optimization.</p>
-
-            <div class="row g-3 align-items-end mb-4">
-                <div class="col-md-8">
-                    <label class="form-label fw-bold">Select Draft</label>
-                    <select class="form-select" id="draft-select">
-                        <option value="">-- Loading drafts... --</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-bold">Target Region</label>
-                    <select class="form-select region-select" id="draft-region">
-                        <option value="PK" selected>Pakistan (PK)</option>
-                        <option value="US">United States (US)</option>
-                        <option value="UK">United Kingdom (UK)</option>
-                        <option value="IN">India (IN)</option>
-                        <option value="AE">UAE (AE)</option>
-                        <option value="global">Global</option>
-                    </select>
-                </div>
+        <div class="seo-picker">
+          <label class="seo-label" id="seoRegionLabel">Region</label>
+          <div class="select-pill" data-select-pill>
+            <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
+              aria-expanded="false" aria-labelledby="seoRegionLabel">
+              <i class="bi bi-globe2" aria-hidden="true"></i>
+              <span class="filter-pill-label" data-pill-text>{{ regions[0][1] }}</span>
+              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+            </button>
+            <select id="seoRegionSelect" data-region-select aria-labelledby="seoRegionLabel">
+              {% for code, name in regions %}
+              <option value="{{ code }}">{{ name }}</option>
+              {% endfor %}
+            </select>
+            <div class="menu is-end" role="listbox" aria-labelledby="seoRegionLabel" hidden>
+              {% for code, name in regions %}
+              <button type="button" class="menu-item{{ ' is-selected' if loop.first }}" role="option"
+                aria-selected="{{ 'true' if loop.first else 'false' }}" data-value="{{ code }}">
+                <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                <span class="menu-label">{{ name }}</span>
+              </button>
+              {% endfor %}
             </div>
+          </div>
+        </div>
 
-            <div class="d-flex flex-wrap gap-3">
-                <button class="btn btn-outline-primary" onclick="researchKeywordsForDraft()">
-                    <i class="bi bi-lightbulb me-2"></i>Research Keywords
+        {# Read first, write last: the two research verbs, then the one that
+           saves over the draft. #}
+        <div class="seo-verbs">
+          <button type="button" class="app-btn is-ghost" data-action="keywords">
+            <i class="bi bi-lightbulb" aria-hidden="true"></i> Research keywords
+          </button>
+          <button type="button" class="app-btn is-primary" data-action="analyze">
+            <i class="bi bi-speedometer2" aria-hidden="true"></i> Analyze SEO
+          </button>
+          <button type="button" class="app-btn is-ghost" data-action="apply">
+            <i class="bi bi-magic" aria-hidden="true"></i> Apply optimization
+          </button>
+          <button type="button" class="app-btn is-ghost seo-refresh" data-action="reload-drafts"
+            aria-label="Reload the draft list" title="Reload the draft list">
+            <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    {# ==================== RESULTS ====================
+       One region, six states, one attribute. The screen used to run three
+       sibling sections toggled with inline display and had no error state at
+       all: a failed lookup raised one alert() and left the panel looking
+       exactly like a run you had never started. #}
+    <section class="surface-card reveal" style="--reveal-delay: 60ms" aria-labelledby="seoResultHeading">
+
+      <header class="card-head">
+        <h2 class="card-title" id="seoResultHeading" data-result-title>Results</h2>
+        <span class="card-note" data-result-note>Nothing analyzed yet</span>
+      </header>
+
+      {# No aria-live on the region itself: the working surface below carries
+         role="status", and a live region wrapping the whole panel would read
+         out every table row of a result set as it arrived. #}
+      <div class="seo-body" data-body="seo" data-state="empty">
+
+        <div class="seo-state" data-for="empty">
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
+            <p>Pick a draft and a region above. <strong>Analyze SEO</strong> scores it as it stands,
+              <strong>Research keywords</strong> looks up the terms it could rank for, and
+              <strong>Apply optimization</strong> rewrites it.</p>
+          </div>
+        </div>
+
+        {# The pill-and-shimmer pair blog generation uses, so "the system is
+           thinking" looks the same here as it does everywhere else. #}
+        <div class="seo-state" data-for="loading">
+          <div class="seo-working" role="status">
+            <span class="seo-working-badge">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              <span data-working-label>Working…</span>
+            </span>
+            <p class="seo-working-note" data-working-note>This usually takes 10–30 seconds.</p>
+            <div class="progress seo-working-bar">
+              <div class="progress-bar bg-primary" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="seo-state" data-for="error">
+          <div class="list-empty seo-error">
+            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <p data-error-text>Something went wrong.</p>
+            <button type="button" class="app-btn is-ghost" data-action="retry">Try again</button>
+          </div>
+        </div>
+
+        {# -------- ANALYSIS: the draft as it stands, nothing written -------- #}
+        <div class="seo-state" data-for="analysis">
+
+          <p class="seo-source">
+            <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+            <span data-analysis-source></span>
+          </p>
+
+          <div class="seo-result-head">
+            <span class="seo-score">
+              <span class="seo-score-label">SEO score</span>
+              <span class="seo-score-value" data-analysis-score>0</span>
+              <span class="seo-score-from">out of 100</span>
+            </span>
+            <span class="seo-grade" data-analysis-grade-pill>
+              <span class="seo-grade-letter" data-analysis-grade>—</span>
+              <span class="seo-grade-caption">grade</span>
+            </span>
+            <button type="button" class="app-btn is-primary seo-head-action" data-action="apply">
+              <i class="bi bi-magic" aria-hidden="true"></i> Apply optimization
+            </button>
+          </div>
+
+          {# Bare metrics, not stat tiles: a stat tile promises label · value ·
+             delta · trend, and this analysis returns none of the comparison
+             half. These say only what they can. #}
+          <div class="seo-metrics">
+            <div class="seo-metric">
+              <span class="seo-metric-label">Words</span>
+              <span class="seo-metric-value" data-metric-words>—</span>
+              <span class="seo-metric-note">1,000+ reads as comprehensive</span>
+            </div>
+            <div class="seo-metric">
+              <span class="seo-metric-label">Readability</span>
+              <span class="seo-metric-value" data-metric-readability>—</span>
+              <span class="seo-metric-note">Flesch reading ease, 0–100</span>
+            </div>
+            <div class="seo-metric">
+              <span class="seo-metric-label">Headings</span>
+              <span class="seo-metric-value" data-metric-headings>—</span>
+              <span class="seo-metric-note">H1–H6 in the body</span>
+            </div>
+            <div class="seo-metric">
+              <span class="seo-metric-label">Links</span>
+              <span class="seo-metric-value" data-metric-links>—</span>
+              <span class="seo-metric-note">internal and external</span>
+            </div>
+          </div>
+
+          {# The per-category breakdown the API has returned all along and the
+             screen never showed — it fed the progress bars of a results panel
+             that nothing ever called. #}
+          <div class="seo-breakdown" data-analysis-breakdown hidden>
+            <h3 class="seo-subhead">Score breakdown</h3>
+            <div class="seo-meters" data-analysis-meters></div>
+          </div>
+
+          <div class="seo-lists">
+            <div class="seo-list-card" data-issues-card hidden>
+              <h3 class="seo-subhead">
+                <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Issues found
+                <span class="card-count" data-issues-count>0</span>
+              </h3>
+              <ul class="seo-list" data-issues-list></ul>
+            </div>
+            <div class="seo-list-card" data-recs-card hidden>
+              <h3 class="seo-subhead">
+                <i class="bi bi-lightbulb" aria-hidden="true"></i> Recommendations
+              </h3>
+              <ul class="seo-list seo-list-todo" data-recs-list></ul>
+            </div>
+          </div>
+        </div>
+
+        {# -------- KEYWORDS: research only, nothing written -------- #}
+        <div class="seo-state" data-for="keywords">
+
+          <p class="seo-source">
+            <i class="bi bi-globe2" aria-hidden="true"></i>
+            <span data-keywords-source></span>
+          </p>
+
+          <div class="seo-primary" data-primary hidden>
+            <div class="seo-primary-lead">
+              <span class="seo-primary-label">Primary keyword</span>
+              <span class="seo-primary-value" data-primary-kw>—</span>
+              <span class="seo-primary-note" data-primary-note></span>
+            </div>
+            <div class="seo-metrics is-tight">
+              <div class="seo-metric">
+                <span class="seo-metric-label">Monthly volume</span>
+                <span class="seo-metric-value" data-primary-volume>—</span>
+                <span class="seo-metric-note">searches in region</span>
+              </div>
+              <div class="seo-metric">
+                <span class="seo-metric-label">Cost per click</span>
+                <span class="seo-metric-value" data-primary-cpc>—</span>
+                <span class="seo-metric-note">what advertisers pay</span>
+              </div>
+              <div class="seo-metric">
+                <span class="seo-metric-label">Difficulty</span>
+                <span class="seo-metric-value" data-primary-difficulty>—</span>
+                <span class="seo-metric-track">
+                  <span class="seo-metric-fill" data-primary-difficulty-fill style="width: 0%"></span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <h3 class="seo-subhead">
+            Opportunities <span class="card-count" data-kw-count>0</span>
+          </h3>
+
+          {# Keyword data is genuinely tabular — the point is comparing volume
+             and difficulty down a column — so it stays a table rather than
+             becoming the row idiom. #}
+          <div class="seo-table-scroll">
+            <table class="seo-table">
+              <caption class="visually-hidden">Keyword opportunities with difficulty, monthly search
+                volume, cost per click and competition</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Keyword</th>
+                  <th scope="col">Difficulty</th>
+                  <th scope="col" class="is-num">Volume</th>
+                  <th scope="col" class="is-num">CPC</th>
+                  <th scope="col">Competition</th>
+                  <th scope="col"><span class="visually-hidden">Copy</span></th>
+                </tr>
+              </thead>
+              <tbody data-kw-rows></tbody>
+            </table>
+          </div>
+        </div>
+
+        {# -------- COMPARISON: after an optimize run -------- #}
+        <div class="seo-state" data-for="comparison">
+
+          <div class="seo-outcome">
+            <span class="seo-outcome-icon"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
+            <div class="seo-outcome-copy">
+              <h3 class="seo-outcome-title">Optimization applied</h3>
+              <p data-outcome-note>The draft has been rewritten and saved.</p>
+            </div>
+          </div>
+
+          <div class="seo-result-head">
+            <span class="seo-score">
+              <span class="seo-score-label">SEO score now</span>
+              <span class="seo-score-value" data-compare-after>0</span>
+              <span class="seo-score-from">
+                was <span data-compare-before>0</span>
+                <span class="seo-score-delta" data-compare-delta></span>
+              </span>
+            </span>
+            <span class="seo-grade" data-compare-grade-pill>
+              <span class="seo-grade-letter" data-compare-grade>—</span>
+              <span class="seo-grade-caption">grade</span>
+            </span>
+            <a class="app-btn is-primary seo-head-action" href="{{ url_for('blog.drafts_page') }}">
+              <i class="bi bi-file-earmark-text" aria-hidden="true"></i> View my drafts
+            </a>
+            <button type="button" class="app-btn is-ghost" data-action="reset">Analyze another</button>
+          </div>
+
+          {# Word count and readability move too, and neither is a score out of
+             100 — so they state the new figure with the old one beneath it
+             rather than borrowing the meters' scale. #}
+          <div class="seo-metrics" data-compare-metrics hidden>
+            <div class="seo-metric">
+              <span class="seo-metric-label">Words</span>
+              <span class="seo-metric-value" data-compare-words>—</span>
+              <span class="seo-metric-note" data-compare-words-note></span>
+            </div>
+            <div class="seo-metric">
+              <span class="seo-metric-label">Readability</span>
+              <span class="seo-metric-value" data-compare-readability>—</span>
+              <span class="seo-metric-note" data-compare-readability-note></span>
+            </div>
+            <div class="seo-metric is-text">
+              <span class="seo-metric-label">Optimized for</span>
+              <span class="seo-metric-value" data-compare-kw>—</span>
+              <span class="seo-metric-note">the primary keyword it targeted</span>
+            </div>
+          </div>
+
+          {# Bar = the score now, tick = where it started. Two stacked fills
+             would hide the smaller of the pair whichever way the run went. #}
+          <div class="seo-breakdown" data-compare-breakdown hidden>
+            <h3 class="seo-subhead">What moved</h3>
+            <div class="seo-meters" data-compare-meters></div>
+          </div>
+
+          <div class="seo-titles">
+            <div class="app-field">
+              <label class="field-label" for="seoTitleBefore">Original title</label>
+              <input type="text" id="seoTitleBefore" data-title-before readonly>
+            </div>
+            <div class="app-field">
+              <label class="field-label" for="seoTitleAfter">Optimized title</label>
+              <div class="seo-copy-field">
+                <input type="text" id="seoTitleAfter" data-title-after readonly>
+                <button type="button" class="app-btn is-ghost" data-action="copy-title"
+                  aria-label="Copy the optimized title" title="Copy the optimized title">
+                  <i class="bi bi-clipboard" aria-hidden="true"></i>
                 </button>
-                <button class="btn btn-primary" onclick="analyzeDraft()">
-                    <i class="bi bi-search me-2"></i>Analyze SEO
-                </button>
-                <button class="btn btn-success" onclick="applyOptimizationToDraft()" id="apply-seo-btn">
-                    <i class="bi bi-magic me-2"></i>Apply SEO Optimization
-                </button>
-                <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="loadDrafts()">
-                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-                </button>
+              </div>
             </div>
+          </div>
+
+          <div class="seo-lists">
+            <div class="seo-list-card" data-changes-card hidden>
+              <h3 class="seo-subhead">
+                <i class="bi bi-list-check" aria-hidden="true"></i> Changes made
+                <span class="card-count" data-changes-count>0</span>
+              </h3>
+              <ul class="seo-list seo-list-done" data-changes-list></ul>
+            </div>
+            <div class="seo-list-card" data-next-card hidden>
+              <h3 class="seo-subhead">
+                <i class="bi bi-lightbulb" aria-hidden="true"></i> Go further
+              </h3>
+              <ul class="seo-list seo-list-todo" data-next-list></ul>
+            </div>
+          </div>
         </div>
+      </div>
+    </section>
 
-        <!-- URL SEO Analysis Section (disabled - API quota limit)
-        <div class="seo-card animate-fade-up mb-4">
-            <h3><i class="bi bi-globe"></i> Analyze URL SEO</h3>
-            <p class="text-muted mb-3">Enter a live URL to analyze its SEO performance, technical health, and content quality.</p>
-
-            <div class="row g-3 align-items-end mb-3">
-                <div class="col-md-9">
-                    <label class="form-label fw-bold">Website URL</label>
-                    <input type="url" class="form-control" id="url-input" placeholder="https://example.com">
-                </div>
-                <div class="col-md-3">
-                    <button class="btn btn-primary w-100" onclick="analyzeUrlSeo()">
-                        <i class="bi bi-search me-2"></i>Analyze URL
-                    </button>
-                </div>
-            </div>
+    {# ==================== CONFIRM ====================
+       Apply rewrites the title, meta and body and saves over the draft. There
+       is no undo, and the old overlay named neither the draft nor the region.
+       The irreversible action states its own blast radius — in the body, and
+       again in the button's own label. #}
+    <div class="modal fade" id="seoApplyModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="seoApplyTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="seoApplyTitle">Optimize this draft?</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <p class="seo-confirm-target">“<span data-confirm-draft></span>”</p>
+            <p class="seo-confirm-copy">
+              Scriptly will rewrite the title, meta description, headings and keyword placement for
+              <strong data-confirm-region>{{ regions[0][1] }}</strong>, then save the result over this
+              draft. The current version is not kept.
+            </p>
+          </div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-primary" data-confirm-apply>Optimize and save</button>
+          </footer>
         </div>
+      </div>
+    </div>
 
-        <div id="url-results-section" style="display: none;">
-            <div class="seo-card mb-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3 class="mb-0"><i class="bi bi-globe2"></i> URL SEO Report</h3>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('url-results-section').style.display='none'">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <div class="col-md-8">
-                        <p class="text-muted mb-1">Analyzed URL</p>
-                        <a id="url-result-link" href="#" target="_blank" class="fw-bold text-break"></a>
-                        <p class="mt-2 mb-1"><strong>Title:</strong> <span id="url-result-title">--</span></p>
-                        <p class="mb-0"><strong>Description:</strong> <span id="url-result-description" class="text-muted">--</span></p>
-                    </div>
-                    <div class="col-md-4 text-center">
-                        <p class="text-muted mb-1">SEO Score</p>
-                        <div class="score-circle" id="url-score-circle">
-                            <span id="url-score-value">--</span>
-                        </div>
-                    </div>
-                </div>
-
-                <h5 class="mt-4 mb-3"><i class="bi bi-file-text me-2"></i>Content Analysis</h5>
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 text-center">
-                            <div class="text-muted small">Word Count</div>
-                            <div class="fw-bold fs-5" id="url-word-count">--</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 text-center">
-                            <div class="text-muted small">Title Length</div>
-                            <div class="fw-bold fs-5" id="url-title-length">--</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 text-center">
-                            <div class="text-muted small">Description Length</div>
-                            <div class="fw-bold fs-5" id="url-desc-length">--</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 text-center">
-                            <div class="text-muted small">Load Time</div>
-                            <div class="fw-bold fs-5" id="url-load-time">--</div>
-                        </div>
-                    </div>
-                </div>
-
-                <h5 class="mb-3"><i class="bi bi-gear me-2"></i>Technical SEO</h5>
-                <div class="row g-2 mb-4" id="url-technical-checks">
-                </div>
-
-                <h5 class="mb-3"><i class="bi bi-exclamation-triangle me-2"></i>Issues & Warnings</h5>
-                <div id="url-issues-container" class="mb-4">
-                    <p class="text-muted">No issues found.</p>
-                </div>
-
-                <h5 class="mb-3"><i class="bi bi-check-circle me-2"></i>Passed Checks</h5>
-                <div id="url-passed-container">
-                    <p class="text-muted">No data yet.</p>
-                </div>
-            </div>
-        </div>
-        END URL SEO Analysis Section -->
-
-        <!-- Results Section -->
-        <div id="results-section">
-
-            <!-- SEO Score -->
-            <div class="row g-4 mb-4" id="seo-score-section">
-                <div class="col-md-4">
-                    <div class="seo-card text-center">
-                        <h3 class="justify-content-center"><i class="bi bi-speedometer2"></i> SEO Score</h3>
-                        <div class="score-circle" id="seo-score-circle">
-                            <span id="seo-score-value">--</span>
-                        </div>
-                        <p class="text-muted mb-0" id="seo-score-label">Analyzing...</p>
-                    </div>
-                </div>
-
-                <div class="col-md-8">
-                    <div class="seo-card">
-                        <h3><i class="bi bi-bar-chart"></i> Score Breakdown</h3>
-                        <div id="score-breakdown">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span>Content Length (15%)</span>
-                                <div class="progress" style="width: 150px; height: 8px;">
-                                    <div class="progress-bar" id="score-content" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <span class="small text-muted" id="score-content-val">--</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span>Headings (15%)</span>
-                                <div class="progress" style="width: 150px; height: 8px;">
-                                    <div class="progress-bar bg-info" id="score-headings" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <span class="small text-muted" id="score-headings-val">--</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span>Keywords (25%)</span>
-                                <div class="progress" style="width: 150px; height: 8px;">
-                                    <div class="progress-bar bg-success" id="score-keywords" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <span class="small text-muted" id="score-keywords-val">--</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span>Readability (15%)</span>
-                                <div class="progress" style="width: 150px; height: 8px;">
-                                    <div class="progress-bar bg-warning" id="score-readability" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <span class="small text-muted" id="score-readability-val">--</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span>Links (10%)</span>
-                                <div class="progress" style="width: 150px; height: 8px;">
-                                    <div class="progress-bar bg-secondary" id="score-links" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <span class="small text-muted" id="score-links-val">--</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span>Title (15%)</span>
-                                <div class="progress" style="width: 150px; height: 8px;">
-                                    <div class="progress-bar bg-primary" id="score-title" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <span class="small text-muted" id="score-title-val">--</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Primary Keyword -->
-            <div class="seo-card mb-4">
-                <h3><i class="bi bi-key"></i> Primary Keyword</h3>
-                <div class="d-flex align-items-center gap-3 mb-3">
-                    <span class="fs-4 fw-bold text-primary" id="primary-keyword">--</span>
-                    <span class="badge bg-success" id="primary-difficulty">--</span>
-                </div>
-                <p class="text-muted mb-0" id="primary-keyword-info">
-                    This keyword has the best balance of search volume and low competition for your region.
-                </p>
-            </div>
-
-            <!-- Keywords -->
-            <div class="seo-card animate-fade-up">
-                <h3><i class="bi bi-tags"></i> Recommended Keywords</h3>
-                <p class="text-muted">Click to copy. Shows difficulty score, search volume, CPC, and competition level.</p>
-                <div id="keywords-container">
-                    <!-- Keywords will be inserted here -->
-                </div>
-            </div>
-
-            <!-- SEO Checklist -->
-            <div class="seo-card animate-fade-up" id="seo-checklist-section">
-                <h3><i class="bi bi-check2-square"></i> SEO Checklist</h3>
-                <ul class="seo-checklist" id="seo-checklist">
-                    <!-- Checklist items will be inserted here -->
-                </ul>
-            </div>
-
-            <!-- Optimized Title -->
-            <div class="seo-card animate-fade-up" id="optimized-title-section">
-                <h3><i class="bi bi-pencil-square"></i> Optimized Title Suggestion</h3>
-                <div class="d-flex align-items-center gap-3">
-                    <input type="text" class="form-control" id="optimized-title" readonly>
-                    <button class="btn btn-outline-primary" onclick="copyToClipboard('optimized-title')">
-                        <i class="bi bi-clipboard"></i>
-                    </button>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- Original Analysis Section (Step 1 - After analyzing draft) -->
-        <div id="original-analysis-section">
-            <div class="seo-card mb-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3 class="mb-0"><i class="bi bi-clipboard-data"></i> Current SEO Analysis</h3>
-                    <span class="badge bg-warning text-dark">Step 1: Analysis Only</span>
-                </div>
-                <p class="text-muted">This is the current SEO status of your draft. Click "Apply SEO" to optimize it.</p>
-            </div>
-
-            <!-- Current Score -->
-            <div class="row g-4 mb-4">
-                <div class="col-md-4">
-                    <div class="seo-card text-center">
-                        <h4 class="text-muted mb-2">Current Score</h4>
-                        <div class="score-circle" id="original-score-circle">
-                            <span id="original-score-value">--</span>
-                        </div>
-                        <p class="mb-0" id="original-score-grade">Grade: --</p>
-                    </div>
-                </div>
-                <div class="col-md-8">
-                    <div class="seo-card">
-                        <h4><i class="bi bi-exclamation-triangle text-warning"></i> Issues Found</h4>
-                        <ul class="list-unstyled mb-0" id="original-issues-list">
-                            <!-- Issues will be inserted here -->
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recommendations -->
-            <div class="seo-card mb-4">
-                <h4><i class="bi bi-lightbulb text-warning"></i> Recommendations</h4>
-                <div id="original-recommendations">
-                    <!-- Recommendations will be inserted here -->
-                </div>
-            </div>
-
-            <!-- Content Stats -->
-            <div class="row g-4 mb-4">
-                <div class="col-md-3">
-                    <div class="seo-card text-center">
-                        <i class="bi bi-file-text fs-2 text-primary"></i>
-                        <h4 class="mt-2 mb-0" id="original-word-count">--</h4>
-                        <small class="text-muted">Words</small>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="seo-card text-center">
-                        <i class="bi bi-book fs-2 text-info"></i>
-                        <h4 class="mt-2 mb-0" id="original-readability">--</h4>
-                        <small class="text-muted">Readability</small>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="seo-card text-center">
-                        <i class="bi bi-list-nested fs-2 text-success"></i>
-                        <h4 class="mt-2 mb-0" id="original-headings">--</h4>
-                        <small class="text-muted">Headings</small>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="seo-card text-center">
-                        <i class="bi bi-link-45deg fs-2 text-secondary"></i>
-                        <h4 class="mt-2 mb-0" id="original-links">--</h4>
-                        <small class="text-muted">Links</small>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Apply SEO Button -->
-            <div class="text-center">
-                <button class="btn btn-success btn-lg" onclick="applyOptimizationToDraft()" id="apply-seo-btn-main">
-                    <i class="bi bi-magic me-2"></i>Apply SEO Optimization
-                </button>
-                <p class="text-muted mt-2 small">This will optimize your content with target keywords and best practices</p>
-            </div>
-        </div>
-
-        <!-- Comparison Section (Step 2 - After applying SEO) -->
-        <div id="comparison-section" class="comparison-container">
-            <div class="seo-card mb-4" style="background: var(--brand-gradient-diag); color: #fff;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h3 class="mb-1 text-white"><i class="bi bi-check-circle-fill me-2"></i>SEO Optimization Complete!</h3>
-                        <p class="mb-0 opacity-75">Your content has been optimized for search engines</p>
-                    </div>
-                    <span class="badge bg-white text-success fs-6">Step 2: Optimized</span>
-                </div>
-            </div>
-
-            <!-- Score Comparison -->
-            <div class="seo-card mb-4">
-                <h4 class="text-center mb-4"><i class="bi bi-arrow-left-right"></i> Score Comparison</h4>
-                <div class="score-comparison">
-                    <div class="score-box before">
-                        <div class="score-value" id="compare-score-before">--</div>
-                        <div class="text-muted">Before</div>
-                    </div>
-                    <div class="score-arrow">
-                        <i class="bi bi-arrow-right"></i>
-                    </div>
-                    <div class="score-box after">
-                        <div class="score-value" id="compare-score-after">--</div>
-                        <div class="text-muted">After</div>
-                    </div>
-                </div>
-                <div class="text-center mt-3">
-                    <span class="improvement-badge" id="improvement-badge">+0 points</span>
-                </div>
-            </div>
-
-            <!-- Detailed Comparison -->
-            <div class="seo-card mb-4">
-                <h4><i class="bi bi-bar-chart-line"></i> Detailed Comparison</h4>
-                <div class="comparison-card">
-                    <div class="comparison-row">
-                        <span class="comparison-label">Category</span>
-                        <span class="comparison-before"><strong>Before</strong></span>
-                        <span class="comparison-after"><strong>After</strong></span>
-                    </div>
-                    <div class="comparison-row">
-                        <span class="comparison-label">Content Length</span>
-                        <span class="comparison-before" id="cmp-content-before">--</span>
-                        <span class="comparison-after" id="cmp-content-after">--</span>
-                    </div>
-                    <div class="comparison-row">
-                        <span class="comparison-label">Headings</span>
-                        <span class="comparison-before" id="cmp-headings-before">--</span>
-                        <span class="comparison-after" id="cmp-headings-after">--</span>
-                    </div>
-                    <div class="comparison-row">
-                        <span class="comparison-label">Keywords</span>
-                        <span class="comparison-before" id="cmp-keywords-before">--</span>
-                        <span class="comparison-after" id="cmp-keywords-after">--</span>
-                    </div>
-                    <div class="comparison-row">
-                        <span class="comparison-label">Readability</span>
-                        <span class="comparison-before" id="cmp-readability-before">--</span>
-                        <span class="comparison-after" id="cmp-readability-after">--</span>
-                    </div>
-                    <div class="comparison-row">
-                        <span class="comparison-label">Title</span>
-                        <span class="comparison-before" id="cmp-title-before">--</span>
-                        <span class="comparison-after" id="cmp-title-after">--</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Changes Made -->
-            <div class="seo-card mb-4">
-                <h4><i class="bi bi-pencil-square"></i> Changes Made</h4>
-                <ul class="changes-list" id="changes-list">
-                    <!-- Changes will be inserted here -->
-                </ul>
-            </div>
-
-            <!-- New Title -->
-            <div class="seo-card mb-4">
-                <h4><i class="bi bi-card-heading"></i> Title Comparison</h4>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label text-muted">Original Title</label>
-                        <input type="text" class="form-control bg-light" id="compare-title-before" readonly>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-success fw-bold">Optimized Title</label>
-                        <input type="text" class="form-control border-success" id="compare-title-after" readonly>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="text-center">
-                <a href="{{ url_for('blog.drafts_page') }}" class="btn btn-primary btn-lg">
-                    <i class="bi bi-file-text me-2"></i>View My Drafts
-                </a>
-                <button class="btn btn-outline-secondary btn-lg ms-2" onclick="resetAnalysis()">
-                    <i class="bi bi-arrow-counterclockwise me-2"></i>Analyze Another
-                </button>
-            </div>
-        </div>
-
-        <!-- Custom Confirmation Modal -->
-        <div class="confirm-modal-overlay" id="confirm-modal">
-            <div class="confirm-modal-content">
-                <div class="confirm-modal-icon">
-                    <i class="bi bi-magic"></i>
-                </div>
-                <h4 class="confirm-modal-title">Apply SEO Optimization</h4>
-                <p class="confirm-modal-message">This will update your draft with SEO-optimized content. Do you want to continue?</p>
-                <div class="confirm-modal-actions">
-                    <button class="btn btn-outline-secondary" id="confirm-cancel-btn">Cancel</button>
-                    <button class="btn btn-primary" id="confirm-ok-btn">
-                        <i class="bi bi-check2 me-1"></i>Yes, Optimize
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Copy Toast Notification -->
-        <div class="copy-toast" id="copy-toast">
-            <i class="bi bi-clipboard-check"></i>
-            <span>Copied to clipboard!</span>
-        </div>
-
-    </main>
+    <script src="{{ url_for('static', filename='js/pages/seo-tools.js') }}?v=2"></script>
+  </main>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/seo-tools.js') }}"></script>
 {% endblock %}

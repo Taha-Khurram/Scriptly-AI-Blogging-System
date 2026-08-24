@@ -91,7 +91,12 @@ def _check_cache():
     return {
         'status': 'ok' if cache.healthy() else 'degraded',
         'backend': stats.get('backend'),
+        # Shared across workers is the correctness property: without it,
+        # invalidation does not propagate between them. Across *instances* is
+        # the further guarantee only Redis provides.
         'shared_across_workers': cache.is_shared,
+        'shared_across_instances': cache.is_shared_across_instances,
+        'entries': stats.get('entries'),
         'hit_rate': stats.get('hit_rate'),
     }
 
@@ -130,6 +135,25 @@ def _check_storage():
     }
 
 
+def _check_store():
+    """The SQLite store that holds sessions and rate-limit counters.
+
+    Critical, unlike the cache: if this is unreachable then no session can be
+    read, so every authenticated request is anonymous and every user is
+    effectively signed out. A cache miss is slow; this is an outage, and the
+    instance should be drained rather than left serving login redirects.
+    """
+    from app.core.store import store
+
+    if not store.healthy():
+        return {'status': 'fail', 'error': 'session store is not readable'}
+
+    stats = store.stats()
+    if 'error' in stats:
+        return {'status': 'fail', **stats}
+    return {'status': 'ok', **stats}
+
+
 def _check_tasks():
     """Background worker pool depth -- the AI throughput ceiling."""
     from app.utils.task_manager import task_manager
@@ -142,13 +166,16 @@ def _check_tasks():
     }
 
 
-# Only Firestore is required to serve a request; everything else degrades.
-# The cache falling back to in-process storage is slower, not broken, and AI
-# being unconfigured breaks the AI features rather than the site.
-_CRITICAL_CHECKS = {'firestore'}
+# Firestore and the session store are required to serve an authenticated
+# request; everything else degrades. The cache falling back to in-process
+# storage is slower, not broken, and AI being unconfigured breaks the AI
+# features rather than the site. The session store is different in kind: with
+# it unreadable, every request is anonymous and no user can stay signed in.
+_CRITICAL_CHECKS = {'firestore', 'store'}
 
 _CHECKS = {
     'firestore': _check_firestore,
+    'store': _check_store,
     'cache': _check_cache,
     'ai': _check_ai,
     'tasks': _check_tasks,

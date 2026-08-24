@@ -141,7 +141,16 @@ def site_home(site_identifier):
             (db_service.get_published_blogs, (user_id, 100)),
         ]
         if featured_post_id:
-            queries.append((db_service.get_published_blog_by_id, (featured_post_id,)))
+            # The hero card renders a title, image, category, date and a link --
+            # site_home.html never touches the body. Unprojected this single
+            # document read measured 3986 ms and was the slowest thing on the
+            # public homepage.
+            from app.repositories._helpers import BLOG_CARD_FIELDS
+
+            queries.append((
+                db_service.get_published_blog_by_id,
+                (featured_post_id, BLOG_CARD_FIELDS),
+            ))
 
         results = run_parallel_simple(queries, max_workers=4)
 
@@ -598,8 +607,17 @@ def site_sitemap(site_identifier):
     <priority>{priority}</priority>
   </url>''')
 
-        # Add all published blog posts
-        published_blogs = db_service.get_published_blogs(user_id, limit=500)
+        # Add all published blog posts. Projected: the sitemap emits a slug, a
+        # document id and a lastmod date, so fetching 500 whole posts -- each
+        # carrying its rendered body and semantic-search embedding vector --
+        # transferred megabytes to produce a few kilobytes of XML. This is a
+        # public, crawler-facing endpoint, so it is hit far more often than any
+        # dashboard page.
+        from app.repositories._helpers import BLOG_LIST_FIELDS
+
+        published_blogs = db_service.get_published_blogs(
+            user_id, limit=500, fields=BLOG_LIST_FIELDS
+        )
 
         for blog in published_blogs:
             slug_or_id = blog.get('slug') or blog.get('id')
@@ -674,8 +692,15 @@ def site_rss_feed(site_identifier):
         base_url = request.host_url.rstrip('/')
         site_url = f"{base_url}/site/{site_identifier}"
 
-        # Get published blogs
-        published_blogs = db_service.get_published_blogs(user_id, limit=posts_count)
+        # The feed needs each post's body (content_type can be 'full'), but not
+        # its embedding vector, outline, seo map or formatting map. Unprojected
+        # this endpoint measured 13.2 s of Firestore time across its two
+        # queries; BLOG_FEED_FIELDS keeps the body and drops the rest.
+        from app.repositories._helpers import BLOG_FEED_FIELDS
+
+        published_blogs = db_service.get_published_blogs(
+            user_id, limit=posts_count, fields=BLOG_FEED_FIELDS
+        )
 
         # Build RSS feed
         rss_parts = [

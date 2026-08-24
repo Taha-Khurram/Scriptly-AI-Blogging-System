@@ -1,306 +1,364 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Approvals | ScriptlyAI{% endblock %}
+{% block title %}Approvals | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/approval.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/approval.css') }}?v=2">
 {% endblock %}
 
+{#
+  One submission. Rendered here and only here — approval.js never builds a row,
+  it only hides, re-windows and removes them, so there is no second
+  implementation to drift from this one.
+
+  Everything the dialogs need rides on the row as a data attribute. The old
+  markup interpolated the blog id into four separate `onclick="openViewModal('…')"`
+  strings instead, and read the title back out of a cell with `.textContent` —
+  which picked up the requested-schedule badge along with it, so the Schedule
+  dialog announced "My post Requested: Mar 03, 2026 at 09:00 AM".
+#}
+{% macro queue_row(blog) %}
+{% set title = (blog.title or 'Untitled') | replace('**', '') | trim %}
+{% set author = blog.author or 'Unknown author' %}
+{% set category = blog.category or 'Uncategorized' %}
+{% set requested = blog.requested_iso %}
+<div class="data-row queue-row{{ ' is-requested' if requested }}" id="row-{{ blog.id }}" data-id="{{ blog.id }}"
+  data-title="{{ title }}" data-author="{{ author }}" data-category="{{ category }}"
+  data-submitted="{{ blog.submitted_iso }}" data-requested="{{ requested }}"
+  data-search="{{ (title ~ ' ' ~ author ~ ' ' ~ category) | lower }}">
+
+  <span class="row-mark" aria-hidden="true">{{ (title[0] if title else '?') | upper }}</span>
+
+  <button type="button" class="row-open" data-action="preview" title="Preview {{ title }}">
+    <span class="row-title">{{ title }}</span>
+    <span class="row-meta">
+      <span>{{ author }}</span>
+      <span class="row-sep" aria-hidden="true">·</span>
+      <span>{{ category }}</span>
+      {# Restated in the meta line because the pill beside it is the first thing
+         the responsive rules drop. Hidden by CSS until then. #}
+      {% if requested %}
+      <span class="row-sep row-meta-requested" aria-hidden="true">·</span>
+      <span class="row-meta-requested">Date requested</span>
+      {% endif %}
+    </span>
+  </button>
+
+  {% if requested %}
+  <span class="status-pill status-requested">
+    <i class="bi bi-calendar-event" aria-hidden="true"></i>
+    <time datetime="{{ requested }}" data-day>{{ requested[:10] }}</time>
+  </span>
+  {% else %}
+  {# Holds the track open so the date column lines up down the page. Both blanks
+     carry a class rather than being bare spans, because the media queries have
+     to be able to drop them along with the cells they stand in for —
+     display:none removes a grid item from placement, an empty span does not. #}
+  <span class="status-pill-blank"></span>
+  {% endif %}
+
+  <time class="row-time" datetime="{{ blog.submitted_iso }}" data-relative>{{ blog.submitted_iso[:10] }}</time>
+
+  <div class="row-trail">
+    {# The hover shortcut is Publish, because that is what this screen is for.
+       Everything it does is also in the menu beside it. #}
+    <button type="button" class="row-action is-publish" data-action="publish" title="Publish {{ title }} now"
+      aria-label="Publish {{ title }} now">
+      <i class="bi bi-check2-circle" aria-hidden="true"></i>
+    </button>
+
+    <div class="dropdown">
+      <button type="button" class="btn-dropdown-trigger" data-bs-toggle="dropdown" aria-expanded="false"
+        aria-label="More actions for {{ title }}">
+        <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><button type="button" class="dropdown-item" data-action="preview">
+            <i class="bi bi-eye" aria-hidden="true"></i> Read it first
+          </button></li>
+        <li><button type="button" class="dropdown-item" data-action="publish">
+            <i class="bi bi-check2-circle" aria-hidden="true"></i> Publish now
+          </button></li>
+        <li><button type="button" class="dropdown-item" data-action="schedule">
+            <i class="bi bi-calendar-event" aria-hidden="true"></i> Schedule…
+          </button></li>
+        <li>
+          <hr class="dropdown-divider">
+        </li>
+        <li><button type="button" class="dropdown-item text-danger" data-action="reject">
+            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Send back to drafts
+          </button></li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
 {% block content %}
+{% set total = pending_total | default(0) | int %}
+{% set requested = requested_total | default(0) | int %}
+
 <div class="dashboard-layout">
 
   {% include 'partials/sidebar.html' %}
 
+  {#
+    Both dialogs and the page script live inside .dashboard-main, like every
+    other screen. PJAX swaps only that element's innerHTML — the dialogs used to
+    sit outside the layout wrapper, so after any in-app navigation they were
+    gone from the document and every action on this page failed until a hard
+    reload.
+  #}
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <div class="header-welcome-text">Administration</div>
-        <h1 class="header-title">Pending Approvals</h1>
-      </div>
-    </header>
 
-    <div class="dashboard-content-wrapper animate-fade-up">
-      <div class="approvals-container">
-        <div class="drafts-header">
-          <div class="col-title">Title</div>
-          <div class="col-tags">Category</div>
-          <div class="col-status">Submitted On</div>
-          <div class="col-actions">Actions</div>
+    {# search_id is what approval.js binds to, so the header field *is* this
+       page's search rather than a second one below it. The whole queue is on
+       the page, so it filters every row rather than only the visible window. #}
+    {% call page_header(
+    title='Approvals',
+    eyebrow='Administration',
+    search=true,
+    search_placeholder='Search submissions',
+    search_id='approvalSearch') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    {% endcall %}
+
+    <div class="approval-stats reveal">
+      <div class="stat-card">
+        <span class="stat-icon stat-waiting"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">{{ 'Submission' if total == 1 else 'Submissions' }}</span>
+          <span class="stat-count" data-stat-total>{{ total }}</span>
+        </span>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-icon stat-requested"><i class="bi bi-calendar-event" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Asked for a date</span>
+          <span class="stat-count" data-stat-requested>{{ requested }}</span>
+        </span>
+        {# A ratio, not a series, so this slot is a meter: how much of the queue
+           arrived with a publish date its writer wants honoured. #}
+        <span class="stat-meter" data-meter{{ ' hidden' if total == 0 else '' }}>
+          <span class="stat-meter-track">
+            <span class="stat-meter-fill" data-meter-fill
+              style="width: {{ (requested * 100 // total) if total else 0 }}%"></span>
+          </span>
+          <span class="stat-meter-note" data-meter-note>
+            {{ (requested * 100 // total) if total else 0 }}% of the queue
+          </span>
+        </span>
+      </div>
+
+      {# The one tile that implies an action. A review queue is not a problem
+         because it is long, it is a problem because something has been sitting
+         in it. Filled by approval.js from data-since. #}
+      <div class="stat-card">
+        <span class="stat-icon stat-oldest"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Waiting longest</span>
+          <span class="stat-count is-text" data-stat-waiting data-since="{{ waiting_since }}">—</span>
+        </span>
+      </div>
+    </div>
+
+    <section class="surface-card approval-card reveal" style="--reveal-delay: 60ms" aria-labelledby="approvalHeading">
+      <header class="card-head">
+        <h2 class="card-title" id="approvalHeading">
+          Queue <span class="card-count" data-list-count>{{ total }}</span>
+        </h2>
+        {# Filled by approval.js: "Page 2 of 3", or what the search matched. #}
+        <span class="card-note" data-list-note></span>
+      </header>
+
+      <div class="approval-list">
+        <div id="approvalList" class="data-rows">
+          {% for blog in pending_blogs %}{{ queue_row(blog) }}{% else %}
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-check2-all" aria-hidden="true"></i></span>
+            <p>Nothing is waiting on you. Posts your writers submit for review arrive here.</p>
+          </div>
+          {% endfor %}
         </div>
 
-        {% for blog in pending_blogs %}
-        <div class="draft-row" id="row-{{ blog.id }}">
-          <div class="col-title title text-truncate pe-3">
-            {{ blog.title.replace('**', '') if blog.title else 'Untitled' }}
-            {% if blog.requested_schedule_at %}
-            <span class="requested-schedule-badge">
-              <i class="bi bi-calendar-event"></i>
-              Requested: {{ blog.requested_schedule_at.strftime('%b %d, %Y at %I:%M %p') }}
-            </span>
-            {% endif %}
-          </div>
-          <div class="col-tags">
-            <span class="badge-tag">{{ blog.category or 'General' }}</span>
-          </div>
-          <div class="col-status">
-            {{ blog.updated_at.strftime('%Y-%m-%d %H:%M') if blog.updated_at }}
-          </div>
+        <p class="list-noresults" data-noresults hidden>No submission matches that search.</p>
+      </div>
 
-          <div class="col-actions">
-            <div class="dropdown">
-              <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-three-dots-vertical"></i>
+      {# Left empty on purpose: a pager is chrome, and two implementations of the
+         same page window drift. approval.js fills it from the rows that survive
+         the search, and .pager:empty is display:none, so nothing shifts. #}
+      <nav class="pager" data-pager aria-label="Queue pages"></nav>
+    </section>
+
+    {# ==================== PREVIEW ====================
+       One dialog, not two. The old page had a "View Content" modal and a
+       "Review & Publish" modal that fetched the same blog from the same
+       endpoint, rendered the same fields into two parallel sets of ids and
+       offered the same four buttons — the only difference between them was that
+       one also showed the author. #}
+    <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true" aria-labelledby="previewTitle">
+      <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content app-modal preview-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="previewTitle" data-preview-title>Preview</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="app-modal-body">
+            <div class="preview-facts">
+              <span class="preview-fact">
+                <i class="bi bi-person" aria-hidden="true"></i>
+                <span data-preview-author>—</span>
+              </span>
+              <span class="preview-fact">
+                <i class="bi bi-folder2" aria-hidden="true"></i>
+                <span data-preview-category>—</span>
+              </span>
+              <span class="preview-fact">
+                <i class="bi bi-stopwatch" aria-hidden="true"></i>
+                <span data-preview-reading>—</span>
+              </span>
+              <span class="preview-fact">
+                <i class="bi bi-body-text" aria-hidden="true"></i>
+                <span data-preview-words>—</span>
+              </span>
+              <span class="preview-fact">
+                <i class="bi bi-clock-history" aria-hidden="true"></i>
+                <span data-preview-submitted>—</span>
+              </span>
+            </div>
+
+            {# Only shown when the writer asked for a date. It is the one part of
+               a submission that is a request rather than a fact, so it reads as
+               one instead of as another meta chip — and it can be granted from
+               here in a single click. #}
+            <p class="preview-request" data-preview-request hidden>
+              <i class="bi bi-calendar-event" aria-hidden="true"></i>
+              <span>The writer asked for <strong data-preview-request-when></strong>.</span>
+              <button type="button" class="preview-request-btn" data-action="schedule-requested">
+                Schedule for then
               </button>
-              <ul class="dropdown-menu dropdown-menu-end">
-                <li>
-                  <button class="dropdown-item" onclick="openViewModal('{{ blog.id }}')">
-                    <i class="bi bi-eye" style="color: var(--info);"></i> View Content
-                  </button>
-                </li>
-                <li>
-                  <button class="dropdown-item" onclick="openReviewModal('{{ blog.id }}')">
-                    <i class="bi bi-check-circle" style="color: var(--success);"></i> Review & Publish
-                  </button>
-                </li>
-                <li>
-                  <button class="dropdown-item" onclick="openScheduleModal('{{ blog.id }}')">
-                    <i class="bi bi-calendar-event" style="color: var(--accent);"></i> Schedule
-                  </button>
-                </li>
-                <li>
-                  <hr class="dropdown-divider">
-                </li>
-                <li>
-                  <button class="dropdown-item text-danger" onclick="rejectToDraft('{{ blog.id }}')">
-                    <i class="bi bi-x-circle"></i> Reject to Draft
-                  </button>
-                </li>
-              </ul>
+            </p>
+
+            <details class="preview-toc" data-preview-toc hidden>
+              <summary><i class="bi bi-list-ul" aria-hidden="true"></i> Table of contents</summary>
+              <div data-preview-toc-body></div>
+            </details>
+
+            <div class="preview-prose" data-preview-body>
+              <p class="preview-placeholder">Loading…</p>
             </div>
           </div>
-        </div>
-        {% else %}
-        <div class="text-center py-5">
-          <div class="mb-3 text-muted opacity-50"><i class="bi bi-check-all fs-1"></i></div>
-          <p class="text-secondary fw-bold">All caught up! No pending approvals.</p>
-        </div>
-        {% endfor %}
 
-        {% if total_pages > 1 %}
-        <div class="p-4 border-top d-flex justify-content-center gap-2">
-          {% if has_prev %}
-          <a href="{{ url_for('blog.approval_page', page=current_page-1) }}"
-            class="btn btn-sm btn-light px-3 fw-bold text-secondary">Previous</a>
-          {% endif %}
-          <span class="text-secondary align-self-center small fw-bold">Page {{ current_page }} of {{ total_pages
-            }}</span>
-          {% if has_next %}
-          <a href="{{ url_for('blog.approval_page', page=current_page+1) }}"
-            class="btn btn-sm btn-light px-3 fw-bold text-secondary">Next</a>
-          {% endif %}
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="app-btn is-danger" data-action="reject">Send back</button>
+            <button type="button" class="app-btn is-quiet" data-action="schedule">
+              <i class="bi bi-calendar-event" aria-hidden="true"></i> Schedule
+            </button>
+            <button type="button" class="app-btn is-primary" data-action="publish">
+              <i class="bi bi-check2-circle" aria-hidden="true"></i> Publish now
+            </button>
+          </footer>
         </div>
-        {% endif %}
       </div>
     </div>
 
-<!-- View Modal (Read-Only) -->
-<div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered">
-    <div class="modal-content">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title">
-          <i class="bi bi-file-earmark-text"></i>
-          Content Preview
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
+    {# ==================== SCHEDULE ==================== #}
+    <div class="modal fade" id="scheduleModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleTitle">
+      <div class="modal-dialog modal-dialog-centered schedule-dialog">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="scheduleTitle">Schedule publication</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
 
-      <div class="custom-modal-body">
-        <!-- Title & Status -->
-        <h2 class="blog-title-display" id="view-modal-title">Blog Title</h2>
-        <span class="status-badge status-under-review mb-3">
-          <i class="bi bi-hourglass-split"></i> UNDER REVIEW
-        </span>
+          <div class="app-modal-body">
+            <p class="schedule-subject">
+              <span class="row-mark" data-schedule-mark aria-hidden="true">?</span>
+              <span class="schedule-subject-text" data-schedule-title>Blog</span>
+            </p>
 
-        <!-- Author Card -->
-        <div class="author-card">
-          <div class="author-avatar" id="view-author-avatar">US</div>
-          <div class="author-details">
-            <div class="author-name" id="view-author-name">Author Name</div>
-            <div class="author-meta">
-              <i class="bi bi-calendar-event"></i>
-              <span id="view-submit-date">Submitted on --</span>
+            {# Our own grid plus a column of quarter-hours, not
+               <input type="datetime-local">. That control brings the browser's
+               own popup: drawn by the browser, so it takes none of the product's
+               surfaces, radius or type, and on a forced dark theme over a light
+               OS it renders as a pale OS widget in the middle of a dark dialog.
+               The same reason All Blogs' date range and the Schedule screen's
+               publish time are both grids we own. The value lives on the hidden
+               input below — the value-holder pattern the select pills use. #}
+            <div class="when-picker" data-when>
+              <div class="when-body">
+                <div class="cal" data-cal>
+                  <div class="cal-head">
+                    <button type="button" class="cal-nav" data-cal-prev aria-label="Previous month">
+                      <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                    </button>
+                    <span class="cal-title" data-cal-title aria-live="polite"></span>
+                    <button type="button" class="cal-nav" data-cal-next aria-label="Next month">
+                      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="cal-dow" aria-hidden="true">
+                    <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
+                    <span>Th</span><span>Fr</span><span>Sa</span>
+                  </div>
+                  <div class="cal-grid" data-cal-grid aria-label="Choose a publish day"></div>
+                </div>
+
+                {# A scrolling column of quarter-hours rather than a time field:
+                   publishing a blog is not a to-the-minute act, and a list can
+                   grey out the slots that have already gone by on today's date,
+                   which a free-text field cannot do until you have typed one. #}
+                <div class="when-times">
+                  <p class="when-times-head">Time</p>
+                  <div class="when-times-list" data-time-list role="listbox" aria-label="Publish time"></div>
+                </div>
+              </div>
+
+              {# The label for what the confirm button is about to do, the same
+                 job the summary line does in the date-range dialog. #}
+              <p class="when-summary" data-when-summary>
+                <i class="bi bi-calendar-event" aria-hidden="true"></i>
+                <span data-when-text>Pick a day, then a time.</span>
+              </p>
+
+              <input type="hidden" id="scheduleValue" data-when-value value="">
+            </div>
+
+            <div class="besttime" data-besttime>
+              <p class="besttime-head">
+                <i class="bi bi-robot" aria-hidden="true"></i>
+                Publish Time Agent
+              </p>
+              <div class="besttime-list" data-besttime-list>
+                <p class="besttime-loading">
+                  <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                  Reading your traffic…
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Meta Info Bar -->
-        <div class="meta-info-bar">
-          <div class="meta-chip">
-            <i class="bi bi-folder2"></i>
-            <span id="view-modal-category">General</span>
-          </div>
-          <div class="meta-chip">
-            <i class="bi bi-stopwatch"></i>
-            <span id="view-modal-reading-time">-- min read</span>
-          </div>
-          <div class="meta-chip">
-            <i class="bi bi-body-text"></i>
-            <span id="view-modal-word-count">-- words</span>
-          </div>
+          <footer class="app-modal-foot">
+            <span class="app-modal-note">It publishes itself — nobody has to be here.</span>
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-primary" data-schedule-confirm disabled>Schedule</button>
+          </footer>
         </div>
-
-        <!-- Table of Contents -->
-        <div class="toc-container d-none" id="view-modal-toc">
-          <div class="toc-header">
-            <i class="bi bi-list-ul"></i>
-            <span>Table of Contents</span>
-          </div>
-          <div id="view-modal-toc-content"></div>
-        </div>
-
-        <!-- Content Preview -->
-        <div class="content-label">
-          <i class="bi bi-text-paragraph"></i>
-          <span>Content Preview</span>
-        </div>
-        <div class="blog-content-preview" id="view-modal-content">
-          Loading content...
-        </div>
-      </div>
-
-      <div class="custom-modal-footer">
-        <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
-          <i class="bi bi-x-lg"></i> Close
-        </button>
-        <button type="button" class="btn-modal btn-modal-danger" id="view-reject-btn">
-          <i class="bi bi-arrow-return-left"></i> Reject
-        </button>
-        <button type="button" class="btn-modal btn-modal-primary" id="view-schedule-btn" style="background: var(--accent); color: var(--text-on-accent);">
-          <i class="bi bi-calendar-event"></i> Schedule
-        </button>
-        <button type="button" class="btn-modal btn-modal-success" id="view-approve-btn">
-          <i class="bi bi-check-circle"></i> Publish Now
-        </button>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- Review Modal -->
-<div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered">
-    <div class="modal-content">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title">
-          <i class="bi bi-clipboard-check"></i>
-          Review & Publish
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-
-      <div class="custom-modal-body">
-        <!-- Title & Status -->
-        <h2 class="blog-title-display" id="viewTitle">Blog Title</h2>
-        <span class="status-badge status-under-review mb-3">
-          <i class="bi bi-hourglass-split"></i> PENDING REVIEW
-        </span>
-
-        <!-- Meta Info Bar -->
-        <div class="meta-info-bar">
-          <div class="meta-chip">
-            <i class="bi bi-folder2"></i>
-            <span id="review-category">General</span>
-          </div>
-          <div class="meta-chip">
-            <i class="bi bi-stopwatch"></i>
-            <span id="review-reading-time">-- min read</span>
-          </div>
-          <div class="meta-chip">
-            <i class="bi bi-body-text"></i>
-            <span id="review-word-count">-- words</span>
-          </div>
-        </div>
-
-        <!-- Table of Contents -->
-        <div class="toc-container d-none" id="review-modal-toc">
-          <div class="toc-header">
-            <i class="bi bi-list-ul"></i>
-            <span>Table of Contents</span>
-          </div>
-          <div id="review-modal-toc-content"></div>
-        </div>
-
-        <!-- Content Preview -->
-        <div class="content-label">
-          <i class="bi bi-text-paragraph"></i>
-          <span>Content Preview</span>
-        </div>
-        <div class="blog-content-preview" id="viewContent">
-          Loading content...
-        </div>
-      </div>
-
-      <div class="custom-modal-footer">
-        <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
-          <i class="bi bi-x-lg"></i> Close
-        </button>
-        <button type="button" class="btn-modal btn-modal-danger" id="modalRejectBtn">
-          <i class="bi bi-arrow-return-left"></i> Reject
-        </button>
-        <button type="button" class="btn-modal btn-modal-primary" id="modalScheduleBtn" style="background: var(--accent); color: var(--text-on-accent);">
-          <i class="bi bi-calendar-event"></i> Schedule
-        </button>
-        <button type="button" class="btn-modal btn-modal-success" id="modalApproveBtn">
-          <i class="bi bi-check-circle"></i> Publish Now
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Schedule Modal -->
-<div class="modal fade" id="scheduleModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title">
-          <i class="bi bi-calendar-event"></i>
-          Schedule for Publishing
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="custom-modal-body">
-        <p class="text-muted mb-3">Choose when this blog should be published:</p>
-        <p class="fw-bold mb-3" id="schedule-modal-title">Blog Title</p>
-        <input type="datetime-local" class="form-control" id="scheduleDateTime"
-               style="padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-        <div id="bestTimeSuggestions" class="best-time-container mt-3">
-          <div class="best-time-header">
-            <i class="bi bi-robot"></i>
-            <span>AI Publish Time Agent — Recommended Times</span>
-          </div>
-          <div id="bestTimeSuggestionsList" class="best-time-list">
-            <div class="best-time-loading">
-              <div class="spinner-border spinner-border-sm text-primary"></div>
-              <span>Analyzing best publish times...</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="custom-modal-footer">
-        <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
-          <i class="bi bi-x-lg"></i> Cancel
-        </button>
-        <button type="button" class="btn-modal btn-modal-success" id="confirmScheduleBtn">
-          <i class="bi bi-calendar-check"></i> Schedule
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script src="{{ url_for('static', filename='js/pages/approval.js') }}?v=2"></script>
+    <script src="{{ url_for('static', filename='js/pages/approval.js') }}?v=3"></script>
   </main>
 </div>
 {% endblock %}

@@ -68,3 +68,12 @@ ui-debug.log
 # --- Runtime ---
 *.log
 *.pid
+
+# --- Session / rate-limit store (app/core/store.py) ---
+# Flask's instance_path. Holds live session records, so it is per-deployment
+# state and must never be committed: a session row is a bearer credential.
+# The -wal and -shm files are SQLite's write-ahead log and shared-memory index.
+instance/
+*.db
+*.db-wal
+*.db-shm

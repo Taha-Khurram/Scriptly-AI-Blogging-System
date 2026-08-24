@@ -1,734 +1,809 @@
 /**
- * SEO Tools Page JavaScript
+ * SEO Tools — research keywords · score a draft · rewrite it for search.
+ *
+ * The previous version declared nine globals (loadDrafts, analyzeDraft,
+ * applyOptimizationToDraft, resetAnalysis, copyToClipboard…) so the template
+ * could reach them from inline onclick attributes, bound its listeners at
+ * module scope, and reported every failure through alert() — a modal browser
+ * dialog that says nothing about which request failed and leaves the panel
+ * looking like a run you never started.
+ *
+ * Everything here is one IIFE, every listener goes through an AbortController
+ * the next run aborts, and every control is reached by delegation off
+ * .dashboard-main. PJAX re-injects this file on each visit to /seo-tools, so a
+ * listener bound to document at module scope would accumulate one copy per
+ * visit and nothing would ever remove it.
+ *
+ * It also drops ~230 lines that were unreachable: displayResults(),
+ * displayChecklist() and updateScoreBreakdown() were only ever called from each
+ * other, and the URL-SEO half (analyzeUrlSeo, displayUrlResults) drove markup
+ * that had been commented out of the template. The score breakdown those dead
+ * functions rendered is now on the analysis panel, where it is reachable.
  */
 
-var currentDraftId = null;
-var currentDraftTitle = null;
-var originalAnalysisData = null;
+(function seoToolsPage() {
+    'use strict';
 
-// Load drafts on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadDrafts();
-});
+    if (window.__seoToolsAbort) {
+        try { window.__seoToolsAbort.abort(); } catch (e) { /* already gone */ }
+    }
+    const controller = new AbortController();
+    const signal = controller.signal;
+    window.__seoToolsAbort = controller;
 
-async function loadDrafts() {
-    const select = document.getElementById('draft-select');
-    select.innerHTML = '<option value="">-- Loading... --</option>';
+    const root = document.querySelector('.dashboard-main');
+    if (!root) return;
 
-    try {
-        const response = await fetch('/api/seo/drafts');
-        const data = await response.json();
+    const $ = (sel, scope) => (scope || root).querySelector(sel);
+    const $$ = (sel, scope) => Array.from((scope || root).querySelectorAll(sel));
 
-        if (data.success && data.drafts.length > 0) {
-            select.innerHTML = '<option value="">-- Select a draft --</option>';
-            data.drafts.forEach(draft => {
-                const option = document.createElement('option');
-                option.value = draft.id;
-                option.textContent = `${draft.title} (${draft.updated_at || 'No date'})`;
-                select.appendChild(option);
-            });
-        } else {
-            select.innerHTML = '<option value="">-- No drafts found --</option>';
+    const body = $('[data-body="seo"]');
+    const draftSelect = $('[data-draft-select]');
+    const regionSelect = $('[data-region-select]');
+    if (!body || !draftSelect || !regionSelect) return;
+
+    // The seven categories the scorer returns, in the order it weights them.
+    // Labels are ours; the weights come from the API so the two cannot drift.
+    const CATEGORIES = [
+        ['keywords', 'Keywords'],
+        ['content_length', 'Content length'],
+        ['headings', 'Headings'],
+        ['readability', 'Readability'],
+        ['title', 'Title'],
+        ['links', 'Links'],
+        ['images', 'Images']
+    ];
+
+    const state = {
+        drafts: [],
+        draftsLoaded: false,
+        retry: null          // the runner the error state's "Try again" repeats
+    };
+
+    // ----------------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------------
+
+    // Escapes all five characters Jinja's autoescape does. NOT the
+    // `div.textContent -> div.innerHTML` trick: that encodes &, < and > and
+    // leaves both quote characters alone, which is safe for text and unsafe the
+    // moment the value lands in data-copy="…" or title="…" — and the keyword
+    // rows below build both.
+    function esc(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&#34;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function num(value, fallback) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : (fallback === undefined ? 0 : fallback);
+    }
+
+    function clamp(n) {
+        return Math.max(0, Math.min(100, n));
+    }
+
+    // Compact for display, exact on the element's title — the compact form is
+    // unparseable, so anything reading the figure back reads the attribute.
+    function compact(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const n = Number(value);
+        if (!Number.isFinite(n)) return null;
+        if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+        if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+        return n.toLocaleString();
+    }
+
+    function money(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n <= 0) return null;
+        return '$' + n.toFixed(2);
+    }
+
+    function toast(type, title, message) {
+        if (typeof window.showToast === 'function') {
+            window.showToast({ type, title, message, duration: type === 'error' ? 5000 : 3000 });
         }
-    } catch (error) {
-        console.error('Error loading drafts:', error);
-        select.innerHTML = '<option value="">-- Error loading drafts --</option>';
-    }
-}
-
-async function researchKeywordsForDraft() {
-    const draftId = document.getElementById('draft-select').value;
-    const region = document.getElementById('draft-region').value;
-
-    if (!draftId) {
-        alert('Please select a draft first');
-        return;
     }
 
-    showLoading('Researching keywords for your draft...');
-    showActionLoader('Researching keywords...');
+    function applyModal() {
+        const el = document.getElementById('seoApplyModal');
+        if (!el || typeof bootstrap === 'undefined') return null;
+        return bootstrap.Modal.getOrCreateInstance(el);
+    }
 
-    try {
-        // First get the draft content
-        const draftRes = await fetch(`/api/get_blog/${draftId}`);
-        const draftData = await draftRes.json();
+    // Reads the error the API actually sent rather than reporting every failure
+    // as a connection problem — a 429 and a dropped socket are different things
+    // and only one of them is worth retrying immediately.
+    async function requestJson(url, options) {
+        const res = await fetch(url, Object.assign({ signal }, options || {}));
+        let payload = null;
+        try { payload = await res.json(); } catch (e) { payload = null; }
+        if (!res.ok || !payload || payload.success === false) {
+            const err = new Error((payload && payload.error) || 'The request failed (' + res.status + ').');
+            err.handled = true;
+            throw err;
+        }
+        return payload;
+    }
 
-        if (!draftData.success) {
-            hideLoading();
-            hideActionLoader();
-            alert('Error loading draft');
+    function describeError(err) {
+        if (err && err.name === 'AbortError') return null;   // navigated away
+        if (err && err.handled) return err.message;
+        return 'Could not reach the server. Check your connection and try again.';
+    }
+
+    function postJson(url, payload) {
+        return requestJson(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+        });
+    }
+
+    function setState(next, message) {
+        body.dataset.state = next;
+        if (next === 'error') {
+            const text = $('[data-error-text]', body);
+            if (text) text.textContent = message || 'Something went wrong.';
+        }
+    }
+
+    function setHead(title, note) {
+        const t = $('[data-result-title]');
+        const n = $('[data-result-note]');
+        if (t) t.textContent = title;
+        if (n) n.textContent = note || '';
+    }
+
+    function working(label, note) {
+        const l = $('[data-working-label]', body);
+        const n = $('[data-working-note]', body);
+        if (l) l.textContent = label;
+        if (n) n.textContent = note;
+    }
+
+    // Concurrent runs would race each other into the same panel, so the verbs
+    // go down together for the duration of any one of them.
+    function lockVerbs(on) {
+        $$('[data-action="analyze"], [data-action="keywords"], [data-action="apply"]')
+            .forEach((btn) => { btn.disabled = on; });
+    }
+
+    function busy(btn, on, label) {
+        if (!btn) return;
+        if (on) {
+            if (!btn.dataset.label) btn.dataset.label = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> ' + esc(label || 'Working…');
+        } else if (btn.dataset.label) {
+            btn.innerHTML = btn.dataset.label;
+            delete btn.dataset.label;
+        }
+    }
+
+    function gradeClass(grade) {
+        const letter = String(grade || '').trim().charAt(0).toLowerCase();
+        return 'abcdf'.includes(letter) ? 'grade-' + letter : '';
+    }
+
+    function setGrade(pill, letterEl, grade) {
+        if (letterEl) letterEl.textContent = grade || '—';
+        if (pill) pill.className = 'seo-grade ' + gradeClass(grade);
+    }
+
+    function difficultyBand(score) {
+        if (score <= 30) return { key: 'easy', word: 'Easy' };
+        if (score <= 60) return { key: 'medium', word: 'Medium' };
+        return { key: 'hard', word: 'Hard' };
+    }
+
+    // A competition level the provider did not send must not be drawn as
+    // "medium" — an invented value looks exactly like a measured one.
+    function competitionBand(value) {
+        const word = String(value || '').trim().toLowerCase();
+        if (word === 'low' || word === 'medium' || word === 'high') return word;
+        return '';
+    }
+
+    async function copyText(text) {
+        if (!text) return false;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        } catch (e) { /* falls through to the textarea */ }
+
+        // Safari without permission, and any page served over plain http.
+        try {
+            const scratch = document.createElement('textarea');
+            scratch.value = text;
+            scratch.setAttribute('readonly', '');
+            scratch.style.position = 'fixed';
+            scratch.style.top = '-1000px';
+            document.body.appendChild(scratch);
+            scratch.select();
+            const ok = document.execCommand('copy');
+            scratch.remove();
+            return ok;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Pickers
+    // ----------------------------------------------------------------------
+
+    function draftId() { return draftSelect.value; }
+    function regionCode() { return regionSelect.value; }
+
+    function selectedText(select) {
+        const opt = select.options[select.selectedIndex];
+        return opt ? opt.textContent : '';
+    }
+
+    function regionName() { return selectedText(regionSelect); }
+
+    function draftTitle() {
+        const id = draftId();
+        const found = state.drafts.find((d) => String(d.id) === String(id));
+        return (found && found.title) || selectedText(draftSelect) || 'this draft';
+    }
+
+    // The SelectPill module in app.js writes through to the <select> and fires
+    // `change`; the visible label on the trigger is the page's to keep in step.
+    function syncPillLabel(select) {
+        const pill = select.closest('[data-select-pill]');
+        if (!pill) return;
+        const label = $('[data-pill-text]', pill);
+        if (label) label.textContent = selectedText(select);
+    }
+
+    function fillDraftPicker(drafts, placeholder) {
+        const pill = draftSelect.closest('[data-select-pill]');
+        const menu = pill ? $('.menu', pill) : null;
+        const current = draftSelect.value;
+
+        draftSelect.innerHTML = '<option value="">' + esc(placeholder) + '</option>' +
+            drafts.map((d) => '<option value="' + esc(d.id) + '">' +
+                esc(d.title || 'Untitled') + '</option>').join('');
+
+        if (menu) {
+            menu.innerHTML = '<button type="button" class="menu-item" role="option" data-value="">' +
+                '<i class="bi bi-check2 menu-check" aria-hidden="true"></i>' +
+                '<span class="menu-label">' + esc(placeholder) + '</span></button>' +
+                drafts.map((d) => '<button type="button" class="menu-item" role="option" ' +
+                    'data-value="' + esc(d.id) + '">' +
+                    '<i class="bi bi-check2 menu-check" aria-hidden="true"></i>' +
+                    '<span class="menu-label">' + esc(d.title || 'Untitled') + '</span></button>').join('');
+        }
+
+        // A draft that vanished between loads must not leave a stale id behind.
+        draftSelect.value = drafts.some((d) => String(d.id) === String(current)) ? current : '';
+        syncPillLabel(draftSelect);
+    }
+
+    async function loadDrafts(force) {
+        if (state.draftsLoaded && !force) return;
+        state.draftsLoaded = true;
+
+        try {
+            const data = await requestJson('/api/seo/drafts');
+            state.drafts = Array.isArray(data.drafts) ? data.drafts : [];
+            fillDraftPicker(state.drafts, state.drafts.length ? 'Select a draft' : 'No drafts yet');
+        } catch (err) {
+            state.draftsLoaded = false;
+            const message = describeError(err);
+            if (!message) return;                 // navigated away mid-request
+            fillDraftPicker([], 'Could not load drafts');
+            toast('error', 'Drafts unavailable', message);
+        }
+    }
+
+    // A verb with no draft chosen is a no-op, and it used to be a browser
+    // alert() saying so.
+    function requireDraft() {
+        if (draftId()) return true;
+        toast('warning', 'Pick a draft', 'Choose which draft you want to work on first.');
+        const trigger = $('[data-select-trigger]', draftSelect.closest('[data-select-pill]'));
+        if (trigger) trigger.focus();
+        return false;
+    }
+
+    // ----------------------------------------------------------------------
+    // Render — analysis
+    // ----------------------------------------------------------------------
+
+    function metric(el, value, missingWhen) {
+        if (!el) return;
+        const tile = el.closest('.seo-metric');
+        const absent = missingWhen === undefined ? (value === null || value === '') : missingWhen;
+        el.textContent = absent ? '—' : value;
+        if (tile) tile.classList.toggle('is-missing', !!absent);
+    }
+
+    function analysisMeters(breakdown) {
+        return CATEGORIES.map(([key, label]) => {
+            const row = breakdown[key];
+            if (!row) return '';
+            const score = clamp(Math.round(num(row.score)));
+            const weight = row.weight ? esc(row.weight) + ' of the score' : '';
+            return '<div class="seo-meter">' +
+                '<span class="seo-meter-label">' + esc(label) +
+                (weight ? '<span class="seo-meter-weight">' + weight + '</span>' : '') +
+                '</span>' +
+                '<span class="seo-meter-track">' +
+                '<span class="seo-meter-fill" style="width: ' + score + '%"></span>' +
+                '</span>' +
+                '<span class="seo-meter-figures"><strong>' + score + '</strong> / 100</span>' +
+                '</div>';
+        }).join('');
+    }
+
+    function issueItems(issues) {
+        return issues.map((issue) => {
+            const severity = String((issue && issue.severity) || 'low').toLowerCase();
+            const known = ['high', 'medium', 'low'].includes(severity) ? severity : 'low';
+            const glyph = known === 'high' ? 'bi-exclamation-octagon'
+                : known === 'medium' ? 'bi-exclamation-triangle' : 'bi-info-circle';
+            const text = typeof issue === 'string' ? issue : (issue.message || issue.description || '');
+            return '<li class="is-' + known + '">' +
+                '<i class="bi ' + glyph + '" aria-hidden="true"></i>' +
+                '<span><span class="seo-issue-severity">' + known + ' priority</span>' +
+                esc(text) + '</span></li>';
+        }).join('');
+    }
+
+    function textItems(items, glyph) {
+        return items.map((item) => {
+            const text = typeof item === 'string'
+                ? item
+                : (item && (item.message || item.description || item.text)) || '';
+            if (!text) return '';
+            return '<li><i class="bi ' + glyph + '" aria-hidden="true"></i><span>' +
+                esc(text) + '</span></li>';
+        }).join('');
+    }
+
+    function renderAnalysis(analysis, title, region) {
+        const score = clamp(Math.round(num(analysis.seo_score && analysis.seo_score.total)));
+        const grade = (analysis.seo_score && analysis.seo_score.grade) || 'N/A';
+
+        const source = $('[data-analysis-source]', body);
+        if (source) source.textContent = title + ' · ' + region;
+
+        const scoreEl = $('[data-analysis-score]', body);
+        if (scoreEl) { scoreEl.textContent = String(score); scoreEl.title = String(score); }
+        setGrade($('[data-analysis-grade-pill]', body), $('[data-analysis-grade]', body), grade);
+
+        const words = num(analysis.word_count);
+        metric($('[data-metric-words]', body), compact(words), !words);
+
+        const flesch = analysis.readability && analysis.readability.flesch_score;
+        metric($('[data-metric-readability]', body),
+            Number.isFinite(Number(flesch)) ? String(Math.round(num(flesch))) : null,
+            !Number.isFinite(Number(flesch)));
+
+        const headings = analysis.headings && analysis.headings.total;
+        metric($('[data-metric-headings]', body),
+            headings === undefined || headings === null ? null : String(num(headings)),
+            headings === undefined || headings === null);
+
+        const links = analysis.links && analysis.links.total;
+        metric($('[data-metric-links]', body),
+            links === undefined || links === null ? null : String(num(links)),
+            links === undefined || links === null);
+
+        const breakdown = (analysis.seo_score && analysis.seo_score.breakdown) || {};
+        const meters = analysisMeters(breakdown);
+        const breakdownCard = $('[data-analysis-breakdown]', body);
+        const metersHost = $('[data-analysis-meters]', body);
+        if (metersHost) metersHost.innerHTML = meters;
+        if (breakdownCard) breakdownCard.hidden = !meters;
+
+        const issues = Array.isArray(analysis.issues) ? analysis.issues : [];
+        const issuesCard = $('[data-issues-card]', body);
+        const issuesList = $('[data-issues-list]', body);
+        const issuesCount = $('[data-issues-count]', body);
+        if (issuesList) issuesList.innerHTML = issueItems(issues);
+        if (issuesCount) issuesCount.textContent = String(issues.length);
+        if (issuesCard) issuesCard.hidden = issues.length === 0;
+
+        const recs = Array.isArray(analysis.recommendations) ? analysis.recommendations : [];
+        const recsCard = $('[data-recs-card]', body);
+        const recsList = $('[data-recs-list]', body);
+        if (recsList) recsList.innerHTML = textItems(recs, 'bi-arrow-right-short');
+        if (recsCard) recsCard.hidden = recs.length === 0;
+
+        setHead('Analysis', 'Nothing written — this is the draft as it stands');
+        setState('analysis');
+    }
+
+    // ----------------------------------------------------------------------
+    // Render — keyword research
+    // ----------------------------------------------------------------------
+
+    function keywordRow(kw) {
+        const keyword = String(kw.keyword || '').trim();
+        if (!keyword) return '';
+
+        const score = clamp(Math.round(num(kw.difficulty_score, 50)));
+        const band = difficultyBand(score);
+        const volume = compact(kw.search_volume);
+        const cpc = money(kw.cpc);
+        const comp = competitionBand(kw.competition);
+
+        return '<tr>' +
+            '<td class="seo-table-keyword">' + esc(keyword) + '</td>' +
+            '<td><span class="seo-difficulty is-' + band.key + '">' +
+            '<span class="seo-difficulty-word">' + band.word + '</span>' +
+            '<span class="seo-difficulty-track">' +
+            '<span class="seo-difficulty-fill" style="width: ' + score + '%"></span>' +
+            '</span>' + score + '</span></td>' +
+            '<td class="is-num"' + (volume ? ' title="' + esc(kw.search_volume) + '"' : '') + '>' +
+            (volume || '—') + '</td>' +
+            '<td class="is-num">' + (cpc || '—') + '</td>' +
+            '<td>' + (comp ? '<span class="seo-comp is-' + comp + '">' + comp + '</span>' : '—') + '</td>' +
+            '<td><button type="button" class="seo-copy" data-copy="' + esc(keyword) + '">' +
+            '<i class="bi bi-clipboard" aria-hidden="true"></i> Copy</button></td>' +
+            '</tr>';
+    }
+
+    function renderKeywords(payload, topic, region) {
+        const keywords = (Array.isArray(payload.related_keywords) ? payload.related_keywords : [])
+            .filter((kw) => kw && kw.keyword);
+
+        const source = $('[data-keywords-source]', body);
+        if (source) source.textContent = '“' + topic + '” · ' + region;
+
+        const primary = keywords[0];
+        const primaryCard = $('[data-primary]', body);
+        if (primaryCard) primaryCard.hidden = !primary;
+
+        if (primary) {
+            const kwEl = $('[data-primary-kw]', body);
+            if (kwEl) kwEl.textContent = primary.keyword;
+
+            const score = clamp(Math.round(num(primary.difficulty_score, 50)));
+            const band = difficultyBand(score);
+            const comp = competitionBand(primary.competition);
+            const note = $('[data-primary-note]', body);
+            if (note) {
+                note.textContent = comp
+                    ? band.word.toLowerCase() + ' to rank for, ' + comp + ' competition'
+                    : band.word.toLowerCase() + ' to rank for';
+            }
+
+            const volume = compact(primary.search_volume);
+            metric($('[data-primary-volume]', body), volume, !volume);
+            const cpc = money(primary.cpc);
+            metric($('[data-primary-cpc]', body), cpc, !cpc);
+            metric($('[data-primary-difficulty]', body), score + ' / 100', false);
+
+            const fill = $('[data-primary-difficulty-fill]', body);
+            if (fill) fill.style.width = score + '%';
+        }
+
+        const rows = $('[data-kw-rows]', body);
+        if (rows) {
+            rows.innerHTML = keywords.length
+                ? keywords.map(keywordRow).join('')
+                : '<tr class="seo-table-empty"><td colspan="6">No keyword data came back for this ' +
+                  'topic and region.</td></tr>';
+        }
+        const count = $('[data-kw-count]', body);
+        if (count) count.textContent = String(keywords.length);
+
+        setHead('Keyword research', 'Research only — nothing written back');
+        setState('keywords');
+    }
+
+    // ----------------------------------------------------------------------
+    // Render — comparison
+    // ----------------------------------------------------------------------
+
+    function comparisonMeters(breakdown) {
+        return CATEGORIES.map(([key, label]) => {
+            const row = breakdown[key];
+            if (!row) return '';
+            const before = clamp(Math.round(num(row.before)));
+            const after = clamp(Math.round(num(row.after)));
+            const gain = after - before;
+            const dir = gain > 0 ? 'is-up' : gain < 0 ? 'is-down' : '';
+            const sign = gain > 0 ? '+' : '';
+
+            return '<div class="seo-meter">' +
+                '<span class="seo-meter-label">' + esc(label) + '</span>' +
+                '<span class="seo-meter-track">' +
+                '<span class="seo-meter-fill" style="width: ' + after + '%"></span>' +
+                '<span class="seo-meter-tick" style="left: ' + before + '%"></span>' +
+                '</span>' +
+                '<span class="seo-meter-figures">was ' + before + ' <strong>' + after + '</strong>' +
+                (gain ? ' <span class="seo-meter-gain ' + dir + '">' + sign + gain + '</span>' : '') +
+                '</span></div>';
+        }).join('');
+    }
+
+    function changeItems(changes) {
+        return changes.map((change) => {
+            if (typeof change === 'string') {
+                return '<li><i class="bi bi-check2" aria-hidden="true"></i><span>' +
+                    esc(change) + '</span></li>';
+            }
+            const description = (change && change.description) || 'Content updated';
+            const before = change && change.before;
+            const after = change && change.after;
+            const detail = (before && after)
+                ? '<span class="seo-change-detail"><strong>was</strong> ' + esc(before) + '</span>' +
+                  '<span class="seo-change-detail"><strong>now</strong> ' + esc(after) + '</span>'
+                : '';
+            return '<li><i class="bi bi-check2" aria-hidden="true"></i>' +
+                '<span>' + esc(description) + detail + '</span></li>';
+        }).join('');
+    }
+
+    function beforeAfterNote(before, after) {
+        if (!Number.isFinite(before) || !Number.isFinite(after)) return '';
+        const gain = Math.round(after - before);
+        if (!gain) return 'unchanged at ' + Math.round(before);
+        return 'was ' + Math.round(before) + ', ' + (gain > 0 ? '+' : '') + gain;
+    }
+
+    function renderComparison(data, originalTitle, region) {
+        const comparison = data.comparison || {};
+        const after = clamp(Math.round(num(data.seo_score)));
+        const before = clamp(Math.round(num(data.original_score)));
+        const gain = Math.round(num(data.score_improvement, after - before));
+
+        const note = $('[data-outcome-note]', body);
+        if (note) {
+            note.textContent = 'Scriptly rewrote “' + originalTitle + '” for ' + region +
+                ' and saved the result over the draft.';
+        }
+
+        const afterEl = $('[data-compare-after]', body);
+        if (afterEl) { afterEl.textContent = String(after); afterEl.title = String(after); }
+        const beforeEl = $('[data-compare-before]', body);
+        if (beforeEl) beforeEl.textContent = String(before);
+
+        const delta = $('[data-compare-delta]', body);
+        if (delta) {
+            const dir = gain > 0 ? 'is-up' : gain < 0 ? 'is-down' : 'is-flat';
+            const arrow = gain > 0 ? '↑' : gain < 0 ? '↓' : '→';
+            delta.className = 'seo-score-delta ' + dir;
+            delta.textContent = arrow + ' ' + (gain > 0 ? '+' : '') + gain +
+                (Math.abs(gain) === 1 ? ' point' : ' points');
+        }
+
+        setGrade($('[data-compare-grade-pill]', body), $('[data-compare-grade]', body),
+            data.seo_grade || (comparison.grades && comparison.grades.after));
+
+        // Word count and readability are not scores out of 100, so they state
+        // the new figure with the old one under it rather than taking a meter.
+        const metrics = $('[data-compare-metrics]', body);
+        const wc = comparison.word_count || {};
+        const rd = comparison.readability || {};
+        const kw = data.primary_keyword || {};
+        const haveFacts = wc.after !== undefined || rd.after !== undefined || kw.keyword;
+
+        if (metrics) metrics.hidden = !haveFacts;
+        if (haveFacts) {
+            metric($('[data-compare-words]', body), compact(wc.after), wc.after === undefined);
+            const wordsNote = $('[data-compare-words-note]', body);
+            if (wordsNote) wordsNote.textContent = beforeAfterNote(Number(wc.before), Number(wc.after));
+
+            const readAfter = Number(rd.after);
+            metric($('[data-compare-readability]', body),
+                Number.isFinite(readAfter) ? String(Math.round(readAfter)) : null,
+                !Number.isFinite(readAfter));
+            const readNote = $('[data-compare-readability-note]', body);
+            if (readNote) readNote.textContent = beforeAfterNote(Number(rd.before), readAfter);
+
+            metric($('[data-compare-kw]', body), kw.keyword || null, !kw.keyword);
+        }
+
+        const meters = comparisonMeters(comparison.breakdown_comparison || {});
+        const breakdownCard = $('[data-compare-breakdown]', body);
+        const metersHost = $('[data-compare-meters]', body);
+        if (metersHost) metersHost.innerHTML = meters;
+        if (breakdownCard) breakdownCard.hidden = !meters;
+
+        const titleBefore = $('[data-title-before]', body);
+        const titleAfter = $('[data-title-after]', body);
+        if (titleBefore) titleBefore.value = (comparison.title && comparison.title.before) || originalTitle || '';
+        if (titleAfter) titleAfter.value = data.new_title || '';
+
+        const changes = Array.isArray(data.changes_made) ? data.changes_made : [];
+        const changesCard = $('[data-changes-card]', body);
+        const changesList = $('[data-changes-list]', body);
+        const changesCount = $('[data-changes-count]', body);
+        if (changesList) changesList.innerHTML = changeItems(changes);
+        if (changesCount) changesCount.textContent = String(changes.length);
+        if (changesCard) changesCard.hidden = changes.length === 0;
+
+        // The optimize response carries recommendations the old comparison view
+        // threw away — what to do next, after the rewrite it just made.
+        const next = Array.isArray(data.recommendations) ? data.recommendations : [];
+        const nextCard = $('[data-next-card]', body);
+        const nextList = $('[data-next-list]', body);
+        if (nextList) nextList.innerHTML = textItems(next, 'bi-arrow-right-short');
+        if (nextCard) nextCard.hidden = next.length === 0;
+
+        setHead('Optimization result', 'Saved over the draft');
+        setState('comparison');
+    }
+
+    // ----------------------------------------------------------------------
+    // Actions
+    // ----------------------------------------------------------------------
+
+    async function run(options) {
+        const { btn, label, note, head, request, render } = options;
+
+        state.retry = () => run(options);
+        lockVerbs(true);
+        busy(btn, true, label);
+        working(label, note);
+        setHead(head, '');
+        setState('loading');
+
+        try {
+            const data = await request();
+            render(data);
+        } catch (err) {
+            const message = describeError(err);
+            if (message === null) return;         // navigated away, panel is gone
+            setHead('Results', 'The last run failed');
+            setState('error', message);
+            toast('error', 'That did not work', message);
+        } finally {
+            lockVerbs(false);
+            busy(btn, false);
+        }
+    }
+
+    function runAnalyze(btn) {
+        if (!requireDraft()) return;
+        const id = draftId();
+        const title = draftTitle();
+        const region = regionName();
+
+        run({
+            btn,
+            label: 'Scoring the draft…',
+            note: 'Reading the draft and scoring it against the seven categories. ' +
+                'Nothing is written.',
+            head: 'Analyzing',
+            request: () => postJson('/api/seo/analyze-draft/' + encodeURIComponent(id),
+                { region: regionCode() }),
+            render: (data) => renderAnalysis(data.original_analysis || {}, data.blog_title || title, region)
+        });
+    }
+
+    function runKeywords(btn) {
+        if (!requireDraft()) return;
+        const topic = draftTitle();
+        const region = regionName();
+
+        run({
+            btn,
+            label: 'Researching keywords…',
+            note: 'Looking up volume, cost per click and competition for the terms this draft ' +
+                'could rank for. Nothing is written.',
+            head: 'Researching',
+            // The draft's title is the topic, and the picker already knows it —
+            // the old version fetched the whole blog document to read it back.
+            request: () => postJson('/api/seo/keywords', { topic, region: regionCode() }),
+            render: (data) => renderKeywords(data, topic, region)
+        });
+    }
+
+    function runApply() {
+        const id = draftId();
+        if (!id) return;
+        const title = draftTitle();
+        const region = regionName();
+
+        run({
+            btn: null,
+            label: 'Rewriting for search…',
+            note: 'This usually takes 15–30 seconds. Leaving the tab is fine — the draft is saved ' +
+                'server-side.',
+            head: 'Optimizing',
+            request: () => postJson('/api/seo/optimize-blog/' + encodeURIComponent(id),
+                { region: regionCode() }),
+            render: (data) => {
+                renderComparison(data, title, region);
+                toast('success', 'Draft optimized', 'Saved over “' + title + '”.');
+                // The title has just changed, so the picker's labels are stale.
+                loadDrafts(true);
+            }
+        });
+    }
+
+    function askApply() {
+        if (!requireDraft()) return;
+        const draft = $('[data-confirm-draft]');
+        const region = $('[data-confirm-region]');
+        if (draft) draft.textContent = draftTitle();
+        if (region) region.textContent = regionName();
+
+        const modal = applyModal();
+        if (modal) { modal.show(); return; }
+
+        // Bootstrap absent (a CDN that did not answer) — the action still needs
+        // a gate, and it must not be a silent write.
+        if (window.confirm('Rewrite and save over “' + draftTitle() + '”? The current version is not kept.')) {
+            runApply();
+        }
+    }
+
+    function reset() {
+        state.retry = null;
+        setHead('Results', 'Nothing analyzed yet');
+        setState('empty');
+        body.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // ----------------------------------------------------------------------
+    // Events — one delegated listener, all of it aborted on the next visit
+    // ----------------------------------------------------------------------
+
+    root.addEventListener('click', async (e) => {
+        const copyBtn = e.target.closest('.seo-copy');
+        if (copyBtn) {
+            const ok = await copyText(copyBtn.dataset.copy || '');
+            toast(ok ? 'success' : 'error', ok ? 'Copied' : 'Could not copy',
+                ok ? '“' + (copyBtn.dataset.copy || '') + '” is on your clipboard.'
+                   : 'Your browser blocked clipboard access — select the text and copy it.');
             return;
         }
 
-        const topic = draftData.blog.title || '';
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
 
-        // Research keywords using the draft title as topic
-        const response = await fetch('/api/seo/keywords', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic, region })
-        });
-
-        const data = await response.json();
-        hideLoading();
-        hideActionLoader();
-
-        if (data.success) {
-            currentDraftId = draftId;
-            currentDraftTitle = topic;
-            displayKeywordsOnly(data);
-        } else {
-            alert('Error: ' + data.error);
-        }
-    } catch (error) {
-        hideLoading();
-        hideActionLoader();
-        alert('Network error. Please try again.');
-        console.error(error);
-    }
-}
-
-async function analyzeDraft() {
-    const draftId = document.getElementById('draft-select').value;
-    const region = document.getElementById('draft-region').value;
-
-    if (!draftId) {
-        alert('Please select a draft to analyze');
-        return;
-    }
-
-    currentDraftId = draftId;
-    showLoading('Analyzing SEO performance...');
-    showActionLoader('Analyzing...');
-
-    try {
-        const response = await fetch(`/api/seo/analyze-draft/${draftId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ region })
-        });
-
-        const data = await response.json();
-        hideLoading();
-        hideActionLoader();
-
-        if (data.success) {
-            currentDraftTitle = data.blog_title;
-            originalAnalysisData = data.original_analysis;
-            displayOriginalAnalysis(data.original_analysis, data.blog_title);
-        } else {
-            alert('Error: ' + data.error);
-        }
-    } catch (error) {
-        hideLoading();
-        hideActionLoader();
-        alert('Network error. Please try again.');
-        console.error(error);
-    }
-}
-
-function displayOriginalAnalysis(analysis, title) {
-    // Hide other sections, show original analysis
-    document.getElementById('results-section').style.display = 'none';
-    document.getElementById('comparison-section').style.display = 'none';
-    document.getElementById('original-analysis-section').style.display = 'block';
-
-    // Score
-    const score = analysis.seo_score?.total || 0;
-    const grade = analysis.seo_score?.grade || 'N/A';
-    const scoreCircle = document.getElementById('original-score-circle');
-    scoreCircle.className = 'score-circle ' + (score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low');
-    document.getElementById('original-score-value').textContent = score;
-    document.getElementById('original-score-grade').textContent = `Grade: ${grade}`;
-
-    // Issues
-    const issuesList = document.getElementById('original-issues-list');
-    issuesList.innerHTML = '';
-    const issues = analysis.issues || [];
-    if (issues.length === 0) {
-        issuesList.innerHTML = '<li class="text-success"><i class="bi bi-check-circle me-2"></i>No major issues found!</li>';
-    } else {
-        issues.forEach(issue => {
-            const icon = issue.severity === 'high' ? 'exclamation-triangle text-danger' :
-                        issue.severity === 'medium' ? 'exclamation-circle text-warning' : 'info-circle text-info';
-            issuesList.innerHTML += `<li class="mb-2"><i class="bi bi-${icon} me-2"></i>${issue.message}</li>`;
-        });
-    }
-
-    // Recommendations
-    const recsContainer = document.getElementById('original-recommendations');
-    recsContainer.innerHTML = '';
-    const recs = analysis.recommendations || [];
-    recs.forEach(rec => {
-        recsContainer.innerHTML += `<div class="recommendation-item">${rec}</div>`;
-    });
-
-    // Stats
-    document.getElementById('original-word-count').textContent = analysis.word_count || 0;
-    document.getElementById('original-readability').textContent = analysis.readability?.flesch_score?.toFixed(0) || '--';
-    document.getElementById('original-headings').textContent = analysis.headings?.total || 0;
-    document.getElementById('original-links').textContent = analysis.links?.total || 0;
-
-    // Scroll to section
-    document.getElementById('original-analysis-section').scrollIntoView({ behavior: 'smooth' });
-}
-
-async function applyOptimizationToDraft() {
-    // Get draft ID from current state or from select dropdown
-    const draftId = currentDraftId || document.getElementById('draft-select').value;
-
-    if (!draftId) {
-        alert('Please select a draft first');
-        return;
-    }
-
-    // Show custom confirmation modal
-    const confirmed = await showConfirmModal();
-    if (!confirmed) {
-        return;
-    }
-
-    currentDraftId = draftId;
-    const region = document.getElementById('draft-region').value;
-    showLoading('Applying SEO optimization to your draft...');
-    showActionLoader('Optimizing...');
-
-    try {
-        const response = await fetch(`/api/seo/optimize-blog/${draftId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ region })
-        });
-
-        const data = await response.json();
-        hideLoading();
-        hideActionLoader();
-
-        if (data.success) {
-            currentDraftTitle = data.new_title || currentDraftTitle;
-            displayComparison(data, currentDraftTitle);
-            loadDrafts(); // Refresh drafts list
-        } else {
-            alert('Error: ' + data.error);
-        }
-    } catch (error) {
-        hideLoading();
-        hideActionLoader();
-        alert('Network error. Please try again.');
-        console.error(error);
-    }
-}
-
-function displayComparison(data, originalTitle) {
-    // Hide other sections, show comparison
-    document.getElementById('results-section').style.display = 'none';
-    document.getElementById('original-analysis-section').style.display = 'none';
-    document.getElementById('comparison-section').style.display = 'block';
-
-    // Scores
-    const scoreBefore = data.original_score || 0;
-    const scoreAfter = data.seo_score || 0;
-    const improvement = data.score_improvement || 0;
-
-    document.getElementById('compare-score-before').textContent = scoreBefore;
-    document.getElementById('compare-score-after').textContent = scoreAfter;
-
-    const badge = document.getElementById('improvement-badge');
-    badge.textContent = (improvement >= 0 ? '+' : '') + improvement + ' points';
-    badge.className = 'improvement-badge ' + (improvement >= 0 ? 'positive' : 'negative');
-
-    // Detailed comparison
-    const comparison = data.comparison?.breakdown_comparison || {};
-    document.getElementById('cmp-content-before').textContent = comparison.content_length?.before || '--';
-    document.getElementById('cmp-content-after').textContent = comparison.content_length?.after || '--';
-    document.getElementById('cmp-headings-before').textContent = comparison.headings?.before || '--';
-    document.getElementById('cmp-headings-after').textContent = comparison.headings?.after || '--';
-    document.getElementById('cmp-keywords-before').textContent = comparison.keywords?.before || '--';
-    document.getElementById('cmp-keywords-after').textContent = comparison.keywords?.after || '--';
-    document.getElementById('cmp-readability-before').textContent = comparison.readability?.before || '--';
-    document.getElementById('cmp-readability-after').textContent = comparison.readability?.after || '--';
-    document.getElementById('cmp-title-before').textContent = comparison.title?.before || '--';
-    document.getElementById('cmp-title-after').textContent = comparison.title?.after || '--';
-
-    // Title comparison
-    document.getElementById('compare-title-before').value = originalTitle || '';
-    document.getElementById('compare-title-after').value = data.new_title || '';
-
-    // Changes made
-    const changesList = document.getElementById('changes-list');
-    changesList.innerHTML = '';
-    const changes = data.changes_made || [];
-    if (changes.length === 0) {
-        changesList.innerHTML = '<li><i class="bi bi-info-circle"></i><span>Content optimized with target keywords</span></li>';
-    } else {
-        changes.forEach(change => {
-            let html = `<li><i class="bi bi-check2"></i><div>`;
-            html += `<strong>${change.description}</strong>`;
-            if (change.before && change.after) {
-                html += `<br><small class="text-muted">Before: ${change.before}</small>`;
-                html += `<br><small class="text-success">After: ${change.after}</small>`;
+        switch (btn.dataset.action) {
+            case 'analyze': runAnalyze(btn); break;
+            case 'keywords': runKeywords(btn); break;
+            case 'apply': askApply(); break;
+            case 'reload-drafts':
+                loadDrafts(true);
+                toast('info', 'Reloading drafts', 'Fetching your latest drafts.');
+                break;
+            case 'retry':
+                if (state.retry) state.retry(); else reset();
+                break;
+            case 'reset': reset(); break;
+            case 'copy-title': {
+                const field = $('[data-title-after]', body);
+                const ok = await copyText(field ? field.value : '');
+                toast(ok ? 'success' : 'error', ok ? 'Copied' : 'Could not copy',
+                    ok ? 'The optimized title is on your clipboard.'
+                       : 'Your browser blocked clipboard access.');
+                break;
             }
-            html += `</div></li>`;
-            changesList.innerHTML += html;
-        });
-    }
-
-    // Scroll to section
-    document.getElementById('comparison-section').scrollIntoView({ behavior: 'smooth' });
-}
-
-function resetAnalysis() {
-    currentDraftId = null;
-    currentDraftTitle = null;
-    originalAnalysisData = null;
-
-    document.getElementById('results-section').style.display = 'none';
-    document.getElementById('original-analysis-section').style.display = 'none';
-    document.getElementById('comparison-section').style.display = 'none';
-    document.getElementById('draft-select').value = '';
-
-    // Reset visibility of subsections for next use
-    document.getElementById('seo-score-section').style.display = '';
-    document.getElementById('seo-checklist-section').style.display = '';
-    document.getElementById('optimized-title-section').style.display = '';
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function showLoading(message = 'AI is analyzing your content...') {
-    document.getElementById('seo-loader-text').textContent = message;
-    document.getElementById('seo-loader').classList.remove('d-none');
-}
-
-function hideLoading() {
-    document.getElementById('seo-loader').classList.add('d-none');
-}
-
-function displayResults(analysis) {
-    // Hide other sections
-    document.getElementById('original-analysis-section').style.display = 'none';
-    document.getElementById('comparison-section').style.display = 'none';
-
-    // Show results section and all its subsections
-    document.getElementById('results-section').style.display = 'block';
-    document.getElementById('seo-score-section').style.display = '';
-    document.getElementById('seo-checklist-section').style.display = '';
-    document.getElementById('optimized-title-section').style.display = '';
-
-    // SEO Score - handle both old and new format
-    let score = 0;
-    let grade = 'N/A';
-
-    // Try new format first (from optimize_blog)
-    if (analysis.optimized?.seo_score) {
-        score = analysis.optimized.seo_score;
-        grade = analysis.optimized.seo_grade || 'N/A';
-    }
-    // Try direct seo_score (from analyze_content)
-    else if (analysis.seo_score?.total) {
-        score = analysis.seo_score.total;
-        grade = analysis.seo_score.grade || 'N/A';
-    }
-    // Fallback to original analysis
-    else if (analysis.original_analysis?.seo_score?.total) {
-        score = analysis.original_analysis.seo_score.total;
-        grade = analysis.original_analysis.seo_score.grade || 'N/A';
-    }
-
-    const scoreCircle = document.getElementById('seo-score-circle');
-    const scoreValue = document.getElementById('seo-score-value');
-    const scoreLabel = document.getElementById('seo-score-label');
-
-    scoreValue.textContent = score;
-    scoreCircle.className = 'score-circle ' + (score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low');
-    scoreLabel.textContent = score >= 70 ? `Excellent! (${grade})` : score >= 40 ? `Good (${grade})` : `Needs work (${grade})`;
-
-    // Primary Keyword
-    const primary = analysis.keyword_research?.primary_keyword;
-    if (primary) {
-        document.getElementById('primary-keyword').textContent = primary.keyword || '--';
-        const diffBadge = document.getElementById('primary-difficulty');
-        const comp = (primary.competition || 'UNKNOWN').toUpperCase();
-        diffBadge.textContent = comp;
-        diffBadge.className = 'badge bg-' + (comp === 'LOW' ? 'success' : comp === 'MEDIUM' ? 'warning' : 'danger');
-
-        // Show detailed info
-        const infoEl = document.getElementById('primary-keyword-info');
-        const volume = primary.search_volume ? primary.search_volume.toLocaleString() : 'N/A';
-        const cpc = primary.cpc ? `$${parseFloat(primary.cpc).toFixed(2)}` : 'N/A';
-        const difficulty = primary.difficulty_score || '--';
-        infoEl.innerHTML = `
-            <span class="badge bg-light text-dark me-2"><i class="bi bi-bar-chart me-1"></i>Volume: ${volume}</span>
-            <span class="badge bg-light text-dark me-2"><i class="bi bi-currency-dollar me-1"></i>CPC: ${cpc}</span>
-            <span class="badge bg-light text-dark me-2"><i class="bi bi-speedometer2 me-1"></i>Difficulty: ${difficulty}/100</span>
-        `;
-    }
-
-    // Keywords - use all_opportunities if available
-    const keywords = analysis.keyword_research?.all_opportunities || analysis.keyword_research?.all_keywords || [];
-    displayKeywords(keywords);
-
-    // Optimized Title
-    document.getElementById('optimized-title').value = analysis.optimized?.optimized_title || '';
-
-    // SEO Checklist - use new keyword_placement format
-    const placement = analysis.optimized?.keyword_placement || {};
-    const seoAnalysis = analysis.optimized?.seo_analysis || analysis.original_analysis || {};
-    const links = seoAnalysis.links || {};
-
-    displayChecklist({
-        keyword_in_title: placement.in_title || false,
-        keyword_in_first_100: placement.in_first_paragraph || false,
-        keyword_density: placement.density >= 1.0 && placement.density <= 2.5,
-        meta_description: !!analysis.optimized?.meta_description,
-        headings_have_keywords: placement.in_headings || false,
-        internal_links: links.internal_count > 0
-    });
-
-    // Score Breakdown - populate progress bars
-    const scoreBreakdown = seoAnalysis.seo_score?.breakdown || analysis.original_analysis?.seo_score?.breakdown || {};
-    updateScoreBreakdown(scoreBreakdown);
-
-    // Scroll to results
-    document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
-}
-
-function updateScoreBreakdown(breakdown) {
-    const categories = {
-        'content': 'content_length',
-        'headings': 'headings',
-        'keywords': 'keywords',
-        'readability': 'readability',
-        'links': 'links',
-        'title': 'title'
-    };
-
-    for (const [elemId, dataKey] of Object.entries(categories)) {
-        const data = breakdown[dataKey];
-        if (data) {
-            const bar = document.getElementById(`score-${elemId}`);
-            const val = document.getElementById(`score-${elemId}-val`);
-            if (bar) bar.style.width = `${data.score}%`;
-            if (val) val.textContent = `${data.score}/100`;
         }
-    }
-}
+    }, { signal });
 
-function displayKeywordsOnly(data) {
-    // Hide other sections first
-    document.getElementById('original-analysis-section').style.display = 'none';
-    document.getElementById('comparison-section').style.display = 'none';
-
-    // Show results section
-    document.getElementById('results-section').style.display = 'block';
-
-    // Hide SEO-specific sections (not relevant for keyword research only)
-    document.getElementById('seo-score-section').style.display = 'none';
-    document.getElementById('seo-checklist-section').style.display = 'none';
-    document.getElementById('optimized-title-section').style.display = 'none';
-
-    // Display keywords
-    const related = data.related_keywords || [];
-    displayKeywords([...related]);
-
-    // Primary from related with full data
-    if (related.length > 0) {
-        const primary = related[0];
-        document.getElementById('primary-keyword').textContent = primary.keyword;
-        const diffBadge = document.getElementById('primary-difficulty');
-        const comp = (primary.competition || 'low').toUpperCase();
-        diffBadge.textContent = comp;
-        diffBadge.className = 'badge bg-' + (comp === 'LOW' ? 'success' : comp === 'MEDIUM' ? 'warning' : 'danger');
-
-        // Show detailed info for primary keyword
-        const infoEl = document.getElementById('primary-keyword-info');
-        const volume = primary.search_volume ? primary.search_volume.toLocaleString() : 'N/A';
-        const cpc = primary.cpc ? `$${parseFloat(primary.cpc).toFixed(2)}` : 'N/A';
-        const difficulty = primary.difficulty_score || '--';
-        infoEl.innerHTML = `
-            <span class="badge bg-light text-dark me-2"><i class="bi bi-bar-chart me-1"></i>Volume: ${volume}</span>
-            <span class="badge bg-light text-dark me-2"><i class="bi bi-currency-dollar me-1"></i>CPC: ${cpc}</span>
-            <span class="badge bg-light text-dark me-2"><i class="bi bi-speedometer2 me-1"></i>Difficulty: ${difficulty}/100</span>
-        `;
+    // The modal's own button, which lives outside any verb row.
+    const confirmBtn = $('[data-confirm-apply]');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+            const modal = applyModal();
+            if (modal) modal.hide();
+            runApply();
+        }, { signal });
     }
 
-    // Scroll to results
-    document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
-}
+    // The pill label is the page's to maintain; the region also appears in the
+    // confirmation, which must never name a region other than the one selected.
+    draftSelect.addEventListener('change', () => syncPillLabel(draftSelect), { signal });
+    regionSelect.addEventListener('change', () => syncPillLabel(regionSelect), { signal });
 
-function displayKeywords(keywords) {
-    const container = document.getElementById('keywords-container');
-    container.innerHTML = '';
-
-    keywords.forEach(kw => {
-        const difficulty = kw.difficulty_score || 50;
-        const level = difficulty <= 30 ? 'easy' : difficulty <= 60 ? 'medium' : 'hard';
-        const volume = kw.search_volume ? kw.search_volume.toLocaleString() : '--';
-        const cpc = kw.cpc ? `$${parseFloat(kw.cpc).toFixed(2)}` : '--';
-        const competition = (kw.competition || 'medium').toLowerCase();
-
-        const card = document.createElement('div');
-        card.className = 'keyword-card mb-2 p-3 border rounded d-flex justify-content-between align-items-center';
-        card.style.cursor = 'pointer';
-        card.style.transition = 'all 0.2s ease';
-        card.innerHTML = `
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-${level === 'easy' ? 'success' : level === 'medium' ? 'warning' : 'danger'} text-white" style="min-width: 32px; text-align: center;">
-                    ${difficulty}
-                </span>
-                <strong class="keyword-text">${kw.keyword}</strong>
-            </div>
-            <div class="d-flex align-items-center gap-3 text-muted small">
-                <span title="Monthly Search Volume"><i class="bi bi-bar-chart"></i> ${volume}</span>
-                <span title="Cost Per Click"><i class="bi bi-currency-dollar"></i> ${cpc}</span>
-                <span title="Competition Level" class="badge bg-${competition === 'low' ? 'success' : competition === 'medium' ? 'warning' : 'danger'} bg-opacity-25 text-${competition === 'low' ? 'success' : competition === 'medium' ? 'warning' : 'danger'}">
-                    ${competition}
-                </span>
-            </div>
-        `;
-        card.onclick = () => {
-            navigator.clipboard.writeText(kw.keyword);
-            card.style.transform = 'scale(0.98)';
-            card.style.background = '#f0f9ff';
-            setTimeout(() => { card.style.transform = ''; card.style.background = ''; }, 200);
-            showCopyToast();
-        };
-        container.appendChild(card);
-    });
-}
-
-function displayChecklist(checks) {
-    const checklist = document.getElementById('seo-checklist');
-    checklist.innerHTML = '';
-
-    const items = [
-        { key: 'keyword_in_title', label: 'Keyword in title' },
-        { key: 'keyword_in_first_100', label: 'Keyword in first 100 words' },
-        { key: 'keyword_density', label: 'Optimal keyword density (1-2%)' },
-        { key: 'meta_description', label: 'Meta description present' },
-        { key: 'headings_have_keywords', label: 'Keywords in headings' },
-        { key: 'internal_links', label: 'Internal linking opportunities' }
-    ];
-
-    items.forEach(item => {
-        const passed = checks[item.key] || false;
-        const li = document.createElement('li');
-        li.innerHTML = `
-            <span class="check-icon ${passed ? 'pass' : 'fail'}">
-                <i class="bi bi-${passed ? 'check' : 'x'}"></i>
-            </span>
-            <span>${item.label}</span>
-        `;
-        checklist.appendChild(li);
-    });
-}
-
-function copyToClipboard(elementId) {
-    const el = document.getElementById(elementId);
-    el.select();
-    document.execCommand('copy');
-    showCopyToast();
-}
-
-// Show copy toast notification
-function showCopyToast() {
-    const toast = document.getElementById('copy-toast');
-    toast.classList.add('show');
-
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 2000);
-}
-
-// Custom confirmation modal
-function showConfirmModal() {
-    return new Promise((resolve) => {
-        const modal = document.getElementById('confirm-modal');
-        const okBtn = document.getElementById('confirm-ok-btn');
-        const cancelBtn = document.getElementById('confirm-cancel-btn');
-
-        // Show modal
-        modal.classList.add('active');
-
-        // Handle OK click
-        const handleOk = () => {
-            modal.classList.remove('active');
-            cleanup();
-            resolve(true);
-        };
-
-        // Handle Cancel click
-        const handleCancel = () => {
-            modal.classList.remove('active');
-            cleanup();
-            resolve(false);
-        };
-
-        // Handle clicking outside the modal
-        const handleOutsideClick = (e) => {
-            if (e.target === modal) {
-                handleCancel();
-            }
-        };
-
-        // Handle escape key
-        const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-                handleCancel();
-            }
-        };
-
-        // Cleanup event listeners
-        const cleanup = () => {
-            okBtn.removeEventListener('click', handleOk);
-            cancelBtn.removeEventListener('click', handleCancel);
-            modal.removeEventListener('click', handleOutsideClick);
-            document.removeEventListener('keydown', handleEscape);
-        };
-
-        // Add event listeners
-        okBtn.addEventListener('click', handleOk);
-        cancelBtn.addEventListener('click', handleCancel);
-        modal.addEventListener('click', handleOutsideClick);
-        document.addEventListener('keydown', handleEscape);
-    });
-}
-
-// =========================================
-// URL SEO ANALYSIS
-// =========================================
-async function analyzeUrlSeo() {
-    const urlInput = document.getElementById('url-input');
-    const url = urlInput.value.trim();
-
-    if (!url) {
-        alert('Please enter a URL to analyze');
-        return;
-    }
-
-    showLoading('Analyzing URL SEO... This may take 10-20 seconds.');
-    showActionLoader('Analyzing URL...');
-
-    try {
-        const response = await fetch('/api/seo/analyze-url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
-        });
-
-        const data = await response.json();
-        hideLoading();
-        hideActionLoader();
-
-        if (data.success) {
-            displayUrlResults(data);
-        } else {
-            alert('Error: ' + (data.error || 'Failed to analyze URL'));
-        }
-    } catch (error) {
-        hideLoading();
-        hideActionLoader();
-        alert('Network error. Please try again.');
-        console.error(error);
-    }
-}
-
-function displayUrlResults(data) {
-    const section = document.getElementById('url-results-section');
-    section.style.display = 'block';
-
-    // URL & Title
-    const link = document.getElementById('url-result-link');
-    link.href = data.url || '#';
-    link.textContent = data.url || '--';
-    document.getElementById('url-result-title').textContent = data.title || 'N/A';
-    document.getElementById('url-result-description').textContent = data.description || 'N/A';
-
-    // Score
-    const score = data.score || 0;
-    const scoreCircle = document.getElementById('url-score-circle');
-    scoreCircle.className = 'score-circle ' + (score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low');
-    document.getElementById('url-score-value').textContent = score;
-
-    // Content Analysis
-    const content = data.content_analysis || {};
-    document.getElementById('url-word-count').textContent = content.word_count || '--';
-    document.getElementById('url-title-length').textContent = content.title_length || '--';
-    document.getElementById('url-desc-length').textContent = content.description_length || '--';
-    document.getElementById('url-load-time').textContent = data.load_time || '--';
-
-    // Technical SEO Checks
-    const technical = data.technical || {};
-    const techContainer = document.getElementById('url-technical-checks');
-    techContainer.innerHTML = '';
-    const techChecks = [
-        { key: 'ssl', label: 'SSL/HTTPS', icon: 'shield-lock' },
-        { key: 'mobile_friendly', label: 'Mobile Friendly', icon: 'phone' },
-        { key: 'robots_txt', label: 'Robots.txt', icon: 'robot' },
-        { key: 'sitemap', label: 'Sitemap', icon: 'diagram-3' },
-    ];
-    techChecks.forEach(check => {
-        const passed = technical[check.key];
-        techContainer.innerHTML += `
-            <div class="col-md-3 col-6">
-                <div class="border rounded p-2 text-center ${passed ? 'border-success' : 'border-danger'}">
-                    <i class="bi bi-${check.icon} ${passed ? 'text-success' : 'text-danger'}"></i>
-                    <div class="small fw-bold">${check.label}</div>
-                    <span class="badge bg-${passed ? 'success' : 'danger'}">${passed ? 'Pass' : 'Fail'}</span>
-                </div>
-            </div>
-        `;
-    });
-
-    if (technical.canonical) {
-        techContainer.innerHTML += `
-            <div class="col-12 mt-2">
-                <small class="text-muted"><strong>Canonical:</strong> ${technical.canonical}</small>
-            </div>
-        `;
-    }
-    if (technical.lang) {
-        techContainer.innerHTML += `
-            <div class="col-12">
-                <small class="text-muted"><strong>Language:</strong> ${technical.lang}</small>
-            </div>
-        `;
-    }
-
-    // Issues & Warnings
-    const issuesContainer = document.getElementById('url-issues-container');
-    const issues = data.issues || [];
-    const warnings = data.warnings || [];
-    const allIssues = [...issues, ...warnings];
-
-    if (allIssues.length > 0) {
-        issuesContainer.innerHTML = allIssues.map(issue => {
-            const text = typeof issue === 'string' ? issue : (issue.message || issue.description || JSON.stringify(issue));
-            const isWarning = warnings.includes(issue);
-            return `<div class="d-flex align-items-start gap-2 mb-2">
-                <i class="bi bi-${isWarning ? 'exclamation-circle text-warning' : 'x-circle text-danger'} mt-1"></i>
-                <span>${text}</span>
-            </div>`;
-        }).join('');
-    } else {
-        issuesContainer.innerHTML = '<p class="text-success mb-0"><i class="bi bi-check-circle me-2"></i>No issues found!</p>';
-    }
-
-    // Passed Checks
-    const passedContainer = document.getElementById('url-passed-container');
-    const passed = data.passed || [];
-    if (passed.length > 0) {
-        passedContainer.innerHTML = passed.map(item => {
-            const text = typeof item === 'string' ? item : (item.message || item.description || JSON.stringify(item));
-            return `<div class="d-flex align-items-start gap-2 mb-2">
-                <i class="bi bi-check-circle text-success mt-1"></i>
-                <span>${text}</span>
-            </div>`;
-        }).join('');
-    } else {
-        passedContainer.innerHTML = '<p class="text-muted mb-0">Detailed checks not available for this URL.</p>';
-    }
-
-    // Scroll to results
-    section.scrollIntoView({ behavior: 'smooth' });
-}
+    loadDrafts();
+})();

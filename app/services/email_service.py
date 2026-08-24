@@ -1,10 +1,26 @@
+import hashlib
 import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from app.core.logging import get_logger
+from app.utils.cache import cache
 
 logger = get_logger(__name__)
+
+# An unreachable or slow-to-answer mail server must not hold a worker thread
+# open indefinitely. smtplib defaults to no timeout at all, which means a
+# blackholed SMTP port blocks until the OS gives up -- minutes, on one of a
+# small number of gthread workers.
+SMTP_TIMEOUT_SECONDS = 10
+
+# How long a successful credential check stays good. SMTP credentials change
+# only when the environment changes or Google revokes the app password, and the
+# cache key includes the credentials, so a change invalidates this on its own.
+_STATUS_TTL_SECONDS = 600
+# Failures are re-checked far sooner: a transient network problem should not
+# leave the screen claiming email is misconfigured for ten minutes.
+_STATUS_FAILURE_TTL_SECONDS = 30
 
 
 class EmailService:
@@ -38,7 +54,8 @@ class EmailService:
         msg["Subject"] = subject
         msg.attach(MIMEText(html_content, "html"))
 
-        with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+        with smtplib.SMTP(self.smtp_host, self.smtp_port,
+                          timeout=SMTP_TIMEOUT_SECONDS) as server:
             server.starttls()
             server.login(self.from_email, self.app_password)
             server.sendmail(self.from_email, to_email, msg.as_string())
@@ -125,14 +142,43 @@ class EmailService:
         return results
 
     def test_connection(self):
-        """Test if Gmail SMTP credentials are valid."""
+        """Whether the Gmail SMTP credentials are valid. Cached.
+
+        This performs a TCP connect, a STARTTLS handshake and an SMTP AUTH --
+        seconds of pure network round trips. It backs a status indicator on the
+        newsletter screen, which called it on every page load and so paid a full
+        SMTP login just to render a green dot; measured in the browser, that one
+        endpoint took 2.58 s.
+
+        The answer is a property of the credentials, not of the request, so it
+        is cached against a digest of them. A credential change produces a
+        different key and re-checks immediately, and a failure is cached only
+        briefly so a blip does not persist as a false "misconfigured".
+        """
         if not self.from_email or not self.app_password:
             return {"valid": False, "error": "GMAIL_USER or GMAIL_APP_PASSWORD not set"}
 
+        # A digest, never the password itself: cache keys reach logs and
+        # Redis's keyspace, and neither is a place for a credential.
+        fingerprint = hashlib.sha256(
+            ('%s\0%s' % (self.from_email, self.app_password)).encode()
+        ).hexdigest()[:16]
+        cache_key = 'smtp_status:%s' % fingerprint
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+            with smtplib.SMTP(self.smtp_host, self.smtp_port,
+                              timeout=SMTP_TIMEOUT_SECONDS) as server:
                 server.starttls()
                 server.login(self.from_email, self.app_password)
-            return {"valid": True}
+            result = {"valid": True}
+            ttl = _STATUS_TTL_SECONDS
         except Exception as e:
-            return {"valid": False, "error": str(e)}
+            result = {"valid": False, "error": str(e)}
+            ttl = _STATUS_FAILURE_TTL_SECONDS
+
+        cache.set(cache_key, result, ttl)
+        return result

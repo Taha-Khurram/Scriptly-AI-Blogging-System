@@ -1,267 +1,281 @@
 /* ==========================================================================
-   Users Page Styles
+   Users — the team table
+
+   Composed from the shared primitives in dashboard.css: §12's .surface-card /
+   .card-head / .data-row / .status-pill / .list-empty / .seg-tabs, and §14's
+   .app-modal / .app-field / .app-btn. A person is the same kind of record as
+   a draft, a subscriber or a category — a mark, a title, a line of meta and a
+   trailing control — so a person now reads like one.
+
+   What used to live here was a parallel implementation of all of that:
+   .users-header / .user-row / .col-username / .badge-status / .badge-role,
+   plus .action-dropdown / .action-dots-btn / .action-menu, a third row menu
+   carrying its own open/close state. None of it was reachable from anywhere
+   else in the app, and none of the rest of the app was reachable from here.
+
+   What is genuinely specific to this screen and stays:
+     - the column template (role and status each get a column)
+     - the role pill, which is not a status
+     - the two member statuses
+     - the role picker inside the modals
+     - the ⋮ menu, restated because this page loads neither drafts.css nor
+       all_blogs.css
    ========================================================================== */
 
-/* ==================== CONTAINER ==================== */
+/* --- Card and rows ------------------------------------------------------ */
+
+.users-card {
+  padding-bottom: var(--sp-6);
+  /* the ⋮ menu escapes the card */
+  overflow: visible;
+}
+
 .users-container {
-    background: var(--surface-1);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    overflow: visible;
+  padding: var(--sp-4) var(--sp-4) 0;
 }
 
-/* ==================== HEADER ROW ==================== */
-.users-header {
-    display: flex;
-    padding: 1rem 2rem;
-    background: var(--bg-body);
-    border-bottom: 1px solid var(--border-subtle);
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--secondary-color);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+/* Role and status get columns of their own rather than another line of meta.
+   This is the screen you open to answer "who can publish?", and that answer
+   only reads as an answer when it lines up down the page. */
+.users-container .data-row {
+  grid-template-columns: 36px minmax(0, 1fr) 92px 104px auto;
 }
 
-/* ==================== USER ROW ==================== */
-.user-row {
-    display: flex;
-    align-items: center;
-    padding: 0.9rem 2rem;
-    border-bottom: 1px solid var(--border-subtle);
-    transition: all 0.15s ease;
+/* Fixed tracks rather than `auto`, because .data-rows is a grid of grids —
+   each row sizes its own columns, so an `auto` role column would sit at a
+   different offset on every row and there would be nothing to scan down.
+   `start` keeps each pill only as wide as its own label inside that track. */
+.users-container .data-row .role-pill,
+.users-container .data-row .status-pill {
+  justify-self: start;
 }
 
-.user-row:hover {
-    background: var(--bg-body);
+/* An invitation is a placeholder for a person rather than one, so its mark
+   recedes — the status pill beside it says the same thing in a word. */
+.users-container .data-row.is-invite .row-mark {
+  background: var(--surface-2);
+  color: var(--text-faint);
 }
 
-.user-row:last-child {
-    border-bottom: none;
+/* --- Role pill ----------------------------------------------------------
+   Deliberately not a .status-pill. A role is a standing property of the
+   account; a status is what that account is doing right now. The two sit in
+   adjacent columns, so they must not read as two values of one thing.
+   Modifiers are scoped under the block, per dashboard.css §12.
+   ------------------------------------------------------------------------ */
+
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
 }
 
-/* ==================== COLUMNS ==================== */
-.col-username {
-    flex: 2;
-    min-width: 0;
-    overflow: hidden;
-    padding-right: 1rem;
+/* Admin is the elevated one, so it takes the accent; editor is the ordinary
+   case and stays neutral. The label carries the meaning either way — the old
+   pair were both uppercase text on a tint, leaving the hue to say which. */
+.role-pill.is-admin {
+  background: var(--accent-soft);
+  color: var(--accent-on-soft);
 }
 
-.col-username .fw-bold {
-    font-size: 0.85rem;
-    color: var(--text-strong);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.role-pill.is-editor {
+  background: var(--surface-3);
+  color: var(--text-2);
 }
 
-.col-email {
-    flex: 3;
-    min-width: 0;
-    overflow: hidden;
-    padding-right: 1rem;
-    font-size: 0.82rem;
-    color: var(--text-2);
-    white-space: nowrap;
-    text-overflow: ellipsis;
+/* --- Member statuses ----------------------------------------------------
+   .status-pill's shared modifiers are the four post states. A person is
+   either on the team or has not accepted yet, so those two live here rather
+   than in dashboard.css — this is the only screen with members.
+   ------------------------------------------------------------------------ */
+
+.status-pill.status-active {
+  background: var(--success-soft);
+  color: var(--success);
 }
 
-.col-role {
-    flex: 1.2;
-    min-width: 0;
-    overflow: hidden;
-    padding-right: 1rem;
+.status-pill.status-invited {
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
-.col-status {
-    flex: 1.2;
-    min-width: 0;
-    overflow: hidden;
-    padding-right: 1rem;
+/* --- Loading state ------------------------------------------------------
+   The list arrives over fetch, so the card has a third state between empty
+   and full. Same shape as .list-empty, without the icon medallion.
+   ------------------------------------------------------------------------ */
+
+.users-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-12) var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
 }
 
-.col-actions {
-    flex: 0 0 100px;
-    text-align: right;
-    display: flex;
-    justify-content: flex-end;
+.users-state p {
+  margin: 0;
 }
 
-/* ==================== AVATAR ==================== */
-.user-row .footer-avatar {
-    width: 32px !important;
-    height: 32px !important;
-    border-radius: 50% !important;
-    font-size: 0.72rem !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    text-align: center;
-    line-height: 1;
-    background: var(--accent) !important;
-    color: var(--text-on-accent) !important;
-    font-weight: 700 !important;
+.users-card .list-empty .app-btn {
+  margin-top: var(--sp-2);
 }
 
-/* ==================== BADGES ==================== */
-.badge-role {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.65rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.68rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+/* --- Modal forms -------------------------------------------------------- */
+
+.users-fields {
+  display: grid;
+  gap: var(--sp-5);
 }
 
-.badge-admin {
-    background: var(--accent-tint);
-    color: var(--primary-color);
+/* .delete-copy is dashboard.css §14's dialog body copy, set in --text-2. The
+   name of the person the dialog is about lifts out of it. */
+.delete-copy strong {
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
 }
 
-.badge-editor {
-    background: var(--info-soft);
-    color: var(--info);
+/* --- Role picker --------------------------------------------------------
+   Inline, not a .select-field popover. .app-modal-body scrolls and .app-modal
+   clips to its radius, so a .menu dropping out of the last field in the form
+   would be cut off — schedule.css hit the same wall with its publish-time
+   calendar and reached the same conclusion.
+
+   .seg-tabs is the app's "one of these is selected" control; here it wears
+   role="radiogroup". Two options that grant different powers also need
+   explaining, and a picker whose choices are both visible can carry that
+   explanation underneath rather than hiding it behind a closed popup.
+   ------------------------------------------------------------------------ */
+
+.role-choice {
+  /* .app-field is a column flex, which would otherwise stretch the track to
+     the full width of the dialog for the sake of two short pills. */
+  align-self: flex-start;
 }
 
-/* ==================== STATUS BADGES ==================== */
-.badge-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.25rem 0.65rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.68rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+.role-choice .seg-tab i {
+  font-size: 0.95em;
 }
 
-.badge-status .bi { font-size: 0.4rem; }
+/* --- Row menu -----------------------------------------------------------
+   The same treatment the drafts, all-blogs and categories listings give their
+   ⋮ menus, restated because this page loads none of those stylesheets.
+   ------------------------------------------------------------------------ */
 
-.badge-active {
-    background: var(--success-soft);
-    color: var(--success);
+.btn-dropdown-trigger {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: var(--transition-base);
 }
 
-.badge-pending {
-    background: var(--warning-soft);
-    color: var(--warning);
+.btn-dropdown-trigger:hover {
+  background: var(--surface-3);
+  color: var(--text-strong);
 }
 
-/* ==================== ACTION DROPDOWN ==================== */
-.action-dropdown {
-    position: relative;
+.dropdown-menu {
+  border: none;
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2);
+  padding: var(--sp-2);
+  min-width: 200px;
 }
 
-.action-dots-btn {
-    width: auto;
-    height: auto;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    color: var(--text-faint);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    padding: 0.25rem;
-    transition: color 0.15s ease;
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-1);
+  transition: var(--transition-base);
 }
 
-.action-dots-btn:hover {
-    color: var(--text-2);
+.dropdown-item:hover {
+  background: var(--surface-2);
+  color: var(--text-strong);
 }
 
-.action-menu {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    margin-top: 0.5rem;
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    box-shadow: var(--elev-3);
-    min-width: 160px;
-    padding: 0.5rem;
-    z-index: 100;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-4px);
-    transition: all 0.15s ease;
+.dropdown-item i {
+  width: 20px;
+  text-align: center;
+  font-size: 1rem;
 }
 
-.action-menu.show {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
+.dropdown-item.text-danger {
+  color: var(--danger);
 }
 
-.action-menu-item {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    width: 100%;
-    padding: 0.55rem 0.85rem;
-    border: none;
-    background: none;
-    border-radius: var(--radius-sm);
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-1);
-    cursor: pointer;
-    transition: all 0.12s ease;
+.dropdown-item.text-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
-.action-menu-item:hover {
-    background: var(--surface-2);
+.dropdown-divider {
+  margin: var(--sp-1) 0;
+  border-color: var(--border-subtle);
 }
 
-.action-menu-item i {
-    font-size: 0.9rem;
-    color: var(--primary-color);
+/* Shown only once the role column has been dropped — see the 620px block. */
+.row-meta-role {
+  display: none;
 }
 
-.action-menu-item-danger {
-    color: var(--danger);
+/* --- Responsive --------------------------------------------------------- */
+
+@media (max-width: 860px) {
+  /* The status is the first column to go: an invitation already reads as one
+     from its recessed mark and its Resend action, and dropping the column
+     buys the name and the email the width they need before either truncates.
+     Members are the overwhelming majority and they are all "Active". */
+  .users-container .data-row {
+    grid-template-columns: 36px minmax(0, 1fr) 92px auto;
+  }
+
+  .users-container .data-row .status-pill {
+    display: none;
+  }
 }
 
-.action-menu-item-danger i {
-    color: var(--danger);
-}
+@media (max-width: 620px) {
+  .users-container .data-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: var(--sp-3);
+  }
 
-.action-menu-item-danger:hover {
-    background: var(--danger-soft);
-}
+  .users-card .row-mark {
+    width: 32px;
+    height: 32px;
+  }
 
-/* ==================== RESPONSIVE ==================== */
-@media (max-width: 1024px) {
-    .users-header {
-        padding: 1rem 1.25rem;
-    }
+  /* The role moves into the meta line rather than disappearing — on this
+     screen it is the whole point of the row. Both are always rendered. */
+  .users-container .data-row .role-pill {
+    display: none;
+  }
 
-    .user-row {
-        padding: 0.9rem 1.25rem;
-    }
-}
+  .users-container .data-row .row-meta-role {
+    display: inline;
+  }
 
-@media (max-width: 768px) {
-    .users-header {
-        display: none;
-    }
-
-    .user-row {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        padding: 1rem 1.25rem;
-    }
-
-    .col-username { flex: 1 1 100%; }
-    .col-email { flex: 1 1 100%; padding-right: 0; }
-    .col-role { flex: 0 0 auto; }
-    .col-status { flex: 0 0 auto; }
-    .col-actions { flex: 0 0 auto; }
+  /* A hover shortcut plus a menu is more than a phone row can carry, and the
+     menu offers everything the shortcut does. */
+  .users-card .row-action {
+    display: none;
+  }
 }

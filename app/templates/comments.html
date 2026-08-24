@@ -1,261 +1,395 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Comment Moderation | ScriptlyAI{% endblock %}
+{% block title %}Comments | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/comments.css') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/comments.css') }}?v=3">
 {% endblock %}
 
+{#
+  One row definition, used for the server-rendered first page. comments.js
+  builds the identical structure for every page and filter after it — the two
+  have to stay in step, so both are kept deliberately small.
+
+  The whole comment is the row title. It used to be cut to 25 characters in
+  Jinja and then to 25 again in JS, which on a screen whose entire job is
+  reading what somebody wrote left about three words.
+#}
+{% macro comment_row(c) %}
+{% set st = (c.status or 'published') | lower %}
+{% set text = c.display_text or c.original_text or '' %}
+{% set name = c.commenter_name or 'Anonymous' %}
+{% set post = c.blog_title or 'Unknown post' %}
+{% set ai = (c.ai_action or 'approved') | lower %}
+{% set ai_label = {'edited': 'AI edited', 'removed': 'AI removed'}.get(ai) %}
+{% set st_label = 'Removed' if st == 'removed' else 'Visible' %}
+<div class="data-row{{ ' is-removed' if st == 'removed' }}" id="comment-row-{{ c.id }}" data-id="{{ c.id }}"
+  data-status="{{ st }}" data-name="{{ name }}" data-email="{{ c.commenter_email or '' }}"
+  data-text="{{ text }}" data-search="{{ (text ~ ' ' ~ name ~ ' ' ~ post) | lower }}">
+
+  <span class="row-mark" aria-hidden="true">{{ (name | trim)[0] | upper if name | trim else '?' }}</span>
+
+  <button type="button" class="row-open" data-action="view" title="Open the comment from {{ name }}">
+    <span class="row-title comment-row-text">{{ text or 'Empty comment' }}</span>
+    <span class="row-meta">
+      <span>{{ name }}</span>
+      <span class="row-sep" aria-hidden="true">·</span>
+      <span>{{ post }}</span>
+      {% if c.created_at %}
+      <span class="row-sep" aria-hidden="true">·</span>
+      <time class="row-time" datetime="{{ c.created_at }}" data-relative>{{ c.created_at[:10] }}</time>
+      {% endif %}
+      {% if ai_label %}
+      <span class="row-sep row-meta-ai" aria-hidden="true">·</span>
+      <span class="row-meta-ai">{{ ai_label }}</span>
+      {% endif %}
+      <span class="row-sep row-meta-status" aria-hidden="true">·</span>
+      <span class="row-meta-status">{{ st_label }}</span>
+    </span>
+  </button>
+
+  {% if ai_label %}
+  <span class="ai-pill is-{{ ai }}">
+    <i class="bi bi-robot" aria-hidden="true"></i> {{ ai_label }}
+  </span>
+  {% else %}
+  {# Holds the track open so the two pill columns line up down the page. It
+     carries a class rather than being a bare <span>, because the media queries
+     have to be able to drop it along with the pill it stands in for —
+     display:none removes a grid item from placement, an empty span does not. #}
+  <span class="ai-pill-blank"></span>
+  {% endif %}
+
+  <span class="status-pill status-{{ 'hidden' if st == 'removed' else 'live' }}">{{ st_label }}</span>
+
+  <div class="row-trail">
+    {% if st == 'removed' %}
+    <button type="button" class="row-action" data-action="restore" title="Put back on the site"
+      aria-label="Put the comment from {{ name }} back on the site">
+      <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+    </button>
+    {% else %}
+    <button type="button" class="row-action" data-action="remove" title="Take off the site"
+      aria-label="Take the comment from {{ name }} off the site">
+      <i class="bi bi-eye-slash" aria-hidden="true"></i>
+    </button>
+    {% endif %}
+
+    <div class="dropdown">
+      <button type="button" class="btn-dropdown-trigger" data-bs-toggle="dropdown" aria-expanded="false"
+        aria-label="More actions for the comment from {{ name }}">
+        <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><button type="button" class="dropdown-item" data-action="view">
+            <i class="bi bi-eye" aria-hidden="true"></i> Open comment
+          </button></li>
+        {% if st == 'removed' %}
+        <li><button type="button" class="dropdown-item" data-action="restore">
+            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Put back on the site
+          </button></li>
+        {% else %}
+        <li><button type="button" class="dropdown-item" data-action="remove">
+            <i class="bi bi-eye-slash" aria-hidden="true"></i> Take off the site
+          </button></li>
+        {% endif %}
+        <li><button type="button" class="dropdown-item" data-action="copy-email">
+            <i class="bi bi-envelope" aria-hidden="true"></i> Copy email address
+          </button></li>
+        <li>
+          <hr class="dropdown-divider">
+        </li>
+        <li><button type="button" class="dropdown-item text-danger" data-action="delete">
+            <i class="bi bi-trash3" aria-hidden="true"></i> Delete permanently
+          </button></li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
 {% block content %}
+{% set s = comment_stats or {} %}
+{% set total = s.total | default(0) | int %}
+{% set live = s.published | default(0) | int %}
+{% set hidden = s.removed | default(0) | int %}
+{% set ai_edited = s.ai_edited | default(0) | int %}
+
 <div class="dashboard-layout">
 
   {% include 'partials/sidebar.html' %}
 
+  {#
+     Both dialogs and the page script live inside .dashboard-main, like every
+     other screen. PJAX swaps only that element's innerHTML — the modals used
+     to sit outside the layout wrapper entirely and were dropped on every
+     in-app navigation, so moderating a comment worked on a hard load and did
+     nothing until the next one. The script survived only because the PJAX
+     asset scraper happens to re-run every <script> it finds anywhere in the
+     response.
+  #}
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <div class="header-welcome-text">Administration</div>
-        <h1 class="header-title">Comment Moderation</h1>
-      </div>
-    </header>
 
-    <div class="dashboard-content-wrapper animate-fade-up">
+    {% call page_header(
+    title='Comments',
+    eyebrow='Moderation',
+    search=true,
+    search_placeholder='Search comments',
+    search_id='commentsSearch') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    {% endcall %}
 
-      <!-- Stats Cards -->
-      <div class="comment-stats-row">
-        <div class="stat-card">
-          <div class="stat-icon stat-total"><i class="bi bi-chat-dots"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="stat-total">{{ comment_stats.total }}</span>
-            <span class="stat-label">Total Comments</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-published"><i class="bi bi-check-circle"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="stat-published">{{ comment_stats.published }}</span>
-            <span class="stat-label">Published</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-removed"><i class="bi bi-shield-x"></i></div>
-          <div class="stat-info">
-            <span class="stat-count" id="stat-removed">{{ comment_stats.removed }}</span>
-            <span class="stat-label">Removed</span>
-          </div>
-        </div>
+    {#
+      Three tiles rather than four: how many comments there are, how many are
+      on the site, how many were taken down. The AI-edited count is not a
+      fourth figure of the same kind — it is a slice of the first — so it is a
+      tab count instead, where it doubles as the way to see them.
+    #}
+    <div class="comments-stats reveal">
+      <div class="stat-card">
+        <span class="stat-icon stat-all"><i class="bi bi-chat-square-text" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">{{ 'Comment' if total == 1 else 'Comments' }}</span>
+          <span class="stat-count" data-stat-total>{{ total }}</span>
+        </span>
       </div>
 
-      <!-- Filter Tabs -->
-      <div class="comment-filters">
-        <button class="filter-tab active" data-filter="all">All</button>
-        <button class="filter-tab" data-filter="published">Published</button>
-        <button class="filter-tab" data-filter="removed">Removed</button>
+      <div class="stat-card">
+        <span class="stat-icon stat-live"><i class="bi bi-eye" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Visible</span>
+          <span class="stat-count" data-stat-live>{{ live }}</span>
+        </span>
+        {# A ratio, not a series, so this slot is a meter: what share of the
+           comments you have are actually on the site. #}
+        <span class="stat-meter" data-meter{{ ' hidden' if total == 0 else '' }}>
+          <span class="stat-meter-track">
+            <span class="stat-meter-fill" data-meter-fill
+              style="width: {{ (live * 100 // total) if total else 0 }}%"></span>
+          </span>
+          <span class="stat-meter-note" data-meter-note>
+            {{ (live * 100 // total) if total else 0 }}% of all comments
+          </span>
+        </span>
       </div>
 
-      <!-- Comments Table -->
-      <div class="comments-container">
-        <div class="drafts-header">
-          <div class="col-commenter">Commenter</div>
-          <div class="col-comment">Comment</div>
-          <div class="col-post">Post</div>
-          <div class="col-status">Status</div>
-          <div class="col-actions">Actions</div>
-        </div>
-        <div id="comments-table-body">
-          {% if initial_comments %}
-            {% for comment in initial_comments %}
-            <div class="draft-row" id="comment-row-{{ comment.id }}">
-              <div class="col-commenter">
-                <div class="commenter-info">
-                  <div class="commenter-avatar">{{ (comment.commenter_name or 'A')[0]|upper }}</div>
-                  <div>
-                    <div class="commenter-name">{{ comment.commenter_name or 'Anonymous' }}</div>
-                    <div class="commenter-date">{{ comment.created_at[:10] if comment.created_at else '' }}</div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-comment" title="{{ comment.display_text or '' }}">{{ (comment.display_text or comment.original_text or '')[:25] }}{{ '...' if (comment.display_text or comment.original_text or '')|length > 25 else '' }}</div>
-              <div class="col-post">{{ (comment.blog_title or 'Unknown Post')[:25] }}{{ '...' if (comment.blog_title or 'Unknown Post')|length > 25 else '' }}</div>
-              <div class="col-status">
-                {% if comment.status == 'published' %}
-                <span class="status-badge status-published"><i class="bi bi-circle-fill"></i> Published</span>
-                {% elif comment.status == 'removed' %}
-                <span class="status-badge status-removed"><i class="bi bi-circle-fill"></i> Removed</span>
-                {% else %}
-                <span class="status-badge status-published"><i class="bi bi-circle-fill"></i> {{ comment.status or 'Unknown' }}</span>
-                {% endif %}
-              </div>
-              <div class="col-actions">
-                <div class="dropdown">
-                  <button class="btn-dropdown-trigger" data-bs-toggle="dropdown">
-                    <i class="bi bi-three-dots-vertical"></i>
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="#" onclick="openCommentModal('{{ comment.id }}'); return false;">
-                      <i class="bi bi-eye"></i> View Details
-                    </a></li>
-                    {% if comment.status == 'published' %}
-                    <li><a class="dropdown-item" href="#" onclick="removeComment('{{ comment.id }}'); return false;">
-                      <i class="bi bi-eye-slash"></i> Remove from Site
-                    </a></li>
-                    {% endif %}
-                    {% if comment.status == 'removed' %}
-                    <li><a class="dropdown-item" href="#" onclick="restoreComment('{{ comment.id }}'); return false;">
-                      <i class="bi bi-arrow-counterclockwise"></i> Restore
-                    </a></li>
-                    {% endif %}
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteComment('{{ comment.id }}'); return false;">
-                      <i class="bi bi-trash"></i> Delete Permanently
-                    </a></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            {% endfor %}
-          {% else %}
-            <div class="text-center py-5">
-              <div class="mb-3 text-muted opacity-50"><i class="bi bi-chat-text fs-1"></i></div>
-              <p class="text-secondary fw-bold mb-0">No comments found.</p>
-            </div>
-          {% endif %}
-        </div>
+      <div class="stat-card">
+        <span class="stat-icon stat-hidden"><i class="bi bi-shield-x" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Removed</span>
+          <span class="stat-count" data-stat-hidden>{{ hidden }}</span>
+        </span>
       </div>
-
-      <!-- Pagination -->
-      <div class="comment-pagination" id="comment-pagination">
-        {% if initial_total > initial_per_page %}
-        {% set total_pages = (initial_total / initial_per_page)|round(0, 'ceil')|int %}
-        <button class="page-btn disabled" disabled><i class="bi bi-chevron-left"></i></button>
-        {% for i in range(1, total_pages + 1) %}
-          {% if i <= 5 %}
-          <button class="page-btn {{ 'active' if i == 1 else '' }}" onclick="goToPage({{ i }})">{{ i }}</button>
-          {% endif %}
-        {% endfor %}
-        {% if total_pages > 5 %}
-        <span class="page-dots">...</span>
-        <button class="page-btn" onclick="goToPage({{ total_pages }})">{{ total_pages }}</button>
-        {% endif %}
-        <button class="page-btn {{ 'disabled' if total_pages <= 1 else '' }}" onclick="goToPage(2)" {{ 'disabled' if total_pages <= 1 else '' }}><i class="bi bi-chevron-right"></i></button>
-        {% endif %}
-      </div>
-
     </div>
+
+    {# Status is the primary dimension, so it is a permanently visible
+       segmented control rather than a dropdown you have to open to read. "AI
+       edited" is a filter the API has always supported and the old screen
+       never offered. #}
+    <section class="surface-card filter-bar comments-filter reveal" style="--reveal-delay: 60ms"
+      aria-label="Filter comments">
+      <div class="seg-tabs" role="group" aria-label="Filter by state">
+        <button type="button" class="seg-tab is-active" data-filter="all">
+          All <span class="seg-count" data-count-all>{{ total }}</span>
+        </button>
+        <button type="button" class="seg-tab" data-filter="published">
+          Visible <span class="seg-count" data-count-published>{{ live }}</span>
+        </button>
+        <button type="button" class="seg-tab" data-filter="removed">
+          Removed <span class="seg-count" data-count-removed>{{ hidden }}</span>
+        </button>
+        <button type="button" class="seg-tab" data-filter="edited">
+          AI edited <span class="seg-count" data-count-edited>{{ ai_edited }}</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="surface-card comments-card reveal" style="--reveal-delay: 120ms"
+      aria-labelledby="commentsHeading">
+      <header class="card-head">
+        <h2 class="card-title" id="commentsHeading">
+          Comments <span class="card-count" data-list-count>{{ initial_total | default(0) }}</span>
+        </h2>
+        {# Filled by comments.js: "Page 2 of 5", or the applied filter. #}
+        <span class="card-note" data-list-note>
+          {% if initial_total and initial_per_page and initial_total > initial_per_page %}
+          Page 1 of {{ (initial_total / initial_per_page) | round(0, 'ceil') | int }}
+          {% endif %}
+        </span>
+      </header>
+
+      <div class="comments-list">
+        <div id="commentsList" class="data-rows" aria-live="polite" aria-busy="false"
+          data-page="{{ initial_page | default(1) }}" data-per-page="{{ initial_per_page | default(10) }}"
+          data-total="{{ initial_total | default(0) }}">
+          {% if initial_comments %}
+          {% for c in initial_comments %}{{ comment_row(c) }}{% endfor %}
+          {% else %}
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-chat-square-text" aria-hidden="true"></i></span>
+            <p>No comments yet. When a reader writes one on a published post it lands here, already
+              checked by the moderation filter, for you to keep or take down.</p>
+          </div>
+          {% endif %}
+        </div>
+
+        <p class="list-noresults" data-noresults hidden>No comment on this page matches that search.</p>
+      </div>
+
+      {# Left empty on purpose. The rows are worth rendering server-side — they
+         are the content — but a pager is chrome, and two implementations of the
+         same page window drift. comments.js fills this from the counts on
+         #commentsList as soon as it runs, and .pager:empty is display:none, so
+         nothing shifts. #}
+      <nav class="pager" data-pager aria-label="Comment pages"></nav>
+    </section>
+
+    {# ==================== DETAIL ==================== #}
+    {#
+      Three tabs, because the dialog answers three different questions: what
+      was said, what the filter and the admins did to it, and what it should
+      say instead. The tab bar sits in a band of its own between the head and
+      the scrolling body, so switching tabs never moves the title.
+    #}
+    <div class="modal fade" id="commentModal" tabindex="-1" aria-hidden="true" aria-labelledby="commentModalTitle">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="commentModalTitle">Comment</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="comment-tabbar">
+            <div class="seg-tabs" role="tablist" aria-label="Comment sections">
+              <button type="button" class="seg-tab is-active" role="tab" aria-selected="true" data-tab="details">
+                <i class="bi bi-chat-left-text" aria-hidden="true"></i> The comment
+              </button>
+              <button type="button" class="seg-tab" role="tab" aria-selected="false" data-tab="log">
+                <i class="bi bi-clock-history" aria-hidden="true"></i> History
+              </button>
+              <button type="button" class="seg-tab" role="tab" aria-selected="false" data-tab="edit">
+                <i class="bi bi-pencil" aria-hidden="true"></i> Edit
+              </button>
+            </div>
+          </div>
+
+          <div class="app-modal-body">
+
+            <div data-tab-panel="details">
+              <div class="commenter-strip">
+                <span class="commenter-mark" data-modal-mark aria-hidden="true">?</span>
+                <span class="commenter-id">
+                  <span class="commenter-name" data-modal-name></span>
+                  <a class="commenter-email" data-modal-email href="#"></a>
+                </span>
+                <span data-modal-status></span>
+              </div>
+
+              <div class="comment-facts">
+                <span class="comment-fact">
+                  <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+                  <span data-modal-post></span>
+                </span>
+                <span class="comment-fact">
+                  <i class="bi bi-calendar3" aria-hidden="true"></i>
+                  <span data-modal-when></span>
+                </span>
+                <span class="comment-fact" data-modal-verdict-chip hidden>
+                  <i class="bi bi-robot" aria-hidden="true"></i>
+                  <span data-modal-verdict></span>
+                </span>
+              </div>
+
+              {# Shown first because it is the text the decision is about. The
+                 earlier versions are context for it, so they come after. The
+                 label is set by comments.js — for a comment that has been taken
+                 down, "on the site now" would be a lie. #}
+              <div class="text-block is-live">
+                <p class="text-block-label" data-modal-display-label>On the site now</p>
+                <div class="text-body" data-modal-display></div>
+              </div>
+
+              <div class="text-block is-before" data-modal-original-block>
+                <p class="text-block-label">As submitted</p>
+                <div class="text-body" data-modal-original></div>
+              </div>
+
+              <div class="text-block is-after" data-modal-moderated-block hidden>
+                <p class="text-block-label">After the moderation filter</p>
+                <div class="text-body" data-modal-moderated></div>
+              </div>
+            </div>
+
+            <div data-tab-panel="log" hidden>
+              <div class="mod-log" data-modal-log></div>
+            </div>
+
+            <div data-tab-panel="edit" hidden>
+              <div class="comment-edit-fields">
+                <p class="edit-scope">
+                  This changes what visitors see. The text as submitted is kept, and every edit is
+                  recorded under History with your name against it.
+                </p>
+
+                <div class="app-field">
+                  <label for="commentEditText">Displayed text</label>
+                  <textarea id="commentEditText" rows="5" placeholder="What the comment should say"></textarea>
+                </div>
+
+                <div class="app-field">
+                  <label for="commentEditReason">Reason <span class="app-field-hint">optional</span></label>
+                  <input type="text" id="commentEditReason" autocomplete="off"
+                    placeholder="e.g. removed a phone number">
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="app-btn is-primary" data-save-edit hidden>Save changes</button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    {# ==================== DELETE ==================== #}
+    <div class="modal fade" id="deleteCommentModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="deleteCommentTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="deleteCommentTitle">Delete comment</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="app-modal-body">
+            <p class="delete-copy">
+              This comment and its whole moderation history are erased from Scriptly. If you only want
+              it off the public site, take it down instead — that keeps the record and can be undone.
+            </p>
+            <blockquote class="delete-quote" data-delete-quote></blockquote>
+          </div>
+
+          <footer class="app-modal-foot">
+            <span class="app-modal-note">Cannot be undone.</span>
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-danger" data-delete-confirm>Delete permanently</button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/pages/comments.js') }}?v=3"></script>
   </main>
 </div>
-
-<!-- View/Edit Comment Modal -->
-<div class="modal fade" id="commentModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content custom-modal">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title"><i class="bi bi-chat-square-text"></i> Comment Details</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="custom-modal-body">
-        <!-- Tab Navigation -->
-        <ul class="comment-modal-tabs">
-          <li class="tab-item active" data-tab="details"><i class="bi bi-info-circle"></i> Details</li>
-          <li class="tab-item" data-tab="moderation"><i class="bi bi-robot"></i> Moderation Log</li>
-          <li class="tab-item" data-tab="edit"><i class="bi bi-pencil-square"></i> Edit</li>
-        </ul>
-
-        <!-- Details Tab -->
-        <div class="tab-content active" id="tab-details">
-          <!-- Commenter Card -->
-          <div class="commenter-card">
-            <div class="commenter-card-avatar" id="modal-commenter-avatar">T</div>
-            <div class="commenter-card-info">
-              <div class="commenter-card-name" id="modal-commenter-name"></div>
-              <div class="commenter-card-email"><i class="bi bi-envelope"></i> <span id="modal-commenter-email"></span></div>
-            </div>
-            <div class="commenter-card-badge" id="modal-status-badge"></div>
-          </div>
-
-          <!-- Meta Info Bar -->
-          <div class="comment-meta-bar">
-            <div class="meta-chip">
-              <i class="bi bi-file-earmark-text"></i>
-              <span id="modal-blog-title"></span>
-            </div>
-            <div class="meta-chip">
-              <i class="bi bi-calendar3"></i>
-              <span id="modal-created-at"></span>
-            </div>
-            <div class="meta-chip" id="modal-ai-action-chip">
-              <i class="bi bi-robot"></i>
-              <span id="modal-ai-action-text"></span>
-            </div>
-          </div>
-
-          <!-- Comment Content -->
-          <div class="comment-content-section">
-            <div class="content-label"><i class="bi bi-chat-left-text"></i> Original Comment</div>
-            <div class="comment-text-box diff-old" id="modal-original-text"></div>
-          </div>
-          <div class="comment-content-section" id="modal-moderated-section">
-            <div class="content-label"><i class="bi bi-magic"></i> AI Moderated Version</div>
-            <div class="comment-text-box diff-new" id="modal-moderated-text"></div>
-          </div>
-          <div class="comment-content-section">
-            <div class="content-label"><i class="bi bi-eye"></i> Currently Displayed</div>
-            <div class="comment-text-box comment-text-display" id="modal-display-text"></div>
-          </div>
-        </div>
-
-        <!-- Moderation Log Tab -->
-        <div class="tab-content" id="tab-moderation">
-          <div class="moderation-log" id="modal-moderation-log"></div>
-        </div>
-
-        <!-- Edit Tab -->
-        <div class="tab-content" id="tab-edit">
-          <div class="edit-field">
-            <label class="edit-label">Display Text</label>
-            <textarea id="modal-edit-text" class="edit-textarea" rows="5" placeholder="Edit the comment text..."></textarea>
-          </div>
-          <div class="edit-field">
-            <label class="edit-label">Reason for Edit <span class="edit-optional">(optional)</span></label>
-            <input type="text" id="modal-edit-reason" class="edit-input" placeholder="Why are you editing this comment?">
-          </div>
-        </div>
-      </div>
-      <div class="custom-modal-footer" id="modal-footer">
-        <button class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">Close</button>
-        <button class="btn-modal btn-modal-primary" id="modal-save-edit" onclick="saveCommentEdit()" style="display:none;">
-          <i class="bi bi-check-lg"></i> Save Changes
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content custom-modal">
-      <div class="custom-modal-header">
-        <h5 class="modal-title">Confirm Delete</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="custom-modal-body text-center py-4">
-        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2.5rem;"></i>
-        <p class="mt-3 mb-0 fw-bold">Permanently delete this comment?</p>
-        <p class="text-secondary small">This action cannot be undone.</p>
-      </div>
-      <div class="custom-modal-footer">
-        <button class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-danger btn-sm" id="confirm-delete-btn" onclick="confirmDelete()">
-          <i class="bi bi-trash"></i> Delete
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-{% endblock %}
-
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/comments.js') }}?v=2"></script>
 {% endblock %}

@@ -1,225 +1,291 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Formatting Tools | ScriptlyAI{% endblock %}
+{% block title %}Formatting Tools | {{ app_config.app_name if app_config else 'ScriptlyAI' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/formatting-tools.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/formatting-tools.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
 <div class="dashboard-layout">
 
-    {% include 'partials/sidebar.html' %}
+  {% include 'partials/sidebar.html' %}
 
-    <!-- MAIN CONTENT -->
-    <main class="dashboard-main">
+  {#
+    The draft-preview modal and the page script live inside .dashboard-main.
+    PJAX swaps only that element's innerHTML — this modal used to sit outside
+    the layout wrapper entirely, so "Preview" did nothing at all after any
+    in-app navigation and only worked on a hard load of /formatting-tools.
+  #}
+  <main class="dashboard-main">
 
-        <header class="dashboard-header">
-            <div>
-                <div class="header-welcome-text">Content Enhancement</div>
-                <h1 class="header-title">Formatting Tools</h1>
-            </div>
-        </header>
+    {% call page_header(title='Formatting Tools', eyebrow='Content enhancement') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    {% endcall %}
 
-        <!-- Loading Overlay -->
-        <div class="loading-overlay" id="loading-overlay">
-            <div class="loading-spinner"></div>
-            <p class="text-muted">Processing your content...</p>
+    {# ==================== INPUT ==================== #}
+    <section class="surface-card reveal" aria-labelledby="fmtInputHeading">
+
+      <header class="card-head is-stacked">
+        <h2 class="card-title" id="fmtInputHeading">Format markdown</h2>
+        <p class="card-note">
+          Paste markdown or load one of your drafts. Scriptly returns the HTML, a table of contents,
+          the reading time and the content statistics. <strong>Nothing is saved</strong> — this is a
+          workbench, not an editor.
+        </p>
+      </header>
+
+      <div class="fmt-source">
+        <div class="fmt-picker fmt-picker-grow">
+          <label class="fmt-label" id="fmtDraftLabel">Load from a draft</label>
+          <div class="select-pill" data-select-pill>
+            <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
+              aria-expanded="false" aria-labelledby="fmtDraftLabel">
+              <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+              <span class="filter-pill-label" data-pill-text>Loading drafts…</span>
+              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+            </button>
+            <select id="fmtDraftSelect" data-draft-select aria-labelledby="fmtDraftLabel">
+              <option value="">Select a draft</option>
+            </select>
+            <div class="menu" role="listbox" aria-labelledby="fmtDraftLabel" hidden></div>
+          </div>
         </div>
 
-        <!-- Input Section -->
-        <div class="format-card animate-fade-up">
-            <h3><i class="bi bi-file-richtext"></i> Format Markdown Content</h3>
-            <p class="text-muted mb-4">Paste your markdown content or load from existing drafts to generate HTML, table of contents, reading time, and statistics.</p>
+        <div class="fmt-source-actions">
+          <button type="button" class="app-btn is-ghost" data-action="preview-draft">
+            <i class="bi bi-eye" aria-hidden="true"></i> Preview
+          </button>
+          <button type="button" class="app-btn is-ghost fmt-icon-btn" data-action="reload-drafts"
+            aria-label="Reload the draft list" title="Reload the draft list">
+            <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
 
-            <!-- Load from Drafts Dropdown -->
-            <div class="mb-4">
-                <label class="form-label fw-bold">Load from Existing Draft</label>
-                <div class="d-flex gap-2">
-                    <select class="form-select" id="draft-select" onchange="loadDraftContent()">
-                        <option value="">-- Select a draft to load --</option>
-                    </select>
-                    <button class="btn btn-outline-primary" onclick="refreshDrafts()" title="Refresh drafts list">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
-                    <button class="btn btn-outline-info" onclick="viewSelectedDraft()" title="View selected draft">
-                        <i class="bi bi-eye"></i>
-                    </button>
-                </div>
-            </div>
+      <div class="fmt-form">
+        <div class="app-field">
+          <label class="field-label" for="fmtTitle">Blog title <span class="fmt-optional">optional</span></label>
+          <input type="text" id="fmtTitle" data-title placeholder="e.g. Ten things nobody tells you about X">
+        </div>
 
-            <hr class="my-4">
-
-            <div class="mb-4">
-                <label class="form-label fw-bold">Blog Title (Optional)</label>
-                <input type="text" class="form-control" id="format-title"
-                    placeholder="e.g., My Awesome Blog Post">
-            </div>
-
-            <div class="mb-4">
-                <label class="form-label fw-bold">Markdown Content</label>
-                <textarea class="form-control" id="format-content" rows="12"
-                    placeholder="# Your Blog Title
+        <div class="app-field">
+          <label class="field-label" for="fmtContent">Markdown content</label>
+          {# The placeholder is a worked example rather than a description: the
+             fastest way to explain what this field wants is to show it. #}
+          <textarea id="fmtContent" data-content rows="14" spellcheck="false"
+placeholder="# Your blog title
 
 ## Introduction
-Write your introduction here...
+Write your introduction here…
 
-## Main Section
-Your content goes here with **bold** and *italic* text.
+## Main section
+Your content goes here, with **bold** and *italic* text.
 
 ### Subsection
 - Bullet point 1
 - Bullet point 2
 
 ## Conclusion
-Final thoughts..."></textarea>
-            </div>
+Final thoughts…"></textarea>
+          <p class="app-field-hint" data-content-hint>Already-rendered HTML is accepted too — it is
+            passed through instead of being re-escaped.</p>
+        </div>
+      </div>
 
-            <div class="d-flex gap-3">
-                <button class="btn btn-primary" onclick="formatContent()">
-                    <i class="bi bi-magic me-2"></i>Format Content
-                </button>
-                <button class="btn btn-outline-secondary" onclick="clearAll()">
-                    <i class="bi bi-x-lg me-2"></i>Clear
-                </button>
-            </div>
+      <div class="fmt-actions">
+        <button type="button" class="app-btn is-primary" data-action="format">
+          <i class="bi bi-magic" aria-hidden="true"></i> Format content
+        </button>
+        <button type="button" class="app-btn is-ghost" data-action="clear">
+          <i class="bi bi-x-lg" aria-hidden="true"></i> Clear
+        </button>
+      </div>
+    </section>
+
+    {# ==================== RESULT ====================
+       Empty, loading, error and results are four states of one region switched
+       by one attribute. The screen used to hide its results behind an inline
+       `display: none` and report every failure through alert(). #}
+    <section class="surface-card reveal" style="--reveal-delay: 60ms" aria-labelledby="fmtResultHeading">
+
+      <header class="card-head">
+        <h2 class="card-title" id="fmtResultHeading" data-result-title>Result</h2>
+        <span class="card-note" data-result-note>Nothing formatted yet</span>
+      </header>
+
+      <div class="fmt-body" data-body="format" data-state="empty">
+
+        <div class="fmt-state" data-for="empty">
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-file-richtext" aria-hidden="true"></i></span>
+            <p>Paste markdown above, or load a draft, then <strong>Format content</strong>. The HTML,
+              the table of contents and the statistics all land here.</p>
+          </div>
         </div>
 
-        <!-- Results Section -->
-        <div id="results-section">
-
-            <!-- Stats & Reading Time -->
-            <div class="format-card animate-fade-up">
-                <h3><i class="bi bi-bar-chart"></i> Content Statistics</h3>
-
-                <div class="d-flex flex-wrap gap-3 mb-4">
-                    <span class="reading-time-badge" id="reading-time">
-                        <i class="bi bi-clock"></i> -- min read
-                    </span>
-                    <span class="feature-badge no" id="has-code">
-                        <i class="bi bi-code-slash"></i> Code Blocks
-                    </span>
-                    <span class="feature-badge no" id="has-images">
-                        <i class="bi bi-image"></i> Images
-                    </span>
-                    <span class="feature-badge no" id="has-tables">
-                        <i class="bi bi-table"></i> Tables
-                    </span>
-                </div>
-
-                <div class="stats-grid">
-                    <div class="stat-box">
-                        <div class="stat-value" id="stat-words">0</div>
-                        <div class="stat-label">Words</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value" id="stat-sentences">0</div>
-                        <div class="stat-label">Sentences</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value" id="stat-paragraphs">0</div>
-                        <div class="stat-label">Paragraphs</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value" id="stat-characters">0</div>
-                        <div class="stat-label">Characters</div>
-                    </div>
-                </div>
+        <div class="fmt-state" data-for="loading">
+          <div class="fmt-working" role="status">
+            <span class="fmt-working-badge">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              <span data-working-label>Formatting…</span>
+            </span>
+            <p class="fmt-working-note">Parsing the markdown, building the anchors and counting the
+              content.</p>
+            <div class="progress fmt-working-bar">
+              <div class="progress-bar bg-primary" style="width: 100%"></div>
             </div>
-
-            <!-- Table of Contents -->
-            <div class="row g-4">
-                <div class="col-md-4">
-                    <div class="format-card animate-fade-up h-100">
-                        <h3><i class="bi bi-list-nested"></i> Table of Contents</h3>
-                        <div class="toc-preview" id="toc-preview">
-                            <p class="text-muted">No headings found</p>
-                        </div>
-                        <button class="btn btn-sm btn-outline-primary mt-3" onclick="copyTOC()">
-                            <i class="bi bi-clipboard me-1"></i> Copy TOC Markdown
-                        </button>
-                    </div>
-                </div>
-
-                <div class="col-md-8">
-                    <div class="format-card animate-fade-up h-100">
-                        <h3><i class="bi bi-code-square"></i> HTML Preview</h3>
-                        <div class="position-relative">
-                            <button class="copy-btn" onclick="copyHTML()">
-                                <i class="bi bi-clipboard me-1"></i> Copy HTML
-                            </button>
-                            <div class="html-preview" id="html-preview">
-                                <p class="text-muted">Formatted content will appear here</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Raw HTML Code -->
-            <div class="format-card animate-fade-up mt-4">
-                <h3><i class="bi bi-file-code"></i> Raw HTML Code</h3>
-                <div class="position-relative">
-                    <button class="copy-btn" onclick="copyRawHTML()">
-                        <i class="bi bi-clipboard me-1"></i> Copy
-                    </button>
-                    <textarea class="form-control font-monospace" id="raw-html" rows="8" readonly
-                        style="background: var(--surface-3); color: var(--text-1); font-size: 0.85rem;"></textarea>
-                </div>
-            </div>
-
+          </div>
         </div>
 
-    </main>
-</div>
-
-<!-- View Draft Modal -->
-<div class="modal fade" id="viewDraftModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content border-0 shadow-card rounded-lg">
-            <div class="modal-header border-bottom p-4">
-                <div>
-                    <h5 class="modal-title fw-bold text-dark mb-1" id="view-draft-title">Draft Title</h5>
-                    <span class="status-badge status-draft">DRAFT</span>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="blog-meta-info">
-                    <div class="meta-item">
-                        <i class="bi bi-folder"></i>
-                        <span id="view-draft-category">General</span>
-                    </div>
-                    <div class="meta-item">
-                        <i class="bi bi-clock"></i>
-                        <span id="view-draft-reading-time">-- min read</span>
-                    </div>
-                    <div class="meta-item">
-                        <i class="bi bi-file-text"></i>
-                        <span id="view-draft-word-count">-- words</span>
-                    </div>
-                    <div class="meta-item">
-                        <i class="bi bi-calendar"></i>
-                        <span id="view-draft-date">--</span>
-                    </div>
-                </div>
-                <div class="view-modal-content">
-                    <div class="blog-content-preview" id="view-draft-content">
-                        Loading content...
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer border-top bg-light p-3">
-                <button type="button" class="btn btn-light text-secondary fw-bold" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary text-white" onclick="useThisDraft()">
-                    <i class="bi bi-file-richtext me-2"></i>Use for Formatting
-                </button>
-            </div>
+        <div class="fmt-state" data-for="error">
+          <div class="list-empty fmt-error">
+            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <p data-error-text>Something went wrong.</p>
+            <button type="button" class="app-btn is-ghost" data-action="retry">Try again</button>
+          </div>
         </div>
+
+        <div class="fmt-state" data-for="results">
+
+          {# Reading time is a figure; the three flags are yes/no. Each says so
+             in a word as well as in its colour — a green pill and a grey pill
+             both reading "Code blocks" left the reader to guess which was
+             which. #}
+          <div class="fmt-facts">
+            <span class="fmt-reading">
+              <i class="bi bi-clock" aria-hidden="true"></i>
+              <span data-reading-time>— min read</span>
+            </span>
+            <span class="fmt-flag" data-flag="code">
+              <i class="bi bi-code-slash" aria-hidden="true"></i> Code blocks
+              <span class="fmt-flag-state" data-flag-state>—</span>
+            </span>
+            <span class="fmt-flag" data-flag="images">
+              <i class="bi bi-image" aria-hidden="true"></i> Images
+              <span class="fmt-flag-state" data-flag-state>—</span>
+            </span>
+            <span class="fmt-flag" data-flag="tables">
+              <i class="bi bi-table" aria-hidden="true"></i> Tables
+              <span class="fmt-flag-state" data-flag-state>—</span>
+            </span>
+          </div>
+
+          {# Bare metrics, not stat tiles: there is no previous run to compare
+             against and no series to draw, so they state the figure and its
+             unit and stop. #}
+          <div class="fmt-metrics">
+            <div class="fmt-metric">
+              <span class="fmt-metric-label">Words</span>
+              <span class="fmt-metric-value" data-stat-words>—</span>
+            </div>
+            <div class="fmt-metric">
+              <span class="fmt-metric-label">Sentences</span>
+              <span class="fmt-metric-value" data-stat-sentences>—</span>
+            </div>
+            <div class="fmt-metric">
+              <span class="fmt-metric-label">Paragraphs</span>
+              <span class="fmt-metric-value" data-stat-paragraphs>—</span>
+            </div>
+            <div class="fmt-metric">
+              <span class="fmt-metric-label">Characters</span>
+              <span class="fmt-metric-value" data-stat-characters>—</span>
+            </div>
+            {# Returned by the formatter since it was written, shown nowhere:
+               it is the one figure here that is a judgement rather than a
+               count. #}
+            <div class="fmt-metric">
+              <span class="fmt-metric-label">Words per sentence</span>
+              <span class="fmt-metric-value" data-stat-avg>—</span>
+              <span class="fmt-metric-note">20 or under reads easily</span>
+            </div>
+          </div>
+
+          <div class="fmt-panels">
+
+            <div class="fmt-panel">
+              <h3 class="fmt-subhead">
+                <i class="bi bi-list-nested" aria-hidden="true"></i> Table of contents
+                <span class="card-count" data-toc-count>0</span>
+              </h3>
+              <p class="fmt-headings" data-headings hidden></p>
+              <div class="fmt-toc" data-toc></div>
+              <button type="button" class="app-btn is-ghost fmt-panel-action" data-action="copy-toc">
+                <i class="bi bi-clipboard" aria-hidden="true"></i> Copy as markdown
+              </button>
+            </div>
+
+            <div class="fmt-panel">
+              <h3 class="fmt-subhead">
+                <i class="bi bi-eye" aria-hidden="true"></i> Rendered preview
+              </h3>
+              {# The preview shows the reader's own content as the site will
+                 draw it, so it is deliberately un-escaped HTML. The raw dump
+                 below is the escaped twin, in a value attribute. #}
+              <div class="fmt-preview" data-preview></div>
+              <button type="button" class="app-btn is-ghost fmt-panel-action" data-action="copy-html">
+                <i class="bi bi-clipboard" aria-hidden="true"></i> Copy HTML
+              </button>
+            </div>
+          </div>
+
+          <details class="fmt-raw">
+            <summary class="fmt-raw-summary">
+              <i class="bi bi-chevron-right fmt-raw-caret" aria-hidden="true"></i>
+              <span>Raw HTML</span>
+              <span class="fmt-raw-note" data-raw-size></span>
+            </summary>
+            <div class="fmt-raw-body">
+              <label class="visually-hidden" for="fmtRaw">Raw HTML output</label>
+              <textarea id="fmtRaw" class="fmt-raw-code" data-raw rows="10" readonly
+                spellcheck="false"></textarea>
+              <button type="button" class="app-btn is-ghost" data-action="copy-raw">
+                <i class="bi bi-clipboard" aria-hidden="true"></i> Copy raw HTML
+              </button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    {# ==================== DRAFT PREVIEW ==================== #}
+    <div class="modal fade" id="fmtDraftModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="fmtDraftModalTitle">
+      <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <div class="fmt-modal-lead">
+              <h2 class="app-modal-title" id="fmtDraftModalTitle" data-draft-title>Draft</h2>
+              <span class="status-pill status-draft">Draft</span>
+            </div>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <div class="fmt-modal-meta">
+              <span><i class="bi bi-folder" aria-hidden="true"></i> <span data-draft-category>General</span></span>
+              <span><i class="bi bi-clock" aria-hidden="true"></i> <span data-draft-reading>— min read</span></span>
+              <span><i class="bi bi-file-text" aria-hidden="true"></i> <span data-draft-words>— words</span></span>
+              <span><i class="bi bi-calendar3" aria-hidden="true"></i> <span data-draft-date>—</span></span>
+            </div>
+            <div class="fmt-modal-content" data-draft-content></div>
+          </div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="app-btn is-primary" data-action="use-draft">
+              <i class="bi bi-file-richtext" aria-hidden="true"></i> Use for formatting
+            </button>
+          </footer>
+        </div>
+      </div>
     </div>
-</div>
-{% endblock %}
 
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/formatting-tools.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pages/formatting-tools.js') }}?v=2"></script>
+  </main>
+</div>
 {% endblock %}

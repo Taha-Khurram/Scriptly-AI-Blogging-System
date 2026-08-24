@@ -40,7 +40,8 @@ from flask import Blueprint, current_app, jsonify, redirect, render_template, re
 
 from app.core.errors import AuthenticationError, ValidationError
 from app.core.extensions import limiter
-from app.core.security import login_required
+from app.core.security import api_login_required, login_required
+from app.core.sessions import destroy_session, rotate_session
 from app.firebase.firestore_service import FirestoreService
 from app.utils.cache import cache
 from app.utils.validators import is_valid_gmail, validate_password
@@ -99,9 +100,15 @@ def _peek_token_uid(id_token):
 
 
 def _establish_session(uid, email, user_record):
-    """Write the verified identity into the session cookie."""
+    """Write the verified identity into a freshly-issued session."""
     session.clear()          # no state carried over from a previous identity
     session.permanent = True
+    # New session id for the authenticated session. Session fixation works by
+    # getting a victim to browse under an id the attacker already holds and
+    # waiting for them to sign in; rotating here makes that id worthless at the
+    # exact moment it would otherwise become valuable. clear() alone does not
+    # do this -- it empties the contents but keeps the identifier.
+    rotate_session()
     session.update({
         'user_id': uid,
         'user_name': user_record.get('name') or email.split('@')[0],
@@ -151,8 +158,10 @@ def forgot_password():
 @auth_bp.route('/logout')
 def logout():
     user_id = session.get('user_id')
-    session.clear()
-    session.modified = True
+    # Deletes the server-side record, not just the browser's copy. With
+    # client-side sessions "logging out" only asked the browser to forget a
+    # cookie that stayed valid for its full lifetime if it had been captured.
+    destroy_session()
     if user_id:
         # Drop the cached record so a role change made while signed in is
         # picked up on the next sign-in rather than served from cache.
@@ -384,6 +393,54 @@ def create_sub_user():
         extra={'user_id': auth_record.uid, 'created_by': user.id},
     )
     return jsonify({'success': True, 'message': 'User created successfully'})
+
+
+# ---------------------------------------------------------------------------
+# Session lifetime
+# ---------------------------------------------------------------------------
+
+@auth_bp.route('/api/session/heartbeat', methods=['POST'])
+@api_login_required
+@limiter.limit('60 per minute')
+def session_heartbeat():
+    """Extend the session because the user is genuinely active.
+
+    The inactivity timeout is ten minutes, and the sliding expiry only moves
+    when a request arrives. Plenty of real activity issues no request at all:
+    typing a post into the rich-text editor happens inside a TinyMCE iframe and
+    reaches neither the server nor the parent document's event listeners. So
+    without this endpoint a ten-minute window would sign an author out mid-post
+    -- and nothing in the editor autosaves, so the draft would go with them.
+
+    The frontend calls this on real interaction, throttled to roughly a third
+    of the window, so an active user costs about three requests per ten minutes
+    and an idle one costs none. That is what keeps "inactivity" meaning idle
+    rather than "has not clicked a link recently".
+
+    Deliberately *not* on a bare timer in the browser: a poll that ran
+    regardless of interaction would keep every open tab alive forever and
+    there would be no inactivity timeout at all.
+
+    Reaching this endpoint at all means the session was still valid --
+    ``enforce_session_timeout`` runs first and answers an expired one with
+    ``session_expired``, which the frontend fetch wrapper turns into a
+    redirect. Returning the full window is therefore accurate: the touch below
+    has just reset it.
+    """
+    timeout = int(current_app.config['PERMANENT_SESSION_LIFETIME'].total_seconds())
+
+    # Force the write. The interface throttles touches to SESSION_TOUCH_SECONDS,
+    # and the whole point of this call is to move the expiry, so it must not be
+    # the request that gets throttled out.
+    session.modified = True
+
+    return jsonify({
+        'success': True,
+        'expires_in': timeout,
+        'warn_in': max(0, timeout - int(
+            current_app.config.get('SESSION_WARNING_SECONDS', 60)
+        )),
+    })
 
 
 # ---------------------------------------------------------------------------
