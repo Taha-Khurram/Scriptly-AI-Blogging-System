@@ -137,76 +137,8 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "embedding_updated_at",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "blogs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "site_owner_id",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
           "fieldPath": "old_slugs",
           "arrayConfig": "CONTAINS"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "blogs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "site_owner_id",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "scheduled_at",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "blogs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "site_owner_id",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updated_at",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "blogs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "scheduled_at",
-          "order": "ASCENDING"
         }
       ]
     },
@@ -267,38 +199,6 @@
       ]
     },
     {
-      "collectionGroup": "contact_submissions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "site_owner_id",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "created_at",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "gallery_images",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "user_id",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "created_at",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "invitations",
       "queryScope": "COLLECTION",
       "fields": [
@@ -345,16 +245,16 @@
       ]
     },
     {
-      "collectionGroup": "newsletter_sends",
+      "collectionGroup": "newsletter_subscribers",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "user_id",
+          "fieldPath": "email",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "sent_at",
-          "order": "DESCENDING"
+          "fieldPath": "active",
+          "order": "ASCENDING"
         }
       ]
     },

@@ -1,11 +1,14 @@
 """Gunicorn configuration.
 
-Previously the server was configured by a command-line string in the platform
-blueprint: ``--workers 1 --threads 8 --timeout 300``. That put tuning decisions
-somewhere they could not be commented, and pinned the deployment to a single
-worker because three pieces of mutable state lived inside the web process -- the
-APScheduler auto-publisher, the in-memory cache, and the background task pool.
-A second worker meant duplicate scheduled publishes and a split cache.
+The server used to be configured by a command-line string in a host-specific
+deployment file: ``--workers 1 --threads 8 --timeout 300``. That put tuning
+decisions somewhere they could not be commented, and pinned the deployment to a
+single worker because three pieces of mutable state lived inside the web process
+-- the APScheduler auto-publisher, the in-memory cache, and the background task
+pool. A second worker meant duplicate scheduled publishes and a split cache.
+
+Host-agnostic on purpose: every value reads from an environment variable, so
+this file works unchanged wherever it runs.
 
 Two of those three are now fixed: the cache is shared through Redis when
 ``REDIS_URL`` is set, and the scheduler holds a single-runner lease. So the
