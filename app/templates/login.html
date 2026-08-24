@@ -84,7 +84,7 @@ everything that matters.' %}
 <script id="firebase-config" type="application/json">
   {{ firebase_config | tojson }}
 </script>
-<script src="{{ url_for('static', filename='js/firebase_google.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/firebase_google.js') }}?v=3"></script>
 <script src="{{ url_for('static', filename='js/pages/auth.js') }}?v=1" defer></script>
 <script>
   if (new URLSearchParams(window.location.search).get('expired') === '1') {

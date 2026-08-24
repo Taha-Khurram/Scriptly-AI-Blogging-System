@@ -50,7 +50,9 @@ class TestSecurityHeaders:
         ('X-Content-Type-Options', 'nosniff'),
         ('X-Frame-Options', 'DENY'),
         ('Referrer-Policy', 'strict-origin-when-cross-origin'),
-        ('Cross-Origin-Opener-Policy', 'same-origin'),
+        # Not the stricter 'same-origin': that nulls window.opener for popups
+        # this page opens, which silently breaks Firebase signInWithPopup.
+        ('Cross-Origin-Opener-Policy', 'same-origin-allow-popups'),
     ])
     def test_present_on_every_response(self, client, header, expected):
         assert client.get('/login').headers[header] == expected
@@ -60,6 +62,26 @@ class TestSecurityHeaders:
         assert "frame-ancestors 'none'" in csp
         assert "object-src 'none'" in csp
         assert "base-uri 'self'" in csp
+
+    def test_csp_allows_the_firebase_auth_iframe(self, client, app):
+        """Firebase Auth's hidden iframe lives on the project authDomain.
+
+        Blocked by frame-src, a popup sign-in completes in the popup and the
+        result never reaches the page -- so sign-in appears to do nothing.
+        """
+        auth_domain = app.config['FIREBASE_CONFIG'].get('authDomain')
+        if not auth_domain:
+            # .env is not in version control, so a clean checkout has no
+            # FB_AUTH_DOMAIN. Nothing to assert rather than a false failure.
+            pytest.skip('FB_AUTH_DOMAIN is not configured in this environment')
+
+        csp = client.get('/login').headers['Content-Security-Policy']
+        frame_src = next(
+            d for d in csp.split('; ') if d.startswith('frame-src')
+        )
+        assert auth_domain in frame_src, (
+            f'{auth_domain} missing from {frame_src!r}'
+        )
 
     def test_hsts_absent_over_plaintext(self, client):
         """HSTS on an http response is ignored by spec and pins localhost."""

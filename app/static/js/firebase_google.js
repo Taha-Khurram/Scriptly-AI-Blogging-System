@@ -47,8 +47,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const code = (error && error.code) || '';
         const message = AUTH_MESSAGES[code] || (error && error.message) || 'Something went wrong. Please try again.';
 
-        // A closed popup is the user changing their mind, not a failure.
-        if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+        // A closed popup is usually the user changing their mind, so it stays
+        // silent on screen. But Firebase reports a popup it *could not talk
+        // to* with the same code, which makes a real breakage look identical
+        // to a cancellation — and that is how a Cross-Origin-Opener-Policy of
+        // 'same-origin' hid a total sign-in outage: the popup authenticated,
+        // lost window.opener, and closed with nothing shown anywhere. Log it
+        // so the next occurrence is diagnosable without nagging a user who
+        // simply cancelled.
+        if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+            console.warn(
+                '[auth] Google popup closed without returning a credential (' + code + '). ' +
+                'If you did not close it yourself, the popup could not reach this page. ' +
+                'Check that Cross-Origin-Opener-Policy allows popups and that the Firebase ' +
+                'authDomain is permitted by frame-src in the CSP.'
+            );
+            return;
+        }
 
         if (window.showToast) {
             window.showToast({ type: 'error', title: title || 'Sign-in failed', message: message, duration: 6000 });

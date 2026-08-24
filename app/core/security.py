@@ -369,6 +369,8 @@ _CSP_DIRECTIVES = {
         'https://www.googleapis.com',
         'https://cdn.tiny.cloud',
     ],
+    # The Firebase Auth project domain is appended at build time from
+    # FB_AUTH_DOMAIN -- see _build_csp().
     'frame-src': ["'self'", 'https://accounts.google.com'],
     'frame-ancestors': ["'none'"],
     'object-src': ["'none'"],
@@ -377,9 +379,27 @@ _CSP_DIRECTIVES = {
 }
 
 
-def _build_csp():
+def _build_csp(auth_domain=None):
+    """Render the policy, folding in the Firebase Auth domain.
+
+    Firebase Auth runs a hidden iframe on the project's ``authDomain``
+    (``https://<project>.firebaseapp.com/__/auth/iframe``) to receive the
+    result of a popup or redirect sign-in. Without that origin in
+    ``frame-src`` the iframe is blocked and the sign-in result never arrives.
+
+    Derived from config rather than hardcoded so pointing FB_AUTH_DOMAIN at a
+    different project -- or a custom auth domain -- does not silently break
+    sign-in.
+    """
+    directives = dict(_CSP_DIRECTIVES)
+
+    if auth_domain:
+        origin = auth_domain if '://' in auth_domain else f'https://{auth_domain}'
+        if origin not in directives['frame-src']:
+            directives['frame-src'] = directives['frame-src'] + [origin]
+
     return '; '.join(
-        f'{name} {" ".join(values)}' for name, values in _CSP_DIRECTIVES.items()
+        f'{name} {" ".join(values)}' for name, values in directives.items()
     )
 
 
@@ -389,7 +409,7 @@ def register_security_headers(app):
         app.logger.warning('Security headers are DISABLED by configuration')
         return
 
-    csp = _build_csp()
+    csp = _build_csp((app.config.get('FIREBASE_CONFIG') or {}).get('authDomain'))
     hsts_max_age = app.config.get('HSTS_MAX_AGE', 31536000)
     is_production = app.config.get('ENV_NAME') == 'production'
 
@@ -403,7 +423,20 @@ def register_security_headers(app):
             'Permissions-Policy',
             'geolocation=(), microphone=(), camera=(), payment=()'
         )
-        response.headers.setdefault('Cross-Origin-Opener-Policy', 'same-origin')
+        # 'same-origin-allow-popups', not 'same-origin'. The strict value puts
+        # any window we open into a separate browsing context group and nulls
+        # its window.opener -- which silently breaks Firebase's
+        # signInWithPopup: the popup authenticates, then has no channel to hand
+        # the credential back, so the SDK sees it close empty and reports
+        # 'auth/popup-closed-by-user'. Sign-in never completed and no request
+        # ever reached /api/auth/verify.
+        #
+        # This still isolates us from windows that open *us* (the cross-window
+        # XS-Leaks protection COOP exists for); it only keeps the opener link
+        # for popups this page opens itself.
+        response.headers.setdefault(
+            'Cross-Origin-Opener-Policy', 'same-origin-allow-popups'
+        )
         # HSTS only over TLS: sent on a plaintext response it is ignored by
         # spec, and in development it would pin localhost to https in the
         # browser's preload cache for a year.
