@@ -1942,10 +1942,55 @@ document.addEventListener("DOMContentLoaded", () => {
     );
     resetTimers();
 
-    // Intercept fetch to handle 401 session_expired responses
+    // ----------------------------------------------------------------------
+    // fetch() wrapper: CSRF header on writes, plus session-expiry handling
+    //
+    // The server runs Flask-WTF CSRFProtect over every POST/PUT/PATCH/DELETE
+    // and publishes the token in a readable `csrf_token` cookie specifically
+    // so this layer can echo it back in `X-CSRFToken`. Nothing was reading it,
+    // so every write in the dashboard came back 400 "session security token
+    // expired". Injecting it here rather than at ~45 individual call sites is
+    // what keeps a newly added fetch() correct by default.
+    // ----------------------------------------------------------------------
+
+    // Methods the server protects (WTF_CSRF_METHODS).
+    const CSRF_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+    function readCsrfToken() {
+        const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    // Only ever attach the token to our own origin. A relative URL is
+    // same-origin by definition; an absolute one is resolved and compared, so
+    // a third-party endpoint never receives the token.
+    function isSameOrigin(url) {
+        try {
+            return new URL(String(url), window.location.href).origin === window.location.origin;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function withCsrf(input, init) {
+        const method = String((init && init.method) || 'GET').toUpperCase();
+        if (!CSRF_METHODS.has(method) || !isSameOrigin(input)) return init;
+
+        const token = readCsrfToken();
+        if (!token) return init;
+
+        // Headers may arrive as a Headers instance, an array of pairs, or a
+        // plain object. Normalising through Headers handles all three, and
+        // preserves a token a caller set explicitly.
+        const headers = new Headers((init && init.headers) || {});
+        if (!headers.has('X-CSRFToken')) headers.set('X-CSRFToken', token);
+
+        return Object.assign({}, init, { headers: headers });
+    }
+
     const _fetch = window.fetch;
-    window.fetch = async function(...args) {
-        const res = await _fetch.apply(this, args);
+    window.fetch = async function(input, init) {
+        const res = await _fetch.call(this, input, withCsrf(input, init));
         if (res.status === 401) {
             try {
                 const data = await res.clone().json();

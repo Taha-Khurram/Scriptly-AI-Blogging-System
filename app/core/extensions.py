@@ -160,9 +160,48 @@ def _init_csrf(app):
         from app.core.errors import _render_error_page
         return _render_error_page(400, 'Security token expired. Please reload the page.')
 
-    # Endpoints that legitimately cannot present a token.
+    # The exemptions themselves are applied by apply_csrf_exemptions(), which
+    # the factory calls *after* the blueprints exist. They cannot be applied
+    # here: resolving an endpoint name needs app.view_functions to be
+    # populated, and extensions are initialised before blueprints register.
+
+
+def apply_csrf_exemptions(app):
+    """Exempt the endpoints in :data:`CSRF_EXEMPT_ENDPOINTS` from CSRF.
+
+    Must run after blueprint registration.
+
+    ``CSRFProtect.exempt`` accepts a view function or a *dotted import path*
+    (``module.function``); given any other string it stores the value verbatim
+    and silently matches nothing. It was previously called with Flask
+    **endpoint** names (``auth_bp.verify_token``), which are a different
+    namespace -- ``blueprint_name.function_name`` -- so every exemption on the
+    list was a no-op and login itself was CSRF-blocked: the browser has no
+    token to present before a session exists, so ``/api/auth/verify`` answered
+    400 and the sign-in never completed.
+
+    Endpoint names are kept as the declaration format because they are what the
+    rest of the app uses and they survive a module move. They are resolved to
+    view functions here, which is also what makes a stale entry loud: an
+    endpoint that no longer exists is logged as an error rather than quietly
+    protecting nothing.
+    """
     for endpoint in CSRF_EXEMPT_ENDPOINTS:
-        csrf.exempt(endpoint)
+        view = app.view_functions.get(endpoint)
+        if view is None:
+            logger.error(
+                'CSRF exemption names an unknown endpoint: %s. Either the '
+                'endpoint was renamed or its blueprint is not registered.',
+                endpoint,
+            )
+            continue
+        csrf.exempt(view)
+
+    app.logger.debug(
+        'CSRF exemptions applied: %d of %d resolved',
+        sum(1 for e in CSRF_EXEMPT_ENDPOINTS if e in app.view_functions),
+        len(CSRF_EXEMPT_ENDPOINTS),
+    )
 
 
 def _init_limiter(app):

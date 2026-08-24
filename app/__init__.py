@@ -27,7 +27,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from whitenoise import WhiteNoise
 
 from app.core.errors import register_error_handlers
-from app.core.extensions import init_extensions
+from app.core.extensions import apply_csrf_exemptions, init_extensions
 from app.core.logging import configure_logging
 from app.core.security import (
     admin_required,
@@ -92,6 +92,9 @@ def create_app(config_class=None):
     _register_template_helpers(app)
     _register_blueprints(app)
     _register_root_routes(app)
+    # After the routes exist: CSRF exemptions are declared by endpoint name, so
+    # they can only be resolved once app.view_functions is populated.
+    apply_csrf_exemptions(app)
     _register_cache_policy(app)
 
     if not app.config.get('TESTING'):
