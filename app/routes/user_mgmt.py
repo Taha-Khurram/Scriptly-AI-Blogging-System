@@ -1,27 +1,18 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, abort, make_response
+from flask import Blueprint, render_template, request, jsonify, session, make_response
 from firebase_admin import auth as admin_auth
 from app.firebase.firestore_service import FirestoreService
 from app.services.email_service import EmailService
 from app.utils.validators import is_valid_gmail
-from functools import wraps
+from app.core.security import admin_required
+
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 # We define the blueprint. The 'url_prefix' will be handled in the app factory.
 user_bp = Blueprint('user_bp', __name__)
 db_service = FirestoreService()
 email_service = EmailService()
-
-
-def admin_required(f):
-    """Decorator to restrict routes to admin users only"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('auth_bp.login'))
-        if session.get('user_role') != 'ADMIN':
-            abort(404)  # Show 404 instead of 403 to hide the existence of the page
-        return f(*args, **kwargs)
-    return decorated_function
-
 
 @user_bp.route('/manage-users')
 @admin_required
@@ -59,9 +50,7 @@ def list_sub_users():
         response.headers['Cache-Control'] = 'no-cache, no-store'
         return response
     except Exception as e:
-        print(f"❌ Error in /users/list: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error in /users/list")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -102,8 +91,8 @@ def invite_user():
         )
         send_result = email_service.send_single(email, "You're invited to join Scriptly", html_content)
         email_sent = send_result.get('success', False)
-    except Exception as e:
-        print(f"⚠️ Email send attempt failed: {e}")
+    except Exception:
+        logger.exception("Email send attempt failed")
 
     db_service.log_activity(
         user_id=admin_id,
@@ -133,7 +122,6 @@ def resend_invitation():
     """Resends the invitation email for a pending invitation."""
     data = request.json
     email = data.get('email', '').strip().lower()
-    admin_id = session.get('user_id')
     admin_name = session.get('user_name', 'Admin')
 
     if not email:

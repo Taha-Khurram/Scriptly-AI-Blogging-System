@@ -5,6 +5,9 @@ Uses ThreadPoolExecutor since Gemini SDK is synchronous.
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, List, Dict, Any, Tuple
 import time
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def run_parallel(tasks: List[Tuple[Callable, tuple, dict]], max_workers: int = 3, timeout: int = 60) -> Dict[str, Any]:
@@ -34,7 +37,7 @@ def run_parallel(tasks: List[Tuple[Callable, tuple, dict]], max_workers: int = 3
             try:
                 results[name] = {"success": True, "data": future.result()}
             except Exception as e:
-                print(f"Task '{name}' failed: {e}")
+                logger.exception(f"Task '{name}' failed")
                 results[name] = {"success": False, "error": str(e)}
 
     return results
@@ -64,8 +67,8 @@ def run_parallel_simple(funcs_with_args: List[Tuple[Callable, tuple]], max_worke
             index = future_to_index[future]
             try:
                 results[index] = future.result()
-            except Exception as e:
-                print(f"Parallel task {index} failed: {e}")
+            except Exception:
+                logger.exception(f"Parallel task {index} failed")
                 results[index] = None
 
     return results
@@ -88,4 +91,4 @@ class TimedExecution:
         self.end_time = time.time()
         self.duration = self.end_time - self.start_time
         if self.name:
-            print(f"[TIMING] {self.name}: {self.duration:.2f}s")
+            logger.debug(f"[TIMING] {self.name}: {self.duration:.2f}s")

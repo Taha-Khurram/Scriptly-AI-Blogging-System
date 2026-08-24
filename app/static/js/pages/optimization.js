@@ -1,959 +1,1191 @@
-(function() {
-    // Tab switching
-    var tabs = document.querySelectorAll('.opt-tab');
-    var tabContents = document.querySelectorAll('.opt-tab-content');
+/**
+ * Optimization — optimize · reports · draft keywords · URL metrics · domain
+ * keywords.
+ *
+ * The previous version declared eight globals (analyzeUrl, runSiteAudit,
+ * deleteReport, toggleReportMenu…) so the template could call them from inline
+ * onclick attributes, and registered its `document`-level listeners at module
+ * scope. PJAX re-injects this file on every visit to /optimization, so those
+ * listeners accumulated: the fifth visit had five copies of the "close the
+ * report menu" handler bound, and nothing ever removed them.
+ *
+ * Everything here is one IIFE, every listener goes through an AbortController
+ * the next run aborts, and every control is reached by delegation off
+ * .dashboard-main rather than by name.
+ *
+ * It also drops ~115 lines that re-implemented a <select> as click-only divs
+ * over a `display: none` native control — which meant the draft and country
+ * pickers could not be operated by keyboard at all. They are .select-pill now,
+ * driven by the SelectPill module in app.js.
+ */
 
-    tabs.forEach(function(tab) {
-        tab.addEventListener('click', function() {
-            tabs.forEach(function(t) { t.classList.remove('active'); });
-            tabContents.forEach(function(c) { c.classList.remove('active'); });
-            tab.classList.add('active');
-            var target = tab.getAttribute('data-tab');
-            if (target === 'url-metrics') {
-                document.getElementById('tabUrlMetrics').classList.add('active');
-            } else if (target === 'keyword-research') {
-                document.getElementById('tabKeywordResearch').classList.add('active');
-            } else if (target === 'site-audit') {
-                document.getElementById('tabSiteAudit').classList.add('active');
-            } else if (target === 'auto-optimize') {
-                document.getElementById('tabAutoOptimize').classList.add('active');
-                loadOptimizeDrafts();
-            } else if (target === 'reports') {
-                document.getElementById('tabReports').classList.add('active');
-                loadReports();
-            }
+(function optimizationPage() {
+    'use strict';
+
+    if (window.__optimizationAbort) {
+        try { window.__optimizationAbort.abort(); } catch (e) { /* already gone */ }
+    }
+    const controller = new AbortController();
+    const signal = controller.signal;
+    window.__optimizationAbort = controller;
+
+    const root = document.querySelector('.dashboard-main');
+    if (!root) return;
+
+    const $ = (sel, scope) => (scope || root).querySelector(sel);
+    const $$ = (sel, scope) => Array.from((scope || root).querySelectorAll(sel));
+
+    const TABS = ['optimize', 'reports', 'draft-keywords', 'url-metrics', 'domain-keywords'];
+
+    const state = {
+        tab: 'optimize',
+        draftsLoaded: false,
+        reportsLoaded: false,
+        reports: [],
+        lastRun: null,        // the payload of the optimize run on screen
+        pendingDeleteId: null,
+        pendingExportId: null
+    };
+
+    // ----------------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------------
+
+    // Escapes all five characters Jinja's autoescape does. NOT the
+    // `div.textContent -> div.innerHTML` trick this file used to use: that
+    // encodes &, < and > and leaves both quote characters alone, which is safe
+    // for text and unsafe the moment the value lands in title="…" or
+    // aria-label="…" — and every row below builds attributes.
+    function esc(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&#34;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function toast(type, title, message) {
+        if (typeof window.showToast === 'function') {
+            window.showToast({ type, title, message, duration: type === 'error' ? 5000 : 3000 });
+        }
+    }
+
+    function bsModal(id) {
+        const el = document.getElementById(id);
+        if (!el || typeof bootstrap === 'undefined') return null;
+        return bootstrap.Modal.getOrCreateInstance(el);
+    }
+
+    function num(value, fallback) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : (fallback === undefined ? 0 : fallback);
+    }
+
+    // Compact for display, exact on the element's title — the compact form is
+    // unparseable, so anything that needs to read the figure back reads the
+    // attribute.
+    function compact(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const n = Number(value);
+        if (!Number.isFinite(n)) return null;
+        if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+        if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+        return n.toLocaleString();
+    }
+
+    function formatDate(value) {
+        if (!value) return '';
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    // snake_case / camelCase -> "Sentence case"
+    function humanise(key) {
+        return String(key)
+            .replace(/_/g, ' ')
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/^./, (s) => s.toUpperCase());
+    }
+
+    function gradeClass(grade) {
+        const letter = String(grade || '').trim().charAt(0).toLowerCase();
+        return 'abcdf'.includes(letter) ? 'grade-' + letter : '';
+    }
+
+    function setState(body, next, message) {
+        const el = typeof body === 'string' ? $('[data-body="' + body + '"]') : body;
+        if (!el) return;
+        el.dataset.state = next;
+        if (next === 'error') {
+            const text = $('[data-error-text]', el);
+            if (text) text.textContent = message || 'Something went wrong.';
+        }
+    }
+
+    function busy(btn, on, label) {
+        if (!btn) return;
+        if (on) {
+            if (!btn.dataset.label) btn.dataset.label = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> ' + esc(label || 'Working…');
+        } else {
+            btn.disabled = false;
+            if (btn.dataset.label) { btn.innerHTML = btn.dataset.label; delete btn.dataset.label; }
+        }
+    }
+
+    // Reads the error the API actually sent rather than reporting every failure
+    // as a connection problem — a 429 and a dropped socket are different
+    // things and only one of them is worth retrying immediately.
+    async function requestJson(url, options) {
+        const res = await fetch(url, Object.assign({ signal }, options || {}));
+        let payload = null;
+        try { payload = await res.json(); } catch (e) { payload = null; }
+        if (!res.ok || !payload || payload.success === false) {
+            const err = new Error((payload && payload.error) || 'The request failed (' + res.status + ').');
+            err.handled = true;
+            throw err;
+        }
+        return payload;
+    }
+
+    function describeError(err) {
+        if (err && err.name === 'AbortError') return null;   // navigated away
+        if (err && err.handled) return err.message;
+        return 'Could not reach the server. Check your connection and try again.';
+    }
+
+    // ----------------------------------------------------------------------
+    // Tabs
+    //
+    // The tab is written to the hash, so a reload, a bookmark or the back
+    // button returns to the panel you were on instead of always landing on the
+    // first one.
+    // ----------------------------------------------------------------------
+
+    function showTab(name, pushHash) {
+        if (TABS.indexOf(name) === -1) name = TABS[0];
+        state.tab = name;
+
+        $$('.opt-tabs .seg-tab').forEach((tab) => {
+            const on = tab.dataset.tab === name;
+            tab.classList.toggle('is-active', on);
+            tab.setAttribute('aria-selected', on ? 'true' : 'false');
         });
-    });
+        $$('[data-tab-panel]').forEach((panel) => {
+            panel.hidden = panel.dataset.tabPanel !== name;
+        });
 
-    // ========== URL METRICS ==========
-    var urlInput = document.getElementById('urlInput');
-    var urlResultsSection = document.getElementById('urlResultsSection');
-    var urlEmptyState = document.getElementById('urlEmptyState');
-    var urlMetricsGrid = document.getElementById('urlMetricsGrid');
-    var urlDetailsGrid = document.getElementById('urlDetailsGrid');
-    var analyzedUrlText = document.getElementById('analyzedUrlText');
-    var analyzeUrlBtn = document.getElementById('analyzeUrlBtn');
+        if (pushHash !== false) {
+            try { history.replaceState(null, '', '#' + name); } catch (e) { /* file:// etc. */ }
+        }
 
-    urlInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') analyzeUrl();
-    });
+        if (name === 'optimize' || name === 'draft-keywords') loadDrafts();
+        if (name === 'reports') loadReports();
+    }
 
-    window.analyzeUrl = async function() {
-        var url = urlInput.value.trim();
-        if (!url) {
-            showToast({ type: 'warning', title: 'Missing URL', message: 'Please enter a URL to analyze.' });
-            urlInput.focus();
+    // ----------------------------------------------------------------------
+    // Stat tiles
+    //
+    // Re-derived in the browser from the report list once it has been fetched,
+    // and only then: the server rendered these figures from the same data, and
+    // an empty cache before the first fetch would zero out numbers that were
+    // already correct.
+    // ----------------------------------------------------------------------
+
+    function sparkline(values, label) {
+        // PAD clears the endpoint marker, not just the line: the dot is r3.5
+        // with a 2px ring, so it reaches 4.5px past its centre.
+        const W = 116, H = 40, PAD = 6;
+        const n = values.length;
+        if (n < 2) return '';
+
+        const max = Math.max.apply(null, values);
+        const min = Math.min.apply(null, values);
+        const span = max - min || 1;
+        const stepX = (W - PAD * 2) / (n - 1);
+
+        const pts = values.map((v, i) => {
+            const x = PAD + i * stepX;
+            // A flat series sits on the baseline rather than halfway up, so
+            // "nothing happened" cannot read as "steady at some level".
+            const y = max === min
+                ? (max === 0 ? H - PAD : H / 2)
+                : H - PAD - ((v - min) / span) * (H - PAD * 2);
+            return [x, y];
+        });
+
+        const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+        const area = line + ' L' + pts[n - 1][0].toFixed(1) + ' ' + (H - PAD) +
+            ' L' + pts[0][0].toFixed(1) + ' ' + (H - PAD) + ' Z';
+        const last = pts[n - 1];
+
+        // A micro-chart has no room for axes, so the whole series gets a text
+        // equivalent rather than depending on a tooltip nobody may reach.
+        const summary = label + ': ' + n + ' runs, from ' + min + ' to ' + max +
+            ' points, most recent ' + values[n - 1] + '.';
+
+        return '<svg class="stat-trend" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+            'aria-label="' + esc(summary) + '">' +
+            '<title>' + esc(summary) + '</title>' +
+            '<path class="stat-trend-area" d="' + area + '"/>' +
+            '<path class="stat-trend-line" d="' + line + '"/>' +
+            '<circle class="stat-trend-dot" cx="' + last[0].toFixed(1) + '" cy="' +
+            last[1].toFixed(1) + '" r="3.5"/>' +
+            '</svg>';
+    }
+
+    function gainOf(report) {
+        const after = num(report.seo_score);
+        const before = num(report.original_score);
+        return Math.round(num(report.score_improvement, after - before));
+    }
+
+    function refreshStats() {
+        if (!state.reportsLoaded) return;
+
+        const reports = state.reports;
+        const count = reports.length;
+        const gains = reports.map(gainOf);
+        const avg = count ? Math.round(gains.reduce((a, b) => a + b, 0) / count) : 0;
+        const best = count ? Math.round(Math.max.apply(null, reports.map((r) => num(r.seo_score)))) : 0;
+
+        const runs = $('[data-stat-runs]');
+        if (runs) { runs.textContent = String(count); runs.title = String(count); }
+
+        const gain = $('[data-stat-gain]');
+        if (gain) { gain.textContent = (avg > 0 ? '+' : '') + avg; gain.title = String(avg); }
+
+        const bestEl = $('[data-stat-best]');
+        if (bestEl) { bestEl.textContent = String(best); bestEl.title = String(best); }
+
+        $$('[data-report-count], [data-report-total]').forEach((el) => { el.textContent = String(count); });
+
+        // "How many" plus "when was the last one" — the delta answers
+        // "compared to what" as well as a run counter can.
+        const runsDelta = $('[data-delta-runs]');
+        if (runsDelta) {
+            const latest = count ? formatDate(reports[0].timestamp || reports[0].created_at) : '';
+            runsDelta.textContent = latest ? 'last run ' + latest : 'none yet';
+        }
+
+        const meter = $('[data-meter-best]');
+        if (meter) {
+            meter.hidden = count === 0;
+            const fill = $('[data-meter-fill]', meter);
+            const note = $('[data-meter-note]', meter);
+            if (fill) fill.style.width = Math.max(0, Math.min(100, best)) + '%';
+            if (note) note.textContent = best + ' / 100';
+        }
+
+        // Reports arrive newest-first; a trend line reads left to right.
+        const trend = $('[data-trend-gain]');
+        if (trend) trend.innerHTML = sparkline(gains.slice(0, 12).reverse(), 'Points gained per run');
+    }
+
+    // ----------------------------------------------------------------------
+    // Drafts — shared by the optimize and keyword pickers
+    // ----------------------------------------------------------------------
+
+    function fillPicker(select, drafts, placeholder) {
+        const pill = select.closest('[data-select-pill]');
+        const menu = pill ? $('.menu', pill) : null;
+        const current = select.value;
+
+        select.innerHTML = '<option value="">' + esc(placeholder) + '</option>' +
+            drafts.map((d) => '<option value="' + esc(d.id) + '">' +
+                esc(d.title || 'Untitled') + '</option>').join('');
+
+        if (menu) {
+            menu.innerHTML = '<button type="button" class="menu-item" role="option" data-value="">' +
+                '<i class="bi bi-check2 menu-check" aria-hidden="true"></i>' +
+                '<span class="menu-label">' + esc(placeholder) + '</span></button>' +
+                drafts.map((d) => '<button type="button" class="menu-item" role="option" ' +
+                    'data-value="' + esc(d.id) + '">' +
+                    '<i class="bi bi-check2 menu-check" aria-hidden="true"></i>' +
+                    '<span class="menu-label">' + esc(d.title || 'Untitled') + '</span></button>').join('');
+        }
+
+        // A draft that vanished between loads must not leave a stale id behind.
+        select.value = drafts.some((d) => d.id === current) ? current : '';
+        syncPillLabel(select);
+    }
+
+    // The SelectPill module writes through to the <select> and fires `change`;
+    // the visible label on the trigger is the page's to keep in step.
+    function syncPillLabel(select) {
+        const pill = select.closest('[data-select-pill]');
+        if (!pill) return;
+        const label = $('[data-pill-text]', pill);
+        if (!label) return;
+        const opt = select.options[select.selectedIndex];
+        label.textContent = opt ? opt.textContent : '';
+    }
+
+    async function loadDrafts() {
+        if (state.draftsLoaded) return;
+        state.draftsLoaded = true;   // set first: two tabs can ask at once
+
+        const selects = $$('[data-drafts-for]');
+        try {
+            const result = await requestJson('/api/seo/drafts');
+            const drafts = (result.drafts || []).filter((d) => d && d.id);
+            selects.forEach((s) => fillPicker(s, drafts, drafts.length ? 'Select a draft' : 'No drafts yet'));
+        } catch (err) {
+            state.draftsLoaded = false;   // let the next tab visit retry
+            const message = describeError(err);
+            if (!message) return;
+            selects.forEach((s) => fillPicker(s, [], 'Could not load drafts'));
+            toast('error', 'Drafts unavailable', message);
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Optimize
+    // ----------------------------------------------------------------------
+
+    function selectedDraft() {
+        const select = $('#optimizeDraftSelect');
+        if (!select || !select.value) return null;
+        const opt = select.options[select.selectedIndex];
+        return { id: select.value, title: opt ? opt.textContent : 'this draft' };
+    }
+
+    function askToOptimize() {
+        const draft = selectedDraft();
+        if (!draft) {
+            toast('warning', 'No draft selected', 'Pick the draft you want optimized first.');
+            const trigger = $('#optimizeDraftSelect');
+            const pill = trigger && trigger.closest('[data-select-pill]');
+            if (pill) { const t = $('[data-select-trigger]', pill); if (t) t.focus(); }
             return;
         }
 
-        analyzeUrlBtn.disabled = true;
-        analyzeUrlBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analyzing...';
-        urlEmptyState.style.display = 'none';
-        urlResultsSection.classList.remove('show');
-        showActionLoader('Analyzing URL...');
+        const region = $('#optimizeRegionSelect');
+        const regionName = region && region.options[region.selectedIndex]
+            ? region.options[region.selectedIndex].textContent : 'your region';
+
+        const target = $('[data-confirm-draft]');
+        if (target) target.textContent = draft.title;
+        const regionEl = $('[data-confirm-region]');
+        if (regionEl) regionEl.textContent = regionName;
+
+        const modal = bsModal('optimizeConfirmModal');
+        if (modal) modal.show();
+        else runOptimize();   // no Bootstrap: do not strand the only path to the action
+    }
+
+    async function runOptimize() {
+        const draft = selectedDraft();
+        if (!draft) return;
+
+        const region = $('#optimizeRegionSelect');
+        const btn = $('.opt-run[data-action="optimize"]');
+
+        busy(btn, true, 'Optimizing…');
+        setState('optimize', 'loading');
 
         try {
-            var response = await fetch('/api/optimization/url-metrics?url=' + encodeURIComponent(url));
-            var result = await response.json();
+            const result = await requestJson('/api/seo/optimize-blog/' + encodeURIComponent(draft.id), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ region: region ? region.value : 'US' })
+            });
 
-            if (!response.ok || !result.success) {
-                showToast({ type: 'error', title: 'Analysis Failed', message: result.error || 'Unable to fetch metrics.' });
-                urlEmptyState.style.display = 'block';
-                return;
-            }
+            result.blog_title = result.blog_title || draft.title;
+            renderOptimizeResult(result);
+            toast('success', 'Optimization complete', 'The draft has been rewritten and saved.');
 
-            renderUrlResults(url, result.data);
+            // The run just wrote a report; the cache and every figure derived
+            // from it are now stale.
+            state.reportsLoaded = false;
+            loadReports();
 
         } catch (err) {
-            showToast({ type: 'error', title: 'Connection Error', message: 'Failed to connect. Please try again.' });
-            urlEmptyState.style.display = 'block';
+            const message = describeError(err);
+            if (!message) return;
+            setState('optimize', 'error', message);
+            toast('error', 'Optimization failed', message);
         } finally {
-            hideActionLoader();
-            analyzeUrlBtn.disabled = false;
-            analyzeUrlBtn.innerHTML = '<i class="bi bi-search"></i> Analyze';
+            busy(btn, false);
         }
+    }
+
+    const BREAKDOWN_LABELS = {
+        content: 'Content', headings: 'Headings', keywords: 'Keywords', meta: 'Meta tags',
+        readability: 'Readability', structure: 'Structure', links: 'Links', images: 'Images'
     };
 
-    var urlMetricDefs = [
-        { key: 'domainRating', altKeys: ['domain_rating', 'dr'], label: 'Domain Rating', icon: 'bi-award-fill', color: 'purple' },
-        { key: 'backlinks', altKeys: ['total_backlinks', 'backlink'], label: 'Backlinks', icon: 'bi-link-45deg', color: 'green' },
-        { key: 'refDomains', altKeys: ['referring_domains', 'ref_domains'], label: 'Referring Domains', icon: 'bi-diagram-3-fill', color: 'blue' },
-        { key: 'traffic', altKeys: ['organic_traffic', 'org_traffic'], label: 'Organic Traffic', icon: 'bi-graph-up-arrow', color: 'orange' },
-        { key: 'organicKeywords', altKeys: ['organic_keywords', 'keywords'], label: 'Organic Keywords', icon: 'bi-key-fill', color: 'pink' },
-        { key: 'urlRating', altKeys: ['url_rating', 'ur'], label: 'URL Rating', icon: 'bi-shield-check', color: 'teal' }
+    // Direction is carried by the arrow glyph, the sign and the title text as
+    // well as by colour — the reserved status hues never mean anything on
+    // their own.
+    function deltaParts(delta) {
+        return {
+            cls: delta > 0 ? 'is-up' : delta < 0 ? 'is-down' : 'is-flat',
+            arrow: delta > 0 ? '↑' : delta < 0 ? '↓' : '→',
+            word: delta > 0 ? 'up' : delta < 0 ? 'down' : 'no change',
+            text: delta === 0 ? 'no change' : (delta > 0 ? '+' : '') + delta
+        };
+    }
+
+    function deltaMarkup(delta, className) {
+        const p = deltaParts(delta);
+        return '<span class="' + className + ' ' + p.cls + '" title="' + esc(p.word) + '">' +
+            '<span aria-hidden="true">' + p.arrow + '</span>' + esc(p.text) + '</span>';
+    }
+
+    // Paints an existing element rather than replacing it, so the node the rest
+    // of the render holds a handle to survives.
+    function paintDelta(el, delta, className) {
+        if (!el) return;
+        const p = deltaParts(delta);
+        el.className = className + ' ' + p.cls;
+        el.title = p.word;
+        el.innerHTML = '<span aria-hidden="true">' + p.arrow + '</span>' + esc(p.text);
+    }
+
+    function renderBreakdown(comparison) {
+        const card = $('[data-breakdown]');
+        const rows = $('[data-breakdown-rows]');
+        if (!card || !rows) return;
+
+        const data = (comparison && comparison.breakdown_comparison) || {};
+        const keys = Object.keys(data).filter((k) => data[k] && typeof data[k] === 'object');
+
+        if (!keys.length) { card.hidden = true; rows.innerHTML = ''; return; }
+
+        rows.innerHTML = keys.map((key) => {
+            const before = Math.round(num(data[key].before));
+            const after = Math.round(num(data[key].after));
+            const delta = after - before;
+            const pct = (v) => Math.max(0, Math.min(100, v));
+
+            return '<div class="opt-meter">' +
+                '<span class="opt-meter-label">' + esc(BREAKDOWN_LABELS[key] || humanise(key)) + '</span>' +
+                '<span class="opt-meter-track" role="img" aria-label="' +
+                esc(humanise(key) + ': ' + before + ' before, ' + after + ' after') + '">' +
+                '<span class="opt-meter-fill" style="width:' + pct(after) + '%"></span>' +
+                '<span class="opt-meter-tick" style="left:' + pct(before) + '%"></span>' +
+                '</span>' +
+                '<span class="opt-meter-figures">' + before + ' → <strong>' + after + '</strong>' +
+                deltaMarkup(delta, 'opt-score-delta') + '</span>' +
+                '</div>';
+        }).join('');
+
+        card.hidden = false;
+    }
+
+    function primaryKeywordText(value) {
+        if (!value) return '—';
+        if (typeof value === 'object') return value.keyword || value.term || '—';
+        return String(value);
+    }
+
+    function changeText(change) {
+        if (change && typeof change === 'object') {
+            return change.description || change.type || JSON.stringify(change);
+        }
+        return String(change);
+    }
+
+    function renderOptimizeResult(data) {
+        state.lastRun = data;
+
+        const after = Math.round(num(data.seo_score));
+        const before = Math.round(num(data.original_score));
+        const delta = Math.round(num(data.score_improvement, after - before));
+
+        $('[data-score-after]').textContent = after;
+        $('[data-score-before]').textContent = before;
+        paintDelta($('[data-score-delta]'), delta, 'opt-score-delta');
+
+        const grade = data.seo_grade || '—';
+        const pill = $('[data-grade-pill]');
+        pill.className = 'opt-grade ' + gradeClass(grade);
+        $('[data-grade]').textContent = grade;
+
+        renderBreakdown(data.comparison);
+
+        $('[data-new-title]').textContent = data.new_title || data.blog_title || '—';
+        $('[data-primary-kw]').textContent = primaryKeywordText(data.primary_keyword);
+
+        const changes = Array.isArray(data.changes_made) ? data.changes_made : [];
+        const changesCard = $('[data-changes-card]');
+        $('[data-changes-list]').innerHTML = changes.map((c) => '<li>' + esc(changeText(c)) + '</li>').join('');
+        changesCard.hidden = changes.length === 0;
+
+        const recs = Array.isArray(data.recommendations) ? data.recommendations : [];
+        const recsCard = $('[data-recs-card]');
+        $('[data-recs-list]').innerHTML = recs.map((r) => '<li>' + esc(String(r)) + '</li>').join('');
+        recsCard.hidden = recs.length === 0;
+
+        setState('optimize', 'results');
+    }
+
+    // ----------------------------------------------------------------------
+    // Reports
+    // ----------------------------------------------------------------------
+
+    async function loadReports() {
+        if (state.reportsLoaded) return;
+
+        const body = $('[data-body="reports"]');
+        if (body && body.dataset.state !== 'results') setState(body, 'loading');
+
+        try {
+            const result = await requestJson('/api/optimization/reports');
+            state.reports = Array.isArray(result.reports) ? result.reports : [];
+            state.reportsLoaded = true;
+            renderReports();
+            refreshStats();
+        } catch (err) {
+            const message = describeError(err);
+            if (!message) return;
+            setState('reports', 'error', message);
+        }
+    }
+
+    function renderReports() {
+        const rows = $('[data-report-rows]');
+        if (!rows) return;
+
+        if (!state.reports.length) {
+            rows.innerHTML = '';
+            setState('reports', 'empty');
+            return;
+        }
+
+        rows.innerHTML = state.reports.map((report) => {
+            const title = report.new_title || report.blog_title || 'Untitled blog';
+            const grade = report.seo_grade || '?';
+            const after = Math.round(num(report.seo_score));
+            const before = Math.round(num(report.original_score));
+            const delta = gainOf(report);
+            const when = formatDate(report.timestamp || report.created_at);
+            const keyword = primaryKeywordText(report.primary_keyword);
+            const id = esc(report.id || '');
+
+            const meta = [when, keyword !== '—' ? keyword : '']
+                .filter(Boolean)
+                .map((part) => '<span>' + esc(part) + '</span>')
+                .join('<span class="row-sep">·</span>');
+
+            return '<div class="data-row report-row" data-report-id="' + id + '">' +
+                '<span class="row-mark ' + gradeClass(grade) + '" aria-hidden="true">' +
+                esc(String(grade).charAt(0)) + '</span>' +
+
+                '<button type="button" class="row-open" data-action="report-detail" data-id="' + id + '">' +
+                '<span class="row-title">' + esc(title) + '</span>' +
+                '<span class="row-meta">' + meta + '</span>' +
+                '</button>' +
+
+                '<div class="report-trail">' +
+                '<span class="report-score" title="' +
+                esc('SEO score ' + before + ' before, ' + after + ' after — grade ' + grade) + '">' +
+                before + ' <span aria-hidden="true">→</span> ' +
+                '<span class="report-score-after">' + after + '</span>' +
+                deltaMarkup(delta, 'report-score-delta') +
+                '</span>' +
+                '<button type="button" class="opt-row-btn" data-action="report-export" data-id="' + id + '" ' +
+                'aria-label="' + esc('Export the report for ' + title) + '" title="Export report">' +
+                '<i class="bi bi-download" aria-hidden="true"></i></button>' +
+                '<button type="button" class="opt-row-btn is-danger" data-action="report-delete" data-id="' + id + '" ' +
+                'aria-label="' + esc('Delete the report for ' + title) + '" title="Delete report">' +
+                '<i class="bi bi-trash3" aria-hidden="true"></i></button>' +
+                '</div>' +
+                '</div>';
+        }).join('');
+
+        setState('reports', 'results');
+    }
+
+    function reportById(id) {
+        return state.reports.find((r) => String(r.id) === String(id)) || null;
+    }
+
+    function openReportDetail(id) {
+        const report = reportById(id);
+        if (!report) return;
+
+        state.pendingExportId = id;
+
+        const after = Math.round(num(report.seo_score));
+        const before = Math.round(num(report.original_score));
+        const delta = gainOf(report);
+        const grade = report.seo_grade || '—';
+        const kw = report.primary_keyword || {};
+        const when = formatDate(report.timestamp || report.created_at);
+
+        $('[data-detail-title]').textContent = report.new_title || report.blog_title || 'Report';
+
+        const facts = [
+            ['Primary keyword', primaryKeywordText(report.primary_keyword)],
+            ['Search volume', (compact(kw.search_volume) || '—')],
+            ['Difficulty', kw.difficulty_score !== undefined && kw.difficulty_score !== null
+                ? Math.round(num(kw.difficulty_score)) + ' / 100' : '—'],
+            ['CPC', kw.cpc !== undefined && kw.cpc !== null ? '$' + num(kw.cpc).toFixed(2) : '—']
+        ];
+
+        const changes = Array.isArray(report.changes_made) ? report.changes_made : [];
+        const recs = Array.isArray(report.recommendations) ? report.recommendations : [];
+
+        let html = '<p class="opt-detail-meta">' +
+            (when ? '<span>' + esc(when) + '</span>' : '') +
+            '<span class="report-score">' + before + ' <span aria-hidden="true">→</span> ' +
+            '<span class="report-score-after">' + after + '</span>' +
+            deltaMarkup(delta, 'report-score-delta') + '</span>' +
+            '<span class="report-score">Grade ' + esc(grade) + '</span>' +
+            '</p>';
+
+        html += '<div class="opt-detail-section"><div class="opt-facts">' +
+            facts.map((f) => '<div class="opt-fact"><span class="opt-fact-label">' + esc(f[0]) +
+                '</span><span class="opt-fact-value">' + esc(f[1]) + '</span></div>').join('') +
+            '</div></div>';
+
+        if (changes.length) {
+            html += '<div class="opt-detail-section"><h3 class="opt-subhead">Changes made</h3>' +
+                '<ul class="opt-list opt-list-done">' +
+                changes.map((c) => '<li>' + esc(changeText(c)) + '</li>').join('') +
+                '</ul></div>';
+        }
+
+        if (recs.length) {
+            html += '<div class="opt-detail-section"><h3 class="opt-subhead">Go further</h3>' +
+                '<ul class="opt-list opt-list-todo">' +
+                recs.map((r) => '<li>' + esc(String(r)) + '</li>').join('') +
+                '</ul></div>';
+        }
+
+        $('[data-detail-body]').innerHTML = html;
+
+        const modal = bsModal('reportDetailModal');
+        if (modal) modal.show();
+    }
+
+    function askToDelete(id) {
+        const report = reportById(id);
+        if (!report) return;
+        state.pendingDeleteId = id;
+        const label = $('[data-delete-title]');
+        if (label) label.textContent = report.new_title || report.blog_title || 'Untitled blog';
+        const modal = bsModal('reportDeleteModal');
+        if (modal) modal.show();
+    }
+
+    async function deleteReport() {
+        const id = state.pendingDeleteId;
+        if (!id) return;
+        state.pendingDeleteId = null;
+
+        const modal = bsModal('reportDeleteModal');
+        if (modal) modal.hide();
+
+        try {
+            await requestJson('/api/optimization/reports/' + encodeURIComponent(id), { method: 'DELETE' });
+            state.reports = state.reports.filter((r) => String(r.id) !== String(id));
+            renderReports();
+            refreshStats();
+            toast('success', 'Report deleted', 'The record of that run has been removed.');
+        } catch (err) {
+            const message = describeError(err);
+            if (!message) return;
+            toast('error', 'Could not delete', message);
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Draft keywords
+    // ----------------------------------------------------------------------
+
+    function difficultyMarkup(value) {
+        if (value === null || value === undefined || value === '') return '—';
+        const n = Math.round(num(value));
+        const band = n >= 70 ? ['is-hard', 'Hard'] : n >= 40 ? ['is-medium', 'Medium'] : ['is-easy', 'Easy'];
+        // The word is the label; the hue and the bar only reinforce it.
+        return '<span class="kw-difficulty ' + band[0] + '">' +
+            '<span class="kw-difficulty-track">' +
+            '<span class="kw-difficulty-fill" style="width:' + Math.max(0, Math.min(100, n)) + '%"></span>' +
+            '</span>' +
+            '<span class="kw-difficulty-word">' + band[1] + '</span>' +
+            '<span>' + n + '</span>' +
+            '</span>';
+    }
+
+    // Compact in the cell, exact on its title — "1.2K" is unreadable as a
+    // precise figure and unparseable as a value.
+    function cell(value, extraClass) {
+        const cls = 'is-num' + (extraClass ? ' ' + extraClass : '');
+        const shown = compact(value);
+        if (shown === null) return '<td class="' + cls + '">—</td>';
+        return '<td class="' + cls + '" title="' + esc(Number(value).toLocaleString()) + '">' +
+            esc(shown) + '</td>';
+    }
+
+    async function runKeywords() {
+        const select = $('#draftSelect');
+        const country = $('#countrySelect');
+        const btn = $('.opt-run[data-action="keywords"]');
+
+        if (!select || !select.value) {
+            toast('warning', 'No draft selected', 'Pick the draft you want researched first.');
+            return;
+        }
+
+        busy(btn, true, 'Researching…');
+        setState('keywords', 'loading');
+
+        try {
+            const result = await requestJson('/api/optimization/draft-keywords', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blog_id: select.value, country: country ? country.value : 'us' })
+            });
+
+            const data = result.data || {};
+            const keywords = Array.isArray(data.keywords) ? data.keywords : [];
+
+            const source = $('[data-kw-source]');
+            const countryName = country && country.options[country.selectedIndex]
+                ? country.options[country.selectedIndex].textContent : '';
+            source.innerHTML = '<i class="bi bi-file-earmark-text" aria-hidden="true"></i> ' +
+                'Keywords found in <strong>' + esc(data.blog_title || 'this draft') + '</strong>' +
+                (countryName ? ', measured for ' + esc(countryName) : '');
+
+            if (!keywords.length) {
+                $('[data-kw-rows]').innerHTML =
+                    '<tr class="opt-table-empty"><td colspan="6">No keywords could be extracted from this draft.</td></tr>';
+            } else {
+                $('[data-kw-rows]').innerHTML = keywords.map((kw) => {
+                    if (kw.error) {
+                        return '<tr class="opt-table-error"><td class="opt-table-keyword">' +
+                            esc(kw.keyword || '') + '</td><td colspan="5">Metrics unavailable</td></tr>';
+                    }
+                    return '<tr>' +
+                        '<td class="opt-table-keyword">' + esc(kw.keyword || '') + '</td>' +
+                        cell(kw.searchVolume) +
+                        '<td>' + difficultyMarkup(kw.difficulty) + '</td>' +
+                        '<td class="is-num opt-col-wide">' +
+                        (kw.cpc === null || kw.cpc === undefined ? '—' : '$' + num(kw.cpc).toFixed(2)) + '</td>' +
+                        cell(kw.clicks, 'opt-col-wide') +
+                        cell(kw.trafficPotential, 'opt-col-wide') +
+                        '</tr>';
+                }).join('');
+            }
+
+            setState('keywords', 'results');
+
+        } catch (err) {
+            const message = describeError(err);
+            if (!message) return;
+            setState('keywords', 'error', message);
+            toast('error', 'Research failed', message);
+        } finally {
+            busy(btn, false);
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // URL metrics
+    // ----------------------------------------------------------------------
+
+    const URL_METRICS = [
+        { key: 'domainRating', alts: ['domain_rating', 'dr'], label: 'Domain rating', ratio: true },
+        { key: 'urlRating', alts: ['url_rating', 'ur'], label: 'URL rating', ratio: true },
+        { key: 'backlinks', alts: ['total_backlinks', 'backlink'], label: 'Backlinks', note: 'links pointing here' },
+        { key: 'refDomains', alts: ['referring_domains', 'ref_domains'], label: 'Referring domains', note: 'unique sites' },
+        { key: 'traffic', alts: ['organic_traffic', 'org_traffic'], label: 'Organic traffic', note: 'visits per month' },
+        { key: 'organicKeywords', alts: ['organic_keywords', 'keywords'], label: 'Organic keywords', note: 'terms ranked for' }
     ];
 
-    function formatNumber(num) {
-        if (num === null || num === undefined || num === '') return 'N/A';
-        num = Number(num);
-        if (isNaN(num)) return 'N/A';
-        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-        return num.toLocaleString();
-    }
-
-    function escapeHtml(text) {
-        if (!text) return '';
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function getMetricValue(data, def) {
-        var val = data[def.key];
-        if (val !== undefined && val !== null) return val;
-        for (var i = 0; i < def.altKeys.length; i++) {
-            val = data[def.altKeys[i]];
-            if (val !== undefined && val !== null) return val;
+    function pick(data, def) {
+        const keys = [def.key].concat(def.alts || []);
+        for (let i = 0; i < keys.length; i++) {
+            const v = data[keys[i]];
+            if (v !== undefined && v !== null && v !== '') return v;
         }
         return null;
     }
 
-    function renderUrlResults(url, data) {
-        analyzedUrlText.textContent = url;
+    async function runUrlMetrics() {
+        const input = $('#urlInput');
+        const btn = $('.opt-run[data-action="url"]');
+        const url = input ? input.value.trim() : '';
 
-        var metricsHtml = '';
-        urlMetricDefs.forEach(function(def) {
-            var val = getMetricValue(data, def);
-            metricsHtml += '<div class="metric-card">' +
-                '<div class="metric-icon ' + def.color + '"><i class="bi ' + def.icon + '"></i></div>' +
-                '<div class="metric-info">' +
-                    '<div class="metric-label">' + def.label + '</div>' +
-                    '<div class="metric-value">' + formatNumber(val) + '</div>' +
-                '</div></div>';
-        });
-        urlMetricsGrid.innerHTML = metricsHtml;
-
-        var detailsHtml = '';
-        var skipKeys = {};
-        urlMetricDefs.forEach(function(def) {
-            skipKeys[def.key] = true;
-            def.altKeys.forEach(function(k) { skipKeys[k] = true; });
-        });
-
-        Object.keys(data).forEach(function(key) {
-            if (skipKeys[key]) return;
-            var val = data[key];
-            if (val === null || val === undefined || val === '') return;
-            if (typeof val === 'object') return;
-            var label = key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^./, function(s) { return s.toUpperCase(); });
-            detailsHtml += '<div class="detail-row">' +
-                '<span class="detail-label">' + escapeHtml(label) + '</span>' +
-                '<span class="detail-value">' + escapeHtml(String(val)) + '</span>' +
-                '</div>';
-        });
-
-        if (detailsHtml) {
-            urlDetailsGrid.innerHTML = detailsHtml;
-            document.getElementById('urlDetailsCard').style.display = 'block';
-        } else {
-            document.getElementById('urlDetailsCard').style.display = 'none';
-        }
-
-        urlResultsSection.classList.add('show');
-    }
-
-    // ========== KEYWORD RESEARCH ==========
-    var draftSelect = document.getElementById('draftSelect');
-    var countrySelect = document.getElementById('countrySelect');
-    var kwResultsSection = document.getElementById('kwResultsSection');
-    var kwEmptyState = document.getElementById('kwEmptyState');
-    var kwResultsBody = document.getElementById('kwResultsBody');
-    var analyzedKeywordText = document.getElementById('analyzedKeywordText');
-    var analyzeKeywordBtn = document.getElementById('analyzeKeywordBtn');
-    var draftsLoaded = false;
-
-    function loadDrafts() {
-        if (draftsLoaded) return;
-        fetch('/api/seo/drafts')
-            .then(function(r) { return r.json(); })
-            .then(function(result) {
-                if (result.success && result.drafts) {
-                    draftSelect.innerHTML = '<option value="">-- Select a draft --</option>';
-                    result.drafts.forEach(function(d) {
-                        var opt = document.createElement('option');
-                        opt.value = d.id;
-                        opt.textContent = d.title || 'Untitled';
-                        draftSelect.appendChild(opt);
-                    });
-                    draftsLoaded = true;
-                }
-            })
-            .catch(function() {});
-    }
-
-    // Load drafts when keyword tab is clicked
-    tabs.forEach(function(tab) {
-        tab.addEventListener('click', function() {
-            if (tab.getAttribute('data-tab') === 'keyword-research') {
-                loadDrafts();
-            }
-        });
-    });
-
-    window.analyzeKeyword = async function() {
-        var blogId = draftSelect.value;
-        if (!blogId) {
-            showToast({ type: 'warning', title: 'No Draft Selected', message: 'Please select a draft blog to analyze.' });
-            draftSelect.focus();
+        if (!url) {
+            toast('warning', 'Missing URL', 'Enter the page you want analyzed.');
+            if (input) input.focus();
             return;
         }
 
-        var country = countrySelect.value;
-        analyzeKeywordBtn.disabled = true;
-        analyzeKeywordBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analyzing...';
-        kwEmptyState.style.display = 'none';
-        kwResultsSection.classList.remove('show');
-        showActionLoader('Researching keywords...');
+        busy(btn, true, 'Analyzing…');
+        setState('url', 'loading');
 
         try {
-            var response = await fetch('/api/optimization/draft-keywords', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ blog_id: blogId, country: country })
+            const result = await requestJson('/api/optimization/url-metrics?url=' + encodeURIComponent(url));
+            const data = result.data || {};
+
+            $('[data-url-source]').innerHTML = '<i class="bi bi-link-45deg" aria-hidden="true"></i> ' +
+                'Metrics for <strong>' + esc(url) + '</strong>' +
+                (result.cached ? ' <span class="opt-raw-count">(cached)</span>' : '');
+
+            const consumed = {};
+            $('[data-url-metrics]').innerHTML = URL_METRICS.map((def) => {
+                [def.key].concat(def.alts || []).forEach((k) => { consumed[k] = true; });
+
+                const raw = pick(data, def);
+                const shown = compact(raw);
+                const missing = shown === null;
+                const value = missing ? 'Not reported' : shown;
+                // A rating out of 100 is a ratio, so it gets a track. A count
+                // has no ceiling to draw one against.
+                const meter = (!missing && def.ratio)
+                    ? '<span class="opt-metric-track"><span class="opt-metric-fill" style="width:' +
+                    Math.max(0, Math.min(100, num(raw))) + '%"></span></span>'
+                    : '';
+
+                return '<div class="opt-metric' + (missing ? ' is-missing' : '') + '">' +
+                    '<span class="opt-metric-label">' + esc(def.label) + '</span>' +
+                    '<span class="opt-metric-value"' +
+                    (missing ? '' : ' title="' + esc(Number(raw).toLocaleString()) + '"') + '>' +
+                    esc(value) + '</span>' +
+                    '<span class="opt-metric-note">' + esc(def.ratio ? 'out of 100' : (def.note || '')) + '</span>' +
+                    meter + '</div>';
+            }).join('');
+
+            // Everything the tiles did not claim. This used to be printed as a
+            // flat grid directly under them — a debug view shipped as UI.
+            const extras = Object.keys(data).filter((key) => {
+                if (consumed[key]) return false;
+                const v = data[key];
+                return v !== null && v !== undefined && v !== '' && typeof v !== 'object';
             });
-            var result = await response.json();
 
-            if (!response.ok || !result.success) {
-                showToast({ type: 'error', title: 'Research Failed', message: result.error || 'Unable to analyze draft.' });
-                kwEmptyState.style.display = 'block';
-                return;
-            }
+            const raw = $('[data-url-raw]');
+            raw.hidden = extras.length === 0;
+            raw.open = false;
+            $('[data-url-raw-count]').textContent = extras.length ? '(' + extras.length + ')' : '';
+            $('[data-url-raw-grid]').innerHTML = extras.map((key) =>
+                '<div class="opt-raw-row"><span class="opt-raw-key">' + esc(humanise(key)) + '</span>' +
+                '<span class="opt-raw-value">' + esc(String(data[key])) + '</span></div>').join('');
 
-            renderKeywordResults(result.data);
+            setState('url', 'results');
 
         } catch (err) {
-            showToast({ type: 'error', title: 'Connection Error', message: 'Failed to connect. Please try again.' });
-            kwEmptyState.style.display = 'block';
+            const message = describeError(err);
+            if (!message) return;
+            setState('url', 'error', message);
+            toast('error', 'Analysis failed', message);
         } finally {
-            hideActionLoader();
-            analyzeKeywordBtn.disabled = false;
-            analyzeKeywordBtn.innerHTML = '<i class="bi bi-search"></i> Research';
+            busy(btn, false);
         }
-    };
-
-    function formatKwNum(num) {
-        if (num === null || num === undefined) return '-';
-        num = Number(num);
-        if (isNaN(num)) return '-';
-        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-        return num.toLocaleString();
     }
 
-    function getDifficultyClass(val) {
-        if (val === null || val === undefined) return '';
-        val = Number(val);
-        if (val >= 70) return 'difficulty-hard';
-        if (val >= 40) return 'difficulty-medium';
-        return 'difficulty-easy';
-    }
+    // ----------------------------------------------------------------------
+    // Domain keywords
+    //
+    // The provider's response shape varies — sometimes an array of rows,
+    // sometimes an object wrapping one, sometimes neither — so the table is
+    // built from whatever keys come back and the scalar leftovers are shown
+    // beside it rather than dropped.
+    // ----------------------------------------------------------------------
 
-    function renderKeywordResults(data) {
-        analyzedKeywordText.textContent = data.blog_title || 'Draft Analysis';
+    function renderDomainTable(rows) {
+        const head = $('[data-domain-head]');
+        const body = $('[data-domain-rows]');
 
-        var html = '';
-        data.keywords.forEach(function(kw) {
-            if (kw.error) {
-                html += '<tr class="kw-row-error"><td>' + escapeHtml(kw.keyword) + '</td><td colspan="5">Failed to fetch metrics</td></tr>';
-                return;
-            }
-            var diff = kw.difficulty;
-            var diffClass = getDifficultyClass(diff);
-            html += '<tr>' +
-                '<td class="kw-cell-keyword">' + escapeHtml(kw.keyword || '') + '</td>' +
-                '<td>' + formatKwNum(kw.searchVolume) + '</td>' +
-                '<td><span class="difficulty-badge ' + diffClass + '">' + (diff !== null && diff !== undefined ? diff + '/100' : '-') + '</span></td>' +
-                '<td>' + (kw.cpc !== null && kw.cpc !== undefined ? '$' + Number(kw.cpc).toFixed(2) : '-') + '</td>' +
-                '<td>' + formatKwNum(kw.clicks) + '</td>' +
-                '<td>' + formatKwNum(kw.trafficPotential) + '</td>' +
-                '</tr>';
+        if (!rows || !rows.length) {
+            head.innerHTML = '';
+            body.innerHTML = '<tr class="opt-table-empty"><td>No keywords found for this domain.</td></tr>';
+            return;
+        }
+
+        // Union of every row's keys, not just the first row's — a provider that
+        // omits an empty field on row 1 used to drop that column entirely.
+        const keys = [];
+        rows.forEach((row) => {
+            Object.keys(row || {}).forEach((k) => {
+                if (keys.indexOf(k) === -1 && typeof row[k] !== 'object') keys.push(k);
+            });
         });
-        kwResultsBody.innerHTML = html;
-        kwResultsSection.classList.add('show');
+
+        head.innerHTML = '<tr>' + keys.map((k) =>
+            '<th scope="col">' + esc(humanise(k)) + '</th>').join('') + '</tr>';
+
+        body.innerHTML = rows.map((row) => '<tr>' + keys.map((k, i) => {
+            const v = row ? row[k] : null;
+            const text = (v === null || v === undefined || v === '') ? '—' : String(v);
+            return '<td' + (i === 0 ? ' class="opt-table-keyword"' : '') + '>' + esc(text) + '</td>';
+        }).join('') + '</tr>').join('');
     }
 
-    // ========== SITE AUDIT ==========
-    var auditDomainInput = document.getElementById('auditDomainInput');
-    var auditResultsSection = document.getElementById('auditResultsSection');
-    var auditEmptyState = document.getElementById('auditEmptyState');
-    var auditResultsHead = document.getElementById('auditResultsHead');
-    var auditResultsBody = document.getElementById('auditResultsBody');
-    var auditedDomainText = document.getElementById('auditedDomainText');
-    var auditBtn = document.getElementById('auditBtn');
-    var auditDetailsCard = document.getElementById('auditDetailsCard');
-    var auditDetailsGrid = document.getElementById('auditDetailsGrid');
+    function renderDomainExtras(fields) {
+        const el = $('[data-domain-extra]');
+        const keys = Object.keys(fields);
+        el.hidden = keys.length === 0;
+        el.innerHTML = keys.map((k) =>
+            '<div class="opt-raw-row"><span class="opt-raw-key">' + esc(humanise(k)) + '</span>' +
+            '<span class="opt-raw-value">' + esc(String(fields[k])) + '</span></div>').join('');
+    }
 
-    auditDomainInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') runSiteAudit();
-    });
+    async function runDomain() {
+        const input = $('#auditDomainInput');
+        const btn = $('.opt-run[data-action="domain"]');
+        const domain = input ? input.value.trim() : '';
 
-    window.runSiteAudit = async function() {
-        var domain = auditDomainInput.value.trim();
         if (!domain) {
-            showToast({ type: 'warning', title: 'Missing Domain', message: 'Please enter a domain to audit.' });
-            auditDomainInput.focus();
+            toast('warning', 'Missing domain', 'Enter the domain you want to look up.');
+            if (input) input.focus();
             return;
         }
 
-        auditBtn.disabled = true;
-        auditBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Auditing...';
-        auditEmptyState.style.display = 'none';
-        auditResultsSection.classList.remove('show');
-        showActionLoader('Auditing...');
+        busy(btn, true, 'Looking up…');
+        setState('domain', 'loading');
 
         try {
-            var response = await fetch('/api/optimization/site-audit?domain=' + encodeURIComponent(domain));
-            var result = await response.json();
+            const result = await requestJson('/api/optimization/site-audit?domain=' + encodeURIComponent(domain));
+            const data = result.data;
 
-            if (!response.ok || !result.success) {
-                showToast({ type: 'error', title: 'Audit Failed', message: result.error || 'Unable to audit this domain.' });
-                auditEmptyState.style.display = 'block';
+            $('[data-domain-source]').innerHTML = '<i class="bi bi-globe2" aria-hidden="true"></i> ' +
+                'Keywords <strong>' + esc(domain) + '</strong> ranks for' +
+                (result.cached ? ' <span class="opt-raw-count">(cached)</span>' : '');
+
+            if (Array.isArray(data)) {
+                renderDomainTable(data);
+                renderDomainExtras({});
+            } else if (data && typeof data === 'object') {
+                let rows = null;
+                const extras = {};
+                Object.keys(data).forEach((key) => {
+                    const v = data[key];
+                    if (Array.isArray(v) && v.length && typeof v[0] === 'object') rows = v;
+                    else if (v !== null && v !== undefined && v !== '' && typeof v !== 'object') extras[key] = v;
+                });
+                renderDomainTable(rows || []);
+                renderDomainExtras(extras);
+            } else {
+                setState('domain', 'error', 'The provider returned a response this screen cannot read.');
                 return;
             }
 
-            renderAuditResults(domain, result.data);
+            setState('domain', 'results');
 
         } catch (err) {
-            showToast({ type: 'error', title: 'Connection Error', message: 'Failed to connect. Please try again.' });
-            auditEmptyState.style.display = 'block';
+            const message = describeError(err);
+            if (!message) return;
+            setState('domain', 'error', message);
+            toast('error', 'Lookup failed', message);
         } finally {
-            hideActionLoader();
-            auditBtn.disabled = false;
-            auditBtn.innerHTML = '<i class="bi bi-shield-check"></i> Audit';
-        }
-    };
-
-    function renderAuditResults(domain, data) {
-        auditedDomainText.textContent = domain;
-
-        // Handle array of keywords (expected response format)
-        if (Array.isArray(data)) {
-            renderAuditTable(data);
-            auditDetailsCard.style.display = 'none';
-            auditResultsSection.classList.add('show');
-            return;
-        }
-
-        // Handle object with nested array (e.g., { keywords: [...], ... })
-        if (typeof data === 'object' && data !== null) {
-            var arrayKey = null;
-            var extraFields = {};
-            Object.keys(data).forEach(function(key) {
-                if (Array.isArray(data[key]) && data[key].length > 0 && typeof data[key][0] === 'object') {
-                    arrayKey = key;
-                } else if (typeof data[key] !== 'object') {
-                    extraFields[key] = data[key];
-                }
-            });
-
-            if (arrayKey) {
-                renderAuditTable(data[arrayKey]);
-            } else {
-                // No array found — display all fields as detail rows
-                auditResultsHead.innerHTML = '';
-                auditResultsBody.innerHTML = '';
-                renderAuditDetails(data);
-                auditResultsSection.classList.add('show');
-                return;
-            }
-
-            // Show extra top-level fields
-            if (Object.keys(extraFields).length > 0) {
-                renderAuditDetails(extraFields);
-                auditDetailsCard.style.display = 'block';
-            } else {
-                auditDetailsCard.style.display = 'none';
-            }
-
-            auditResultsSection.classList.add('show');
-            return;
-        }
-
-        // Fallback: unexpected format
-        showToast({ type: 'warning', title: 'Unexpected Data', message: 'The API returned an unexpected format.' });
-        auditEmptyState.style.display = 'block';
-    }
-
-    function renderAuditTable(rows) {
-        if (!rows || rows.length === 0) {
-            auditResultsHead.innerHTML = '';
-            auditResultsBody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;">No keywords found for this domain.</td></tr>';
-            return;
-        }
-
-        // Build table headers from first row keys
-        var keys = Object.keys(rows[0]);
-        var headHtml = '<tr>';
-        keys.forEach(function(key) {
-            var label = key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^./, function(s) { return s.toUpperCase(); });
-            headHtml += '<th>' + escapeHtml(label) + '</th>';
-        });
-        headHtml += '</tr>';
-        auditResultsHead.innerHTML = headHtml;
-
-        // Build table body
-        var bodyHtml = '';
-        rows.forEach(function(row) {
-            bodyHtml += '<tr>';
-            keys.forEach(function(key, idx) {
-                var val = row[key];
-                if (val === null || val === undefined) val = '-';
-                var cellClass = idx === 0 ? ' class="kw-cell-keyword"' : '';
-                bodyHtml += '<td' + cellClass + '>' + escapeHtml(String(val)) + '</td>';
-            });
-            bodyHtml += '</tr>';
-        });
-        auditResultsBody.innerHTML = bodyHtml;
-    }
-
-    function renderAuditDetails(obj) {
-        var html = '';
-        Object.keys(obj).forEach(function(key) {
-            var val = obj[key];
-            if (val === null || val === undefined || val === '') return;
-            if (typeof val === 'object') return;
-            var label = key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^./, function(s) { return s.toUpperCase(); });
-            html += '<div class="detail-row">' +
-                '<span class="detail-label">' + escapeHtml(label) + '</span>' +
-                '<span class="detail-value">' + escapeHtml(String(val)) + '</span>' +
-                '</div>';
-        });
-        auditDetailsGrid.innerHTML = html;
-        if (html) {
-            auditDetailsCard.style.display = 'block';
+            busy(btn, false);
         }
     }
 
-    // ========== AUTO OPTIMIZE ==========
-    var optimizeDraftSelect = document.getElementById('optimizeDraftSelect');
-    var optimizeRegionSelect = document.getElementById('optimizeRegionSelect');
-    var optimizeBtn = document.getElementById('optimizeBtn');
-    var optimizeLoading = document.getElementById('optimizeLoading');
-    var optimizeResultsSection = document.getElementById('optimizeResultsSection');
-    var optimizeEmptyState = document.getElementById('optimizeEmptyState');
-    var optimizeDraftsLoaded = false;
-    var lastOptimizeData = null;
+    // ----------------------------------------------------------------------
+    // Export — a standalone HTML document
+    //
+    // Detached from the app, so it carries its own literal palette rather than
+    // the token layer: it is opened from the filesystem, where no stylesheet
+    // of ours is loaded. The values are the light-theme tokens.
+    // ----------------------------------------------------------------------
 
-    function loadOptimizeDrafts() {
-        if (optimizeDraftsLoaded) return;
-        fetch('/api/seo/drafts')
-            .then(function(r) { return r.json(); })
-            .then(function(result) {
-                if (result.success && result.drafts) {
-                    optimizeDraftSelect.innerHTML = '<option value="">-- Select a draft --</option>';
-                    result.drafts.forEach(function(d) {
-                        var opt = document.createElement('option');
-                        opt.value = d.id;
-                        opt.textContent = d.title || 'Untitled';
-                        optimizeDraftSelect.appendChild(opt);
-                    });
-                    optimizeDraftsLoaded = true;
-                }
-            })
-            .catch(function() {});
-    }
+    const REPORT_CSS = [
+        '*{margin:0;padding:0;box-sizing:border-box}',
+        'body{font-family:"Google Sans",Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;',
+        'background:#F0F4F9;color:#202124;line-height:1.6;padding:24px}',
+        '.report{max-width:820px;margin:0 auto;background:#fff;border-radius:20px;',
+        'box-shadow:0 1px 3px rgba(60,64,67,.12);overflow:hidden}',
+        '.header{padding:32px;border-bottom:1px solid #E8EAED}',
+        '.header .eyebrow{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#5F6368}',
+        '.header h1{font-size:28px;font-weight:500;margin:4px 0 8px;letter-spacing:-.01em}',
+        '.header .date{font-size:13px;color:#5F6368}',
+        '.scores{display:flex;gap:16px;padding:24px 32px;flex-wrap:wrap}',
+        '.score{flex:1;min-width:150px;padding:16px 20px;border-radius:16px;background:#F0F4F9}',
+        '.score .label{display:block;font-size:12px;color:#5F6368}',
+        '.score .value{display:block;font-size:34px;font-weight:400;line-height:1.1;color:#1F1F1F}',
+        '.score .sub{display:block;font-size:12px;color:#80868B}',
+        '.score.up .value{color:#1E8E3E}.score.down .value{color:#D93025}',
+        '.section{padding:24px 32px;border-top:1px solid #E8EAED}',
+        '.section h2{font-size:16px;font-weight:500;margin-bottom:16px;color:#1F1F1F}',
+        'table{width:100%;border-collapse:collapse;font-size:14px}',
+        'th{background:#F0F4F9;padding:10px 14px;text-align:left;font-size:11px;font-weight:500;',
+        'text-transform:uppercase;letter-spacing:.04em;color:#5F6368}',
+        'td{padding:10px 14px;border-top:1px solid #E8EAED;vertical-align:top}',
+        '.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}',
+        '.fact{background:#F0F4F9;border-radius:12px;padding:14px 16px}',
+        '.fact .label{font-size:12px;color:#5F6368}',
+        '.fact .value{font-size:15px;font-weight:500;color:#1F1F1F}',
+        'ul{list-style:none}li{padding:10px 0 10px 22px;position:relative;border-bottom:1px solid #E8EAED;font-size:14px}',
+        'li:last-child{border-bottom:none}li::before{content:"\\2022";position:absolute;left:4px;color:#0B57D0}',
+        '.pos{color:#1E8E3E;font-weight:500}.neg{color:#D93025;font-weight:500}.flat{color:#5F6368}',
+        '.footer{padding:20px 32px;border-top:1px solid #E8EAED;font-size:12px;color:#80868B;text-align:center}',
+        '@media print{body{background:#fff;padding:0}.report{box-shadow:none;border-radius:0}}'
+    ].join('');
 
-    window.runAutoOptimize = async function() {
-        var blogId = optimizeDraftSelect.value;
-        if (!blogId) {
-            showToast({ type: 'warning', title: 'No Draft Selected', message: 'Please select a draft blog to optimize.' });
-            optimizeDraftSelect.focus();
-            return;
-        }
-
-        var region = optimizeRegionSelect.value;
-        optimizeBtn.disabled = true;
-        optimizeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Optimizing...';
-        if (optimizeEmptyState) optimizeEmptyState.style.display = 'none';
-        optimizeResultsSection.classList.remove('show');
-        optimizeLoading.style.display = 'flex';
-        showActionLoader('Optimizing...');
-
-        try {
-            var response = await fetch('/api/seo/optimize-blog/' + blogId, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ region: region })
-            });
-            var result = await response.json();
-
-            if (!response.ok || !result.success) {
-                showToast({ type: 'error', title: 'Optimization Failed', message: result.error || 'Unable to optimize this blog.' });
-                if (optimizeEmptyState) optimizeEmptyState.style.display = 'block';
-                return;
-            }
-
-            renderOptimizeResults(result);
-
-        } catch (err) {
-            showToast({ type: 'error', title: 'Connection Error', message: 'Failed to connect. Please try again.' });
-            if (optimizeEmptyState) optimizeEmptyState.style.display = 'block';
-        } finally {
-            hideActionLoader();
-            optimizeBtn.disabled = false;
-            optimizeBtn.innerHTML = '<i class="bi bi-magic"></i> Optimize';
-            optimizeLoading.style.display = 'none';
-        }
-    };
-
-    function renderOptimizeResults(data) {
-        lastOptimizeData = data;
-
-        var originalScore = data.original_score || 0;
-        var newScore = data.seo_score || 0;
-        var improvement = data.score_improvement || (newScore - originalScore);
-
-        document.getElementById('optimizeScoreBefore').textContent = Math.round(originalScore);
-        document.getElementById('optimizeScoreAfter').textContent = Math.round(newScore);
-        document.getElementById('optimizeScoreImprovement').textContent = '+' + Math.round(improvement);
-
-        document.getElementById('optimizeNewTitle').textContent = data.new_title || 'N/A';
-        document.getElementById('optimizeGrade').textContent = data.seo_grade || 'N/A';
-
-        var primaryKw = data.primary_keyword;
-        if (primaryKw && typeof primaryKw === 'object') {
-            document.getElementById('optimizePrimaryKw').textContent = primaryKw.keyword || primaryKw.term || 'N/A';
-        } else {
-            document.getElementById('optimizePrimaryKw').textContent = primaryKw || 'N/A';
-        }
-
-        var changesList = document.getElementById('optimizeChangesList');
-        var changes = data.changes_made || [];
-        if (changes.length > 0) {
-            var changesHtml = '';
-            changes.forEach(function(change) {
-                var text = typeof change === 'object' ? (change.description || JSON.stringify(change)) : String(change);
-                changesHtml += '<li>' + escapeHtml(text) + '</li>';
-            });
-            changesList.innerHTML = changesHtml;
-            document.getElementById('optimizeChangesCard').style.display = 'block';
-        } else {
-            document.getElementById('optimizeChangesCard').style.display = 'none';
-        }
-
-        // Render suggestions
-        var suggestionsList = document.getElementById('optimizeSuggestionsList');
-        var suggestionsCard = document.getElementById('optimizeSuggestionsCard');
-        var recommendations = data.recommendations || [];
-        if (recommendations.length > 0) {
-            var sugHtml = '';
-            recommendations.forEach(function(rec) {
-                sugHtml += '<li>' + escapeHtml(String(rec)) + '</li>';
-            });
-            suggestionsList.innerHTML = sugHtml;
-            suggestionsCard.style.display = 'block';
-        } else {
-            suggestionsCard.style.display = 'none';
-        }
-
-        optimizeResultsSection.classList.add('show');
-        showToast({ type: 'success', title: 'Optimization Complete', message: 'Your blog has been optimized and saved!' });
-        loadReports();
-    }
-
-    // ========== EXPORT HTML REPORT ==========
-    window.exportOptimizeReport = function() {
-        if (!lastOptimizeData) return;
-        generateAndDownloadReport(lastOptimizeData);
-    };
-
-    // ========== REPORTS TAB ==========
-    var reportsCache = [];
-
-    async function loadReports() {
-        var listEl = document.getElementById('reportsList');
-        var emptyEl = document.getElementById('reportsEmptyState');
-        if (!listEl) return;
-
-        try {
-            var response = await fetch('/api/optimization/reports');
-            var result = await response.json();
-            if (!result.success) {
-                listEl.innerHTML = '';
-                emptyEl.style.display = 'block';
-                return;
-            }
-            reportsCache = result.reports || [];
-            renderReportsList();
-        } catch (err) {
-            listEl.innerHTML = '';
-            emptyEl.style.display = 'block';
-        }
-    }
-
-    function renderReportsList() {
-        var listEl = document.getElementById('reportsList');
-        var emptyEl = document.getElementById('reportsEmptyState');
-
-        if (reportsCache.length === 0) {
-            listEl.innerHTML = '';
-            emptyEl.style.display = 'block';
-            return;
-        }
-        emptyEl.style.display = 'none';
-
-        var html = '';
-        reportsCache.forEach(function(report, idx) {
-            var title = report.new_title || report.blog_title || 'Untitled Blog';
-            var grade = report.seo_grade || 'N/A';
-            var gradeClass = 'grade-' + grade.charAt(0).toLowerCase();
-            var before = Math.round(report.original_score || 0);
-            var after = Math.round(report.seo_score || 0);
-            var diff = Math.round(report.score_improvement || (after - before));
-            var dateStr = '';
-            if (report.timestamp) {
-                var d = new Date(report.timestamp);
-                dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            }
-
-            html += '<div class="report-card" id="reportCard' + idx + '">'
-                + '<div class="report-card-header">'
-                + '<div class="report-card-meta">'
-                + '<p class="report-card-title">' + escapeHtml(title) + '</p>'
-                + '<span class="report-card-date">' + dateStr + '</span>'
-                + '</div>'
-                + '<div class="report-card-scores">'
-                + '<span class="report-grade ' + gradeClass + '">' + escapeHtml(grade) + '</span>'
-                + '<span class="report-score-pill">'
-                + '<span class="score-before">' + before + '</span>'
-                + '<span class="score-arrow"><i class="bi bi-arrow-right-short"></i></span>'
-                + '<span class="score-after">' + after + '</span>'
-                + '<span class="score-diff">(+' + diff + ')</span>'
-                + '</span>'
-                + '</div>'
-                + '<div class="report-card-actions">'
-                + '<button class="report-dots-btn" onclick="toggleReportMenu(' + idx + ')"><i class="bi bi-three-dots-vertical"></i></button>'
-                + '<div class="report-dropdown" id="reportMenu' + idx + '">'
-                + '<button onclick="toggleReportDetails(' + idx + '); closeReportMenus();"><i class="bi bi-eye"></i> View Details</button>'
-                + '<button onclick="exportSavedReport(' + idx + '); closeReportMenus();"><i class="bi bi-download"></i> Export Report</button>'
-                + '<button class="danger" onclick="deleteReport(\'' + report.id + '\', ' + idx + '); closeReportMenus();"><i class="bi bi-trash3"></i> Delete</button>'
-                + '</div>'
-                + '</div>'
-                + '</div>'
-                + '<div class="report-details" id="reportDetails' + idx + '">'
-                + buildReportDetails(report)
-                + '</div>'
-                + '</div>';
-        });
-        listEl.innerHTML = html;
-    }
-
-    function buildReportDetails(report) {
-        var primaryKw = report.primary_keyword || {};
-        var kwText = primaryKw.keyword || primaryKw.term || 'N/A';
-        var kwVolume = primaryKw.search_volume || 0;
-        var kwDiff = primaryKw.difficulty_score || 0;
-        var kwCpc = primaryKw.cpc || 0;
-
-        var detailsHtml = '<div class="report-details-grid">'
-            + '<div class="report-detail-item"><span class="label">Keyword</span><span class="value">' + escapeHtml(kwText) + '</span></div>'
-            + '<div class="report-detail-item"><span class="label">Volume</span><span class="value">' + Number(kwVolume).toLocaleString() + '</span></div>'
-            + '<div class="report-detail-item"><span class="label">Difficulty</span><span class="value">' + kwDiff + '/100</span></div>'
-            + '<div class="report-detail-item"><span class="label">CPC</span><span class="value">$' + Number(kwCpc).toFixed(2) + '</span></div>'
-            + '</div>';
-
-        var changes = report.changes_made || [];
-        if (changes.length > 0) {
-            detailsHtml += '<ul class="report-changes-list">';
-            changes.forEach(function(change) {
-                var text = typeof change === 'object' ? (change.description || JSON.stringify(change)) : String(change);
-                detailsHtml += '<li>' + escapeHtml(text) + '</li>';
-            });
-            detailsHtml += '</ul>';
-        }
-
-        var recs = report.recommendations || [];
-        if (recs.length > 0) {
-            detailsHtml += '<div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid #e2e8f0"><strong style="font-size:0.78rem;color:#707EAE">Suggestions:</strong><ul class="report-changes-list" style="margin-top:0.35rem">';
-            recs.forEach(function(r) {
-                detailsHtml += '<li>' + escapeHtml(String(r)) + '</li>';
-            });
-            detailsHtml += '</ul></div>';
-        }
-
-        return detailsHtml;
-    }
-
-    window.toggleReportDetails = function(idx) {
-        var el = document.getElementById('reportDetails' + idx);
-        if (el) el.classList.toggle('show');
-    };
-
-    window.toggleReportMenu = function(idx) {
-        var menu = document.getElementById('reportMenu' + idx);
-        var isOpen = menu && menu.classList.contains('show');
-        closeReportMenus();
-        if (!isOpen && menu) menu.classList.add('show');
-    };
-
-    window.closeReportMenus = function() {
-        document.querySelectorAll('.report-dropdown.show').forEach(function(el) {
-            el.classList.remove('show');
-        });
-    };
-
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.report-card-actions')) {
-            closeReportMenus();
-        }
-    });
-
-    window.deleteReport = async function(reportId, idx) {
-        closeAllDropdowns();
-        if (!confirm('Delete this optimization report?')) return;
-        showActionLoader('Deleting...');
-        try {
-            var response = await fetch('/api/optimization/reports/' + reportId, { method: 'DELETE' });
-            var result = await response.json();
-            hideActionLoader();
-            if (result.success) {
-                reportsCache.splice(idx, 1);
-                renderReportsList();
-                showToast({ type: 'success', title: 'Deleted', message: 'Report deleted successfully.' });
-            } else {
-                showToast({ type: 'error', title: 'Error', message: result.error || 'Could not delete report.' });
-            }
-        } catch (err) {
-            hideActionLoader();
-            showToast({ type: 'error', title: 'Error', message: 'Failed to delete report.' });
-        }
-    };
-
-    window.exportSavedReport = function(idx) {
-        var report = reportsCache[idx];
+    function exportReport(report) {
         if (!report) return;
-        generateAndDownloadReport(report);
-    };
 
-    function generateAndDownloadReport(d) {
-        var originalScore = d.original_score || 0;
-        var newScore = d.seo_score || 0;
-        var improvement = d.score_improvement || (newScore - originalScore);
-        var grade = d.seo_grade || 'N/A';
-        var title = d.new_title || d.blog_title || 'Optimized Blog';
-        var primaryKw = d.primary_keyword || {};
-        var kwText = primaryKw.keyword || primaryKw.term || 'N/A';
-        var kwVolume = primaryKw.search_volume || 0;
-        var kwDiff = primaryKw.difficulty_score || 0;
-        var kwCpc = primaryKw.cpc || 0;
-        var changes = d.changes_made || [];
-        var comparison = d.comparison || {};
-        var recommendations = d.recommendations || [];
-        var dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const after = Math.round(num(report.seo_score));
+        const before = Math.round(num(report.original_score));
+        const delta = Math.round(num(report.score_improvement, after - before));
+        const title = report.new_title || report.blog_title || 'Optimized blog';
+        const grade = report.seo_grade || 'N/A';
+        const kw = report.primary_keyword || {};
+        const when = formatDate(report.timestamp || report.created_at) ||
+            new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 
-        var changesRows = '';
-        changes.forEach(function(change) {
-            if (typeof change === 'object') {
-                changesRows += '<tr><td>' + escapeHtml(change.type || '') + '</td><td>' + escapeHtml(change.description || '') + '</td><td>' + escapeHtml(change.before || '—') + '</td><td>' + escapeHtml(change.after || '—') + '</td></tr>';
-            } else {
-                changesRows += '<tr><td colspan="4">' + escapeHtml(String(change)) + '</td></tr>';
+        const deltaClass = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
+        const deltaText = (delta > 0 ? '+' : '') + delta;
+
+        const facts = [
+            ['Primary keyword', primaryKeywordText(report.primary_keyword)],
+            ['Search volume', Number(num(kw.search_volume)).toLocaleString()],
+            ['Difficulty', Math.round(num(kw.difficulty_score)) + ' / 100'],
+            ['CPC', '$' + num(kw.cpc).toFixed(2)],
+            ['SEO grade', grade]
+        ];
+
+        const changes = Array.isArray(report.changes_made) ? report.changes_made : [];
+        const changeRows = changes.map((c) => {
+            if (c && typeof c === 'object') {
+                return '<tr><td>' + esc(c.type || '—') + '</td><td>' + esc(c.description || '') + '</td>' +
+                    '<td>' + esc(c.before || '—') + '</td><td>' + esc(c.after || '—') + '</td></tr>';
             }
-        });
+            return '<tr><td colspan="4">' + esc(String(c)) + '</td></tr>';
+        }).join('');
 
-        var breakdownRows = '';
-        var catLabels = { content: 'Content', headings: 'Headings', keywords: 'Keywords', meta: 'Meta Tags', readability: 'Readability', structure: 'Structure', links: 'Links' };
-        var breakdown = comparison.breakdown_comparison || {};
-        Object.keys(breakdown).forEach(function(cat) {
-            var bef = breakdown[cat].before || 0;
-            var aft = breakdown[cat].after || 0;
-            var diff = aft - bef;
-            var diffStr = diff > 0 ? '+' + diff : String(diff);
-            var diffColor = diff > 0 ? '#05CD99' : diff < 0 ? '#dc3545' : '#707EAE';
-            breakdownRows += '<tr><td>' + (catLabels[cat] || cat) + '</td><td>' + bef + '</td><td>' + aft + '</td><td style="color:' + diffColor + ';font-weight:700">' + diffStr + '</td></tr>';
-        });
+        const breakdown = (report.comparison && report.comparison.breakdown_comparison) || {};
+        const breakdownRows = Object.keys(breakdown).map((key) => {
+            const b = Math.round(num(breakdown[key].before));
+            const a = Math.round(num(breakdown[key].after));
+            const d = a - b;
+            const cls = d > 0 ? 'pos' : d < 0 ? 'neg' : 'flat';
+            const arrow = d > 0 ? '↑ ' : d < 0 ? '↓ ' : '→ ';
+            return '<tr><td>' + esc(BREAKDOWN_LABELS[key] || humanise(key)) + '</td><td>' + b +
+                '</td><td>' + a + '</td><td class="' + cls + '">' + arrow +
+                (d === 0 ? 'no change' : (d > 0 ? '+' : '') + d) + '</td></tr>';
+        }).join('');
 
-        var recommendationsHtml = '';
-        if (recommendations.length > 0) {
-            recommendationsHtml = '<div class="section"><h2>Further Recommendations</h2><ul class="suggestions">';
-            recommendations.forEach(function(rec) {
-                recommendationsHtml += '<li>' + escapeHtml(String(rec)) + '</li>';
-            });
-            recommendationsHtml += '</ul></div>';
-        }
+        const recs = Array.isArray(report.recommendations) ? report.recommendations : [];
 
-        var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>SEO Report - ' + escapeHtml(title) + '</title><style>'
-            + '*{margin:0;padding:0;box-sizing:border-box}'
-            + 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f8fafc;color:#1B2559;line-height:1.6}'
-            + '.report{max-width:800px;margin:2rem auto;background:white;border-radius:20px;box-shadow:0 4px 24px rgba(112,144,176,0.12);overflow:hidden}'
-            + '.header{background:linear-gradient(135deg,#4318FF 0%,#6b4dff 100%);color:white;padding:2.5rem 2rem;text-align:center}'
-            + '.header h1{font-size:1.5rem;font-weight:800;margin-bottom:0.25rem}'
-            + '.header .subtitle{opacity:0.85;font-size:0.9rem}'
-            + '.header .date{opacity:0.7;font-size:0.8rem;margin-top:0.5rem}'
-            + '.scores{display:flex;justify-content:center;gap:1.5rem;padding:2rem;flex-wrap:wrap}'
-            + '.score-box{text-align:center;padding:1.25rem 1.5rem;border-radius:16px;border:1px solid #e2e8f0;min-width:130px;flex:1}'
-            + '.score-box.before{background:rgba(220,53,69,0.04);border-color:rgba(220,53,69,0.2)}'
-            + '.score-box.after{background:rgba(5,205,153,0.04);border-color:rgba(5,205,153,0.2)}'
-            + '.score-box.improvement{background:rgba(67,24,255,0.04);border-color:rgba(67,24,255,0.2)}'
-            + '.score-label{display:block;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#707EAE;margin-bottom:0.25rem}'
-            + '.score-value{display:block;font-size:2rem;font-weight:800}'
-            + '.score-box.before .score-value{color:#dc3545}'
-            + '.score-box.after .score-value{color:#05CD99}'
-            + '.score-box.improvement .score-value{color:#4318FF}'
-            + '.score-sub{display:block;font-size:0.72rem;color:#a3aed0;margin-top:0.15rem}'
-            + '.section{padding:1.5rem 2rem;border-top:1px solid #f1f5f9}'
-            + '.section h2{font-size:1rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;color:#1B2559}'
-            + '.section h2::before{content:"";width:4px;height:18px;background:#4318FF;border-radius:2px}'
-            + 'table{width:100%;border-collapse:collapse;font-size:0.85rem}'
-            + 'th{background:#f8fafc;padding:0.7rem 1rem;text-align:left;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.3px;color:#707EAE;border-bottom:1px solid #e2e8f0}'
-            + 'td{padding:0.7rem 1rem;border-bottom:1px solid #f1f5f9;color:#1B2559}'
-            + 'tr:last-child td{border-bottom:none}'
-            + '.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem}'
-            + '.detail-item{background:#f8fafc;border-radius:10px;padding:0.85rem 1rem;border:1px solid #e2e8f0}'
-            + '.detail-item .label{font-size:0.72rem;font-weight:600;text-transform:uppercase;color:#707EAE;margin-bottom:0.2rem}'
-            + '.detail-item .value{font-size:0.95rem;font-weight:600;color:#1B2559}'
-            + '.grade-badge{display:inline-block;background:linear-gradient(135deg,#4318FF,#6b4dff);color:white;padding:0.3rem 0.8rem;border-radius:20px;font-size:0.8rem;font-weight:700}'
-            + '.suggestions{list-style:none;padding:0}'
-            + '.suggestions li{padding:0.6rem 0 0.6rem 1.5rem;position:relative;border-bottom:1px solid #f1f5f9;font-size:0.88rem}'
-            + '.suggestions li:last-child{border-bottom:none}'
-            + '.suggestions li::before{content:"\\26A1";position:absolute;left:0}'
-            + '.footer{text-align:center;padding:1.5rem 2rem;border-top:1px solid #f1f5f9;color:#a3aed0;font-size:0.8rem}'
-            + '@media print{body{background:white}.report{box-shadow:none;margin:0;border-radius:0}}'
-            + '@media(max-width:600px){.scores{flex-direction:column;align-items:center}.detail-grid{grid-template-columns:1fr}}'
-            + '</style></head><body><div class="report">'
-            + '<div class="header"><h1>SEO Optimization Report</h1><div class="subtitle">' + escapeHtml(title) + '</div><div class="date">' + dateStr + '</div></div>'
-            + '<div class="scores">'
-            + '<div class="score-box before"><span class="score-label">Before</span><span class="score-value">' + Math.round(originalScore) + '</span><span class="score-sub">SEO Score</span></div>'
-            + '<div class="score-box after"><span class="score-label">After</span><span class="score-value">' + Math.round(newScore) + '</span><span class="score-sub">SEO Score</span></div>'
-            + '<div class="score-box improvement"><span class="score-label">Improvement</span><span class="score-value">+' + Math.round(improvement) + '</span><span class="score-sub">Grade: <span class="grade-badge">' + escapeHtml(grade) + '</span></span></div>'
-            + '</div>'
-            + '<div class="section"><h2>Keyword Data</h2><div class="detail-grid">'
-            + '<div class="detail-item"><div class="label">Primary Keyword</div><div class="value">' + escapeHtml(kwText) + '</div></div>'
-            + '<div class="detail-item"><div class="label">Search Volume</div><div class="value">' + Number(kwVolume).toLocaleString() + '</div></div>'
-            + '<div class="detail-item"><div class="label">Difficulty</div><div class="value">' + kwDiff + '/100</div></div>'
-            + '<div class="detail-item"><div class="label">CPC</div><div class="value">$' + Number(kwCpc).toFixed(2) + '</div></div>'
-            + '</div></div>'
-            + '<div class="section"><h2>Changes Made</h2><table><thead><tr><th>Type</th><th>Description</th><th>Before</th><th>After</th></tr></thead><tbody>' + changesRows + '</tbody></table></div>'
-            + '<div class="section"><h2>Score Breakdown</h2><table><thead><tr><th>Category</th><th>Before</th><th>After</th><th>Change</th></tr></thead><tbody>' + breakdownRows + '</tbody></table></div>'
-            + recommendationsHtml
-            + '<div class="footer">Generated by ScriptlyAI &mdash; ' + dateStr + '</div>'
-            + '</div></body></html>';
+        const html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' +
+            '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+            '<title>SEO report — ' + esc(title) + '</title><style>' + REPORT_CSS + '</style></head><body>' +
+            '<div class="report">' +
+            '<div class="header"><p class="eyebrow">SEO optimization report</p><h1>' + esc(title) + '</h1>' +
+            '<p class="date">' + esc(when) + '</p></div>' +
+            '<div class="scores">' +
+            '<div class="score"><span class="label">Before</span><span class="value">' + before +
+            '</span><span class="sub">SEO score</span></div>' +
+            '<div class="score"><span class="label">After</span><span class="value">' + after +
+            '</span><span class="sub">SEO score</span></div>' +
+            '<div class="score ' + deltaClass + '"><span class="label">Change</span><span class="value">' +
+            deltaText + '</span><span class="sub">points · grade ' + esc(grade) + '</span></div>' +
+            '</div>' +
+            '<div class="section"><h2>Keyword</h2><div class="facts">' +
+            facts.map((f) => '<div class="fact"><div class="label">' + esc(f[0]) + '</div>' +
+                '<div class="value">' + esc(f[1]) + '</div></div>').join('') +
+            '</div></div>' +
+            (changeRows ? '<div class="section"><h2>Changes made</h2><table><thead><tr>' +
+                '<th>Type</th><th>Description</th><th>Before</th><th>After</th></tr></thead>' +
+                '<tbody>' + changeRows + '</tbody></table></div>' : '') +
+            (breakdownRows ? '<div class="section"><h2>Score breakdown</h2><table><thead><tr>' +
+                '<th>Category</th><th>Before</th><th>After</th><th>Change</th></tr></thead>' +
+                '<tbody>' + breakdownRows + '</tbody></table></div>' : '') +
+            (recs.length ? '<div class="section"><h2>Go further</h2><ul>' +
+                recs.map((r) => '<li>' + esc(String(r)) + '</li>').join('') + '</ul></div>' : '') +
+            '<div class="footer">Generated by ScriptlyAI · ' + esc(when) + '</div>' +
+            '</div></body></html>';
 
-        var blob = new Blob([html], { type: 'text/html' });
-        var dlUrl = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = dlUrl;
-        var slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 40);
-        a.download = 'seo-report-' + slug + '-' + new Date().toISOString().slice(0, 10) + '.html';
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'report';
+        const stamp = new Date().toISOString().slice(0, 10);
+        const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'seo-report-' + slug + '-' + stamp + '.html';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(dlUrl);
-    }
-    
-    function enhanceSelect(select) {
-        if (select.dataset.csEnhanced) return;
-        select.dataset.csEnhanced = '1';
-
-        var isGrow = select.classList.contains('draft-select');
-        var wrap = document.createElement('div');
-        wrap.className = 'cs-wrap' + (isGrow ? ' cs-wrap--grow' : ' cs-wrap--fixed');
-
-        var trigger = document.createElement('button');
-        trigger.type = 'button';
-        trigger.className = 'cs-trigger';
-        trigger.setAttribute('aria-haspopup', 'listbox');
-        trigger.setAttribute('aria-expanded', 'false');
-
-        var label = document.createElement('span');
-        label.className = 'cs-label';
-        trigger.appendChild(label);
-
-        var caret = document.createElement('i');
-        caret.className = 'bi bi-chevron-down cs-caret';
-        trigger.appendChild(caret);
-
-        var panel = document.createElement('div');
-        panel.className = 'cs-panel';
-        panel.setAttribute('role', 'listbox');
-
-        select.parentNode.insertBefore(wrap, select);
-        wrap.appendChild(select);
-        wrap.appendChild(trigger);
-        wrap.appendChild(panel);
-        select.classList.add('cs-native');
-
-        function buildOptions() {
-            panel.innerHTML = '';
-            Array.prototype.forEach.call(select.options, function(opt, i) {
-                var item = document.createElement('div');
-                item.className = 'cs-option';
-                item.setAttribute('role', 'option');
-                item.dataset.index = i;
-                var text = document.createElement('span');
-                text.className = 'cs-option-text';
-                text.textContent = opt.textContent;
-                var check = document.createElement('i');
-                check.className = 'bi bi-check2 cs-option-check';
-                item.appendChild(text);
-                item.appendChild(check);
-                if (i === select.selectedIndex) item.classList.add('is-selected');
-                item.addEventListener('click', function() {
-                    select.selectedIndex = i;
-                    select.dispatchEvent(new Event('change', { bubbles: true }));
-                    close();
-                });
-                panel.appendChild(item);
-            });
-        }
-
-        function markSelected() {
-            panel.querySelectorAll('.cs-option').forEach(function(el) {
-                el.classList.toggle('is-selected', Number(el.dataset.index) === select.selectedIndex);
-            });
-        }
-
-        function syncLabel() {
-            var opt = select.options[select.selectedIndex];
-            label.textContent = opt ? opt.textContent : '';
-            label.classList.toggle('cs-placeholder', !!(opt && opt.value === ''));
-        }
-
-        function open() {
-            closeAllCustomSelects();
-            buildOptions();
-            var sel = panel.querySelector('.cs-option.is-selected');
-            wrap.classList.add('cs-open');
-            trigger.setAttribute('aria-expanded', 'true');
-            if (sel) sel.scrollIntoView({ block: 'nearest' });
-        }
-        function close() {
-            wrap.classList.remove('cs-open');
-            trigger.setAttribute('aria-expanded', 'false');
-        }
-        wrap._csClose = close;
-
-        trigger.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (wrap.classList.contains('cs-open')) close(); else open();
-        });
-
-        // Rebuild when the native <select> options change (drafts load async).
-        var mo = new MutationObserver(function() {
-            syncLabel();
-            if (wrap.classList.contains('cs-open')) buildOptions();
-        });
-        mo.observe(select, { childList: true });
-
-        select.addEventListener('change', function() { syncLabel(); markSelected(); });
-
-        buildOptions();
-        syncLabel();
+        URL.revokeObjectURL(url);
     }
 
-    function closeAllCustomSelects() {
-        document.querySelectorAll('.cs-wrap.cs-open').forEach(function(w) {
-            if (w._csClose) w._csClose();
-        });
+    // ----------------------------------------------------------------------
+    // Wiring
+    // ----------------------------------------------------------------------
+
+    const ACTIONS = {
+        optimize: askToOptimize,
+        keywords: runKeywords,
+        url: runUrlMetrics,
+        domain: runDomain,
+        'reload-reports': () => { state.reportsLoaded = false; loadReports(); },
+        'export-current': () => exportReport(state.lastRun)
+    };
+
+    root.addEventListener('click', (e) => {
+        const tab = e.target.closest('.opt-tabs .seg-tab');
+        if (tab) { showTab(tab.dataset.tab); return; }
+
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+
+        const action = btn.dataset.action;
+
+        if (action === 'report-detail') { openReportDetail(btn.dataset.id); return; }
+        if (action === 'report-export') { exportReport(reportById(btn.dataset.id)); return; }
+        if (action === 'report-delete') { askToDelete(btn.dataset.id); return; }
+
+        const handler = ACTIONS[action];
+        if (handler) handler();
+    }, { signal });
+
+    // Enter submits the field it was pressed in.
+    root.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const input = e.target.closest('[data-submit]');
+        if (!input) return;
+        e.preventDefault();
+        if (input.dataset.submit === 'url') runUrlMetrics();
+        if (input.dataset.submit === 'domain') runDomain();
+    }, { signal });
+
+    // The SelectPill module owns the menu and writes through to the <select>;
+    // the trigger's visible label is ours to keep in step.
+    root.addEventListener('change', (e) => {
+        const select = e.target.closest('[data-select-pill] select');
+        if (select) syncPillLabel(select);
+    }, { signal });
+
+    const confirmOptimize = $('[data-confirm-optimize]');
+    if (confirmOptimize) {
+        confirmOptimize.addEventListener('click', () => {
+            const modal = bsModal('optimizeConfirmModal');
+            if (modal) modal.hide();
+            runOptimize();
+        }, { signal });
     }
 
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.cs-wrap')) closeAllCustomSelects();
-    });
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeAllCustomSelects();
-    });
+    const confirmDelete = $('[data-confirm-delete]');
+    if (confirmDelete) confirmDelete.addEventListener('click', deleteReport, { signal });
 
-    document.querySelectorAll('.draft-select, .country-select').forEach(enhanceSelect);
+    const detailExport = $('[data-detail-export]');
+    if (detailExport) {
+        detailExport.addEventListener('click', () => exportReport(reportById(state.pendingExportId)), { signal });
+    }
 
+    // Only a hash this page owns moves the tab — an unrelated in-page anchor
+    // must not yank the reader back to the first panel.
+    window.addEventListener('hashchange', () => {
+        const name = (location.hash || '').replace('#', '');
+        if (TABS.indexOf(name) !== -1 && name !== state.tab) showTab(name, false);
+    }, { signal });
+
+    // ----------------------------------------------------------------------
+    // Start
+    // ----------------------------------------------------------------------
+
+    $$('[data-select-pill] select').forEach(syncPillLabel);
+
+    const initial = (location.hash || '').replace('#', '');
+    showTab(TABS.indexOf(initial) === -1 ? 'optimize' : initial, false);
 })();

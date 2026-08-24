@@ -3,7 +3,11 @@ import re
 from app.agents.content_agent import ContentAgent
 from app.agents.formatting_agent import FormattingAgent
 from app.agents.seo_agent import SEOAgent
-from app.utils.parallel import run_parallel_simple, TimedExecution
+from app.services.gemini_client import gemini
+from app.utils.parallel import TimedExecution
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class BlogAgent:
@@ -26,7 +30,7 @@ class BlogAgent:
             enable_seo: Whether to run full SEO optimization (slower, default False)
             region: Target region for SEO keywords (default Pakistan)
         """
-        print(f"--- Starting Optimized AI Pipeline ---")
+        logger.info("Starting Optimized AI Pipeline ---")
 
         try:
             # Step 1: Generate the full blog in a single call
@@ -61,7 +65,7 @@ class BlogAgent:
                         )
                         seo_data['enabled'] = True
                     except Exception as seo_error:
-                        print(f"SEO analysis skipped: {seo_error}")
+                        logger.warning(f"SEO analysis skipped: {seo_error}")
                         seo_data = {"error": str(seo_error), "skipped": True}
 
             # Step 5: Package for Firestore
@@ -88,7 +92,9 @@ class BlogAgent:
                 "seo": seo_data if seo_data else {"enabled": False},
                 "metadata": {
                     "word_count": word_count,
-                    "model_used": "gemini-flash-lite-latest",
+                    # Read from the client so this metadata cannot drift
+                    # out of date the next time the model changes.
+                    "model_used": gemini.default_model,
                     "status": "success",
                     "seo_enabled": enable_seo,
                     "humanized": False,
@@ -97,14 +103,14 @@ class BlogAgent:
             }
 
         except (IndexError, KeyError, ValueError) as e:
-            print(f"Pipeline Error: {e}")
+            logger.exception("Pipeline Error")
             return {
                 "error": str(e),
                 "status": "failed",
                 "partial_outline": outline if 'outline' in locals() else None
             }
-        except Exception as e:
-            print(f"Unexpected Error: {e}")
+        except Exception:
+            logger.exception("Unexpected Error")
             return {"error": "An unexpected system error occurred.", "status": "failed"}
 
     def run_seo_analysis(self, title, content, region="PK"):
@@ -115,7 +121,7 @@ class BlogAgent:
         try:
             return self.seo_agent.optimize_blog(title, content, region)
         except Exception as e:
-            print(f"SEO Analysis Error: {e}")
+            logger.exception("SEO Analysis Error")
             return {"error": str(e), "status": "failed"}
 
     def format_content(self, content, title=""):
@@ -126,5 +132,5 @@ class BlogAgent:
         try:
             return self.formatting_agent.format_blog(content, title)
         except Exception as e:
-            print(f"Formatting Error: {e}")
+            logger.exception("Formatting Error")
             return {"error": str(e), "status": "failed"}

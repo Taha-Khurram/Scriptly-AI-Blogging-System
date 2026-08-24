@@ -1,6 +1,9 @@
 from flask import Blueprint, render_template, request, session, jsonify, redirect, url_for
 from app.firebase.firestore_service import FirestoreService
-from datetime import datetime
+from app.utils.date_utils import to_utc, utcnow
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 schedule_bp = Blueprint('schedule', __name__)
 db_service = FirestoreService()
@@ -30,9 +33,29 @@ def schedule_list():
 
     try:
         site_owner_id = db_service.get_site_owner_for_user(user_id)
-        print(f"[Schedule List] user_id={user_id}, site_owner_id={site_owner_id}")
+        logger.info(f"[Schedule List] user_id={user_id}, site_owner_id={site_owner_id}")
         entries = db_service.get_schedule_entries_for_calendar(site_owner_id)
-        print(f"[Schedule List] Found {len(entries)} entries from schedule_entries collection")
+        logger.info(f"[Schedule List] Found {len(entries)} entries from schedule_entries collection")
+
+        # Author names for the entries written before save_schedule_entry
+        # denormalised them. One read per *distinct* author, not per entry — a
+        # calendar is usually one or two people's work.
+        missing_authors = {
+            entry.get("author_id")
+            for entry in entries
+            if entry.get("author_id") and not entry.get("author_name")
+        }
+        author_names = {}
+        for author_id in missing_authors:
+            try:
+                doc = db_service.db.collection("users").document(author_id).get()
+                if doc.exists:
+                    u = doc.to_dict()
+                    author_names[author_id] = (
+                        u.get("name") or (u.get("email") or "").split("@")[0] or ""
+                    )
+            except Exception:
+                logger.exception(f"[Schedule List] Could not resolve author {author_id}")
 
         result = []
         for entry in entries:
@@ -54,21 +77,23 @@ def schedule_list():
                     entry_status = "PUBLISHED"
                     db_service.update_schedule_entry_status(blog_id, "PUBLISHED")
 
+            # Empty, never a placeholder. These two used to default to
+            # "General" / "Unknown" against fields nothing had ever written, so
+            # every row on the calendar carried the same two invented values; the
+            # client now simply omits a label it has no value for.
             result.append({
                 "id": blog_id,
                 "title": (entry.get("title") or "Untitled").replace("**", ""),
-                "category": entry.get("category", "General"),
-                "author": entry.get("author", "Unknown"),
+                "category": entry.get("category") or "",
+                "author": entry.get("author_name") or author_names.get(entry.get("author_id"), ""),
                 "status": entry_status,
                 "scheduled_at": display_date
             })
 
-        print(f"[Schedule List] Returning {len(result)} entries")
+        logger.info(f"[Schedule List] Returning {len(result)} entries")
         return jsonify({"success": True, "blogs": result})
     except Exception as e:
-        print(f"❌ Schedule list error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Schedule list error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -87,53 +112,51 @@ def best_publish_time():
     else:
         analytics_user_id = user_id
 
-    print(f"[BestTime] user_id={user_id}, role={user_role}, analytics_user_id={analytics_user_id}")
+    logger.info(f"[BestTime] user_id={user_id}, role={user_role}, analytics_user_id={analytics_user_id}")
 
     cache_key = f"best_publish_time:{analytics_user_id}"
     cached = cache.get(cache_key)
     if cached:
-        print(f"[BestTime] Returning cached result")
+        logger.info("[BestTime] Returning cached result")
         return jsonify(cached)
 
     try:
         from app.routes.analytics_routes import _get_analytics_config, _get_credentials
         config = _get_analytics_config(analytics_user_id)
-        print(f"[BestTime] Analytics config: {config}")
+        logger.info(f"[BestTime] Analytics config: {config}")
 
         if not config or not config.get('property_id'):
-            print(f"[BestTime] NO ANALYTICS CONFIG FOUND for user {analytics_user_id}")
+            logger.info(f"[BestTime] NO ANALYTICS CONFIG FOUND for user {analytics_user_id}")
             result = {"success": True, "suggestions": [], "reason": "no_analytics",
                       "message": "Connect Google Analytics in Settings to get personalized suggestions."}
             return jsonify(result)
 
         property_id = config['property_id']
-        print(f"[BestTime] Property ID: {property_id}")
+        logger.info(f"[BestTime] Property ID: {property_id}")
 
         creds = _get_credentials(analytics_user_id)
         if not creds:
-            print(f"[BestTime] CREDENTIALS FAILED - token refresh may have failed")
+            logger.error("[BestTime] CREDENTIALS FAILED - token refresh may have failed")
             result = {"success": True, "suggestions": [], "reason": "no_credentials",
                       "message": "Analytics credentials expired. Please reconnect in Settings."}
             return jsonify(result)
 
-        print(f"[BestTime] Credentials OK, calling PublishTimeAgent...")
+        logger.info("[BestTime] Credentials OK, calling PublishTimeAgent...")
 
         from app.agents.publish_time_agent import PublishTimeAgent
         agent = PublishTimeAgent()
         result = agent.get_best_times(creds, property_id)
 
-        print(f"[BestTime] Agent result: success={result.get('success')}, suggestions={len(result.get('suggestions', []))}, reason={result.get('reason', 'none')}")
+        logger.info(f"[BestTime] Agent result: success={result.get('success')}, suggestions={len(result.get('suggestions', []))}, reason={result.get('reason', 'none')}")
 
         if result.get('suggestions'):
             for s in result['suggestions']:
-                print(f"[BestTime]   -> {s['display_time']} (score={s['score']}, {s['reasoning']})")
+                logger.info(f"[BestTime]   -> {s['display_time']} (score={s['score']}, {s['reasoning']})")
 
         cache.set(cache_key, result, ttl=21600)
         return jsonify(result)
     except Exception as e:
-        import traceback
-        print(f"[BestTime] EXCEPTION: {e}")
-        traceback.print_exc()
+        logger.exception("[BestTime] EXCEPTION")
         return jsonify({"success": True, "suggestions": [], "reason": "error",
                         "message": f"Analytics error: {str(e)}"})
 
@@ -189,7 +212,7 @@ def available_blogs():
         results.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
         return jsonify({"success": True, "blogs": results})
     except Exception as e:
-        print(f"❌ Available blogs error: {e}")
+        logger.exception("Available blogs error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -208,13 +231,14 @@ def schedule_blog(blog_id):
     if not scheduled_at_str:
         return jsonify({"success": False, "error": "scheduled_at is required"}), 400
 
-    try:
-        scheduled_at = datetime.fromisoformat(scheduled_at_str.replace('Z', '+00:00'))
-        scheduled_at = scheduled_at.replace(tzinfo=None)
-    except (ValueError, TypeError):
+    # to_utc converts the instant; the previous .replace(tzinfo=None) discarded
+    # the offset instead, so a request for 10:00+05:00 was stored as 10:00 UTC
+    # and published five hours late.
+    scheduled_at = to_utc(scheduled_at_str)
+    if scheduled_at is None:
         return jsonify({"success": False, "error": "Invalid date format"}), 400
 
-    if scheduled_at <= datetime.utcnow():
+    if scheduled_at <= utcnow():
         return jsonify({"success": False, "error": "Scheduled time must be in the future"}), 400
 
     blog_data = db_service.get_blog_by_id(blog_id)
@@ -248,7 +272,7 @@ def schedule_blog(blog_id):
 
             db_service.update_blog_content(blog_id, title, formatted_content)
         except Exception as e:
-            print(f"⚠ Formatting warning during schedule (continuing): {e}")
+            logger.warning(f"Formatting warning during schedule (continuing): {e}")
 
         # Generate embedding
         try:
@@ -256,18 +280,33 @@ def schedule_blog(blog_id):
             search_agent = SemanticSearchAgent()
             search_agent.generate_and_store_embedding(blog_id)
         except Exception as e:
-            print(f"⚠ Embedding warning during schedule (continuing): {e}")
+            logger.warning(f"Embedding warning during schedule (continuing): {e}")
 
         success = db_service.update_blog_status(blog_id, "SCHEDULED", scheduled_at=scheduled_at, scheduled_by=user_id)
 
         if success:
             site_owner_id = db_service.get_site_owner_for_user(user_id) or user_id
+
+            # Denormalised onto the entry so the calendar can label a row without
+            # reading the blog and the author back for every event it draws.
+            author_id = blog_data.get('author_id', user_id)
+            author_name = ''
+            try:
+                author_doc = db_service.db.collection("users").document(author_id).get()
+                if author_doc.exists:
+                    a = author_doc.to_dict()
+                    author_name = a.get('name') or (a.get('email') or '').split('@')[0] or ''
+            except Exception:
+                logger.exception("Could not resolve author name for schedule entry")
+
             db_service.save_schedule_entry(
                 blog_id=blog_id,
                 title=blog_data.get('title', 'Untitled'),
                 scheduled_at=scheduled_at,
-                author_id=blog_data.get('author_id', user_id),
-                site_owner_id=site_owner_id
+                author_id=author_id,
+                site_owner_id=site_owner_id,
+                category=blog_data.get('category') or '',
+                author_name=author_name
             )
 
             db_service.log_activity(
@@ -286,7 +325,7 @@ def schedule_blog(blog_id):
         doc_ref.update({
             "requested_schedule_at": scheduled_at,
             "status": "UNDER_REVIEW",
-            "updated_at": datetime.utcnow()
+            "updated_at": utcnow()
         })
 
         db_service.log_activity(
@@ -317,13 +356,14 @@ def reschedule_blog(blog_id):
     if not scheduled_at_str:
         return jsonify({"success": False, "error": "scheduled_at is required"}), 400
 
-    try:
-        scheduled_at = datetime.fromisoformat(scheduled_at_str.replace('Z', '+00:00'))
-        scheduled_at = scheduled_at.replace(tzinfo=None)
-    except (ValueError, TypeError):
+    # to_utc converts the instant; the previous .replace(tzinfo=None) discarded
+    # the offset instead, so a request for 10:00+05:00 was stored as 10:00 UTC
+    # and published five hours late.
+    scheduled_at = to_utc(scheduled_at_str)
+    if scheduled_at is None:
         return jsonify({"success": False, "error": "Invalid date format"}), 400
 
-    if scheduled_at <= datetime.utcnow():
+    if scheduled_at <= utcnow():
         return jsonify({"success": False, "error": "Scheduled time must be in the future"}), 400
 
     blog_data = db_service.get_blog_by_id(blog_id)
@@ -337,7 +377,7 @@ def reschedule_blog(blog_id):
 
     if success:
         doc_ref = db_service.db.collection("schedule_entries").document(blog_id)
-        doc_ref.update({"scheduled_at": scheduled_at, "status": "SCHEDULED", "updated_at": datetime.utcnow()})
+        doc_ref.update({"scheduled_at": scheduled_at, "status": "SCHEDULED", "updated_at": utcnow()})
 
         db_service.log_activity(
             user_id=user_id,

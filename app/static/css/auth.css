@@ -1,219 +1,686 @@
-/* 
+/*
    --------------------------------------------------------------------------
-   Auth Pages Styling (Login / Signup) - Premium Admin Style Sync
+   Scriptly — Authentication
+
+   The front door to the studio. Two panes:
+
+     · Brand pane   fixed ink surface with a slow brand-gradient aurora. It
+                    stays dark in both themes on purpose — it is the one
+                    constant that anchors the split.
+     · Form pane    canvas surface, one narrow column, soft-filled fields.
+
+   Everything is token-driven (see dashboard.css) so both themes come from the
+   same markup. The gradient appears exactly twice: the aurora and the mark.
    --------------------------------------------------------------------------
 */
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+/* ==========================================================================
+   1. SHELL
+   ========================================================================== */
 
-body {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    color: #2B3674;
-}
-
-.auth-wrapper {
-    display: flex;
+.auth-shell {
+    display: grid;
+    /* minmax(0, …) rather than a bare fr: a grid track's automatic minimum is
+       its content's min-content width, which lets the form column push past a
+       narrow viewport and scroll the whole page sideways. */
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
     min-height: 100vh;
+    min-height: 100dvh;
     width: 100%;
-    background: #ffffff;
+    max-width: 100%;
+    background: var(--bg-canvas);
     overflow-x: hidden;
 }
 
-/* 
-   LEFT SIDE - Branding / Welcome 
-   (Matches the Admin Sidebar depth)
-*/
-.auth-left {
-    flex: 6;
+/* ==========================================================================
+   2. BRAND PANE
+   ========================================================================== */
+
+.auth-brand {
+    /* Scoped ink palette — deliberately theme-independent. */
+    --ink: #121316;
+    --ink-2: #1B1D21;
+    --on-brand: #F3F4F6;
+    --on-brand-muted: rgba(243, 244, 246, 0.64);
+    --on-brand-line: rgba(255, 255, 255, 0.10);
+
     position: relative;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    padding: 4rem;
-    color: white;
-    text-align: center;
+    justify-content: space-between;
+    gap: var(--sp-12);
+    padding: var(--sp-12) clamp(var(--sp-10), 5vw, var(--sp-16));
+    background: var(--ink);
+    color: var(--on-brand);
     overflow: hidden;
-    background: #111c44;
+    isolation: isolate;
 }
 
-.auth-left::before {
+/* --- Aurora: the brand gradient, diffused past recognition --------------- */
+.auth-brand::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-image: url('https://images.unsplash.com/photo-1497366216548-37526070297c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    z-index: 0;
+    inset: -30%;
+    z-index: -2;
+    background:
+        radial-gradient(38% 44% at 18% 22%, #4285F4 0%, transparent 68%),
+        radial-gradient(42% 46% at 78% 34%, #9B72CB 0%, transparent 70%),
+        radial-gradient(46% 42% at 46% 88%, #D96570 0%, transparent 72%);
+    opacity: 0.30;
+    filter: blur(24px);
+    animation: authAurora 26s var(--ease-standard) infinite alternate;
 }
 
-.auth-left::after {
+/* A fine grid, barely there — gives the flat ink some structure. */
+.auth-brand::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    /* Exact Dashboard Sidebar Gradient Overlay */
-    background: linear-gradient(180deg, rgba(17, 28, 68, 0.94) 0%, rgba(11, 16, 43, 0.98) 100%);
-    z-index: 1;
+    inset: 0;
+    z-index: -1;
+    background-image:
+        linear-gradient(var(--on-brand-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--on-brand-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(120% 100% at 50% 0%, #000 10%, transparent 78%);
+    -webkit-mask-image: radial-gradient(120% 100% at 50% 0%, #000 10%, transparent 78%);
+    opacity: 0.5;
 }
 
-.auth-left-content {
+@keyframes authAurora {
+    0% {
+        transform: translate3d(-3%, -2%, 0) scale(1);
+    }
+
+    50% {
+        transform: translate3d(2%, 3%, 0) scale(1.08);
+    }
+
+    100% {
+        transform: translate3d(4%, -3%, 0) scale(1.02);
+    }
+}
+
+/* --- Mark --------------------------------------------------------------- */
+.auth-brand-mark {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    flex-shrink: 0;
+}
+
+.auth-brand-mark .logo-img {
+    height: 30px;
+    width: auto;
+    /* The wordmark ships dark — invert it for the ink pane. */
+    filter: brightness(0) invert(1);
+    opacity: 0.94;
+}
+
+.auth-brand-wordmark {
+    font-family: var(--font-display);
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-medium);
+    letter-spacing: -0.01em;
+    color: var(--on-brand);
+}
+
+/* --- Copy --------------------------------------------------------------- */
+.auth-brand-body {
+    max-width: 36ch;
+}
+
+.auth-brand-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-2);
+    margin-bottom: var(--sp-5);
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--on-brand-line);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--on-brand-muted);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.auth-brand-eyebrow .material-symbols-outlined {
+    font-size: 16px;
+    background: var(--brand-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.auth-brand h1,
+.auth-brand-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 3.2vw, 2.75rem);
+    font-weight: var(--fw-regular);
+    line-height: 1.14;
+    letter-spacing: -0.02em;
+    color: var(--on-brand);
+    margin: 0 0 var(--sp-4);
+    /* Even line lengths — the headline is the one place ragged wrapping shows. */
+    text-wrap: balance;
+}
+
+/* The gradient reads as one sweep only if the phrase stays on one line. */
+.auth-brand-title em {
+    white-space: nowrap;
+}
+
+.auth-brand-title em {
+    font-style: normal;
+    background: var(--brand-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.auth-brand-lede {
+    font-size: var(--fs-body);
+    line-height: var(--lh-relaxed);
+    color: var(--on-brand-muted);
+    margin: 0;
+    max-width: 42ch;
+}
+
+/* --- Proof points ------------------------------------------------------- */
+.auth-brand-points {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    margin-top: var(--sp-10);
+    padding: 0;
+    list-style: none;
+}
+
+.auth-point {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
+}
+
+.auth-point-icon {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid var(--on-brand-line);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--on-brand);
+}
+
+.auth-point-icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.auth-point-text {
+    min-width: 0;
+}
+
+.auth-point-title {
+    display: block;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--on-brand);
+    line-height: 1.4;
+}
+
+.auth-point-note {
+    display: block;
+    font-size: var(--fs-xs);
+    color: var(--on-brand-muted);
+    line-height: 1.5;
+    margin-top: 2px;
+}
+
+/* --- Foot --------------------------------------------------------------- */
+.auth-brand-foot {
+    font-size: var(--fs-xs);
+    color: var(--on-brand-muted);
+    border-top: 1px solid var(--on-brand-line);
+    padding-top: var(--sp-5);
+    flex-shrink: 0;
+}
+
+/* ==========================================================================
+   3. FORM PANE
+   ========================================================================== */
+
+/* The pane sits a step above the canvas so that soft-filled fields, which are
+   canvas-coloured by definition, stay visible without gaining a border. */
+.auth-pane {
     position: relative;
-    z-index: 2;
-    max-width: 500px;
-    margin: 0 auto;
-}
-
-.auth-left h1 {
-    font-size: 3.5rem;
-    font-weight: 800;
-    margin-bottom: 1.5rem;
-    color: white;
-    letter-spacing: -0.04em;
-    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-}
-
-.auth-left p {
-    font-size: 1.15rem;
-    opacity: 0.8;
-    line-height: 1.7;
-    font-weight: 400;
-}
-
-/* 
-   RIGHT SIDE - Form 
-*/
-.auth-right {
-    flex: 5;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #ffffff;
-    padding: 2rem;
-    position: relative;
+    padding: var(--sp-12) var(--sp-8);
+    background: var(--surface-1);
+    min-width: 0;
+    overflow: hidden;
 }
 
-.auth-card {
-    width: 100%;
-    max-width: 450px;
-    padding: 2rem;
-    text-align: left;
-    /* Aligned left like modern premium dashboards */
-}
-
-.auth-card h2 {
-    font-size: 2.25rem;
-    font-weight: 800;
-    color: #2B3674;
-    margin-bottom: 0.5rem;
-    letter-spacing: -0.02em;
-}
-
-.auth-subtitle {
-    color: #707EAE;
-    margin-bottom: 2.5rem;
-    font-size: 1rem;
-    font-weight: 500;
-}
-
-/* Form Styling */
-.auth-card form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.input-group {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.input-group label {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: #2B3674;
-    margin-left: 0.25rem;
-}
-
-.input-wrapper {
-    position: relative;
-}
-
-.auth-card input {
-    width: 100%;
-    padding: 1rem 1.25rem;
-    padding-left: 3rem;
-    font-size: 0.95rem;
-    border: 1px solid #E0E5F2;
-    border-radius: 16px;
-    /* Matching Dashboard Radius */
-    background: #ffffff;
-    color: #2B3674;
-    transition: all 0.2s ease;
-}
-
-.auth-card input:focus {
-    border-color: #4318FF;
-    box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.05);
-    outline: none;
-}
-
-.input-icon {
+/* Very low radial accent behind the column — the same trick the create-blog
+   empty state uses, so the two "first screens" feel related. */
+.auth-pane::before {
+    content: '';
     position: absolute;
-    left: 1.25rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #A3AED0;
-    font-size: 1.1rem;
+    top: -10%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(620px, 90%);
+    aspect-ratio: 1;
+    background: radial-gradient(circle, var(--accent-tint) 0%, transparent 62%);
     pointer-events: none;
 }
 
-.auth-card input:focus+.input-icon {
-    color: #4318FF;
+.auth-pane-tools {
+    position: absolute;
+    top: var(--sp-6);
+    right: var(--sp-6);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    z-index: 2;
 }
 
-/* Primary Button */
-.primary-btn {
-    width: 100%;
-    padding: 1rem;
-    margin-top: 1rem;
-    background: #4318FF;
-    color: white;
+.auth-theme-toggle {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
     border: none;
-    border-radius: 16px;
-    font-weight: 700;
-    font-size: 1rem;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-2);
     cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 10px 20px rgba(67, 24, 255, 0.15);
+    transition: background-color var(--dur-fast) var(--ease-standard),
+        color var(--dur-fast) var(--ease-standard);
 }
 
+.auth-theme-toggle:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.auth-card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: min(400px, 100%);
+    min-width: 0;
+}
+
+/* Compact mark — only shown once the brand pane is gone. */
+.auth-card-mark {
+    display: none;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-8);
+}
+
+.auth-card-mark .logo-img {
+    height: 30px;
+    width: auto;
+}
+
+/* --- Card header -------------------------------------------------------- */
+.auth-eyebrow {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    margin: 0 0 var(--sp-1);
+}
+
+.auth-title {
+    font-family: var(--font-display);
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+    margin: 0 0 var(--sp-2);
+}
+
+.auth-subtitle {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    line-height: var(--lh-body);
+    margin: 0 0 var(--sp-8);
+}
+
+/* ==========================================================================
+   4. FIELDS
+   Soft-filled, no resting stroke — the field lifts to a raised surface on
+   focus instead of drawing a heavier outline. Same idiom as .prompt-box.
+   ========================================================================== */
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+}
+
+.auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-width: 0;
+}
+
+.auth-label {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
+}
+
+/* Kept as .input-wrapper: firebase_google.js toggles .error / .success here. */
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    transition: background-color var(--dur-fast) var(--ease-standard),
+        border-color var(--dur-fast) var(--ease-standard),
+        box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.input-wrapper:hover {
+    background: var(--surface-3);
+}
+
+.input-wrapper:focus-within {
+    background: var(--surface-1);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring), var(--elev-1);
+}
+
+.field-icon {
+    position: absolute;
+    left: var(--sp-4);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    font-size: 20px;
+    pointer-events: none;
+    transition: color var(--dur-fast) var(--ease-standard);
+}
+
+.input-wrapper:focus-within .field-icon {
+    color: var(--accent);
+}
+
+.auth-input,
+.auth-card input[type="text"],
+.auth-card input[type="email"],
+.auth-card input[type="password"] {
+    width: 100%;
+    min-width: 0;
+    padding: 0.875rem var(--sp-4) 0.875rem 3rem;
+    border: none;
+    border-radius: inherit;
+    background: transparent;
+    color: var(--text-1);
+    font-family: inherit;
+    font-size: var(--fs-body);
+    line-height: 1.4;
+}
+
+.auth-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.auth-input::placeholder {
+    color: var(--text-faint);
+}
+
+/* A field with a reveal button needs room on the right. */
+.input-wrapper:has(.auth-reveal) .auth-input {
+    padding-right: 3rem;
+}
+
+/* Chrome paints autofilled fields a fixed pale yellow, which wrecks dark mode.
+   The inset shadow repaints the field in our own surface colour. */
+.auth-input:-webkit-autofill,
+.auth-input:-webkit-autofill:hover,
+.auth-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--text-1);
+    -webkit-box-shadow: 0 0 0 100px var(--surface-2) inset;
+    caret-color: var(--text-1);
+    transition: background-color 100000s ease-in-out 0s;
+}
+
+.input-wrapper:focus-within .auth-input:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 100px var(--surface-1) inset;
+}
+
+/* --- Reveal button ------------------------------------------------------ */
+.auth-reveal {
+    position: absolute;
+    right: var(--sp-2);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-standard),
+        color var(--dur-fast) var(--ease-standard);
+}
+
+.auth-reveal:hover {
+    background: var(--surface-3);
+    color: var(--text-2);
+}
+
+.auth-reveal .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* --- Validation --------------------------------------------------------- */
+.input-wrapper.error {
+    border-color: var(--danger);
+    background: var(--danger-soft);
+}
+
+.input-wrapper.error:focus-within {
+    box-shadow: 0 0 0 3px var(--danger-border);
+}
+
+.input-wrapper.error .field-icon {
+    color: var(--danger);
+}
+
+.input-wrapper.success {
+    border-color: var(--success-border);
+}
+
+.input-wrapper.success:focus-within {
+    border-color: var(--success);
+    box-shadow: 0 0 0 3px var(--success-border);
+}
+
+/* .show is toggled by firebase_google.js / forgot_password.js */
+.error-message {
+    display: none;
+    align-items: center;
+    gap: var(--sp-1);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--danger);
+    line-height: 1.45;
+}
+
+.error-message.show {
+    display: flex;
+}
+
+.error-message::before {
+    content: 'error';
+    font-family: 'Material Symbols Outlined';
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    font-size: 15px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.auth-hint,
+.password-hint {
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    line-height: 1.45;
+}
+
+/* --- Password requirements ---------------------------------------------
+   Rules that fill in as they are satisfied. Far calmer than a red error
+   string re-rendering on every keystroke.
+   ----------------------------------------------------------------------- */
+.pw-rules {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-1) var(--sp-3);
+    margin: var(--sp-1) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.pw-rules li {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    line-height: 1.5;
+    transition: color var(--dur-fast) var(--ease-standard);
+}
+
+.pw-rules li::before {
+    content: '';
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    background: transparent;
+    transition: background-color var(--dur-fast) var(--ease-standard),
+        border-color var(--dur-fast) var(--ease-standard);
+}
+
+.pw-rules li.met {
+    color: var(--success);
+}
+
+.pw-rules li.met::before {
+    border-color: var(--success);
+    background: var(--success) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 4.7 8.4 9.5 3.6' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 10px 10px no-repeat;
+}
+
+@media (max-width: 380px) {
+    .pw-rules {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- Row: remember / forgot -------------------------------------------- */
+.auth-field-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: calc(var(--sp-2) * -1);
+}
+
+.auth-link {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--accent);
+}
+
+.auth-link:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+/* ==========================================================================
+   5. BUTTONS
+   ========================================================================== */
+
+.auth-submit,
+.primary-btn {
+    position: relative;
+    width: 100%;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-2);
+    padding: 0 var(--sp-6);
+    border: none;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-standard),
+        box-shadow var(--dur-fast) var(--ease-standard),
+        transform var(--dur-fast) var(--ease-standard);
+}
+
+.auth-submit:hover,
 .primary-btn:hover {
-    background: #3311db;
-    transform: translateY(-2px);
-    box-shadow: 0 15px 30px rgba(67, 24, 255, 0.25);
+    background: var(--accent-hover);
+    box-shadow: var(--elev-2);
 }
 
+.auth-submit:active,
+.primary-btn:active {
+    transform: translateY(1px);
+    box-shadow: var(--elev-1);
+}
+
+.auth-submit:disabled,
 .primary-btn:disabled,
+.auth-oauth:disabled,
 .google-outline-btn:disabled {
-    opacity: 0.7;
+    opacity: 0.6;
     cursor: not-allowed;
+    box-shadow: none;
     transform: none;
 }
 
+/* --- Loading ------------------------------------------------------------ */
+.auth-submit.loading,
 .primary-btn.loading,
+.auth-oauth.loading,
 .google-outline-btn.loading {
-    position: relative;
     color: transparent;
+    pointer-events: none;
 }
 
+.auth-submit.loading > *,
+.primary-btn.loading > *,
+.auth-oauth.loading > *,
+.google-outline-btn.loading > * {
+    visibility: hidden;
+}
+
+.auth-submit.loading::after,
 .primary-btn.loading::after,
+.auth-oauth.loading::after,
 .google-outline-btn.loading::after {
     content: '';
     position: absolute;
@@ -221,149 +688,299 @@ body {
     height: 20px;
     top: 50%;
     left: 50%;
-    margin-left: -10px;
-    margin-top: -10px;
-    border: 3px solid transparent;
-    border-top-color: currentColor;
+    margin: -10px 0 0 -10px;
+    border: 2px solid transparent;
     border-radius: 50%;
-    animation: btn-spinner 0.8s linear infinite;
+    border-top-color: var(--text-on-accent);
+    animation: authSpin 0.7s linear infinite;
 }
 
-.primary-btn.loading::after {
-    border-top-color: white;
-}
-
+.auth-oauth.loading::after,
 .google-outline-btn.loading::after {
-    border-top-color: #2B3674;
+    border-top-color: var(--accent);
 }
 
-@keyframes btn-spinner {
+@keyframes authSpin {
     to {
         transform: rotate(360deg);
     }
 }
 
-/* Divider */
+/* --- Divider ------------------------------------------------------------ */
+.auth-divider,
 .divider {
     display: flex;
     align-items: center;
-    text-align: center;
-    margin: 2rem 0;
-    color: #A3AED0;
-    font-size: 0.875rem;
-    font-weight: 600;
+    gap: var(--sp-4);
+    margin: var(--sp-6) 0;
+    color: var(--text-faint);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
 }
 
+.auth-divider::before,
+.auth-divider::after,
 .divider::before,
 .divider::after {
     content: '';
     flex: 1;
-    border-bottom: 2px solid #F4F7FE;
+    height: 1px;
+    background: var(--border-subtle);
 }
 
-.divider::before {
-    margin-right: 1.5rem;
-}
-
-.divider::after {
-    margin-left: 1.5rem;
-}
-
-/* Google Button */
+/* --- OAuth -------------------------------------------------------------- */
+.auth-oauth,
 .google-outline-btn {
-    display: flex;
+    position: relative;
+    width: 100%;
+    height: 48px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
-    width: 100%;
-    padding: 1rem;
-    border: none;
-    border-radius: 16px;
-    background: #F4F7FE;
-    font-weight: 700;
-    color: #2B3674;
-    font-size: 0.95rem;
-    transition: all 0.2s ease;
+    gap: var(--sp-3);
+    padding: 0 var(--sp-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-1);
+    color: var(--text-1);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-standard),
+        border-color var(--dur-fast) var(--ease-standard),
+        box-shadow var(--dur-fast) var(--ease-standard);
 }
 
+.auth-oauth:hover,
 .google-outline-btn:hover {
-    background: #E9EDF7;
-    transform: translateY(-1px);
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+    box-shadow: var(--elev-1);
 }
 
-/* Footer Link */
+.auth-oauth svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+/* ==========================================================================
+   6. FOOTER / ALTERNATE ACTION
+   ========================================================================== */
+
+.auth-alt,
 .auth-footer {
-    margin-top: 1.5rem;
-    font-size: 0.95rem;
-    color: #707EAE;
+    margin-top: var(--sp-8);
     text-align: center;
-    width: 100%;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
 }
 
+.auth-alt a,
 .auth-footer a {
-    color: #4318FF;
-    font-weight: 700;
-    text-decoration: none;
-    margin-left: 0.5rem;
+    color: var(--accent);
+    font-weight: var(--fw-medium);
+    margin-left: var(--sp-1);
 }
 
+.auth-alt a:hover,
 .auth-footer a:hover {
     text-decoration: underline;
 }
 
-/* Validation Styles */
-.error-message {
-    color: #E53E3E;
-    font-size: 0.8rem;
-    font-weight: 500;
-    margin-top: 0.25rem;
-    margin-left: 0.25rem;
-    display: none;
+.auth-legal {
+    margin-top: var(--sp-6);
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    line-height: 1.5;
+    text-align: center;
 }
 
-.error-message.show {
-    display: block;
+.auth-legal a {
+    color: var(--text-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
-.input-wrapper.error input {
-    border-color: #E53E3E;
+/* Back link (reset flow) */
+.auth-back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
 }
 
-.input-wrapper.error input:focus {
-    box-shadow: 0 0 0 4px rgba(229, 62, 62, 0.1);
+.auth-back:hover {
+    color: var(--text-strong);
 }
 
-.input-wrapper.success input {
-    border-color: #38A169;
+.auth-back .material-symbols-outlined {
+    font-size: 18px;
 }
 
-.password-hint {
-    font-size: 0.75rem;
-    color: #A3AED0;
-    margin-top: 0.25rem;
-    margin-left: 0.25rem;
+/* ==========================================================================
+   7. STATES
+   ========================================================================== */
+
+/* Reset-link-sent confirmation */
+.auth-confirm {
+    text-align: center;
 }
 
-/* RESPONSIVE */
+.auth-confirm-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto var(--sp-5);
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.auth-confirm-icon .material-symbols-outlined {
+    font-size: 30px;
+}
+
+.auth-confirm .auth-title {
+    margin-bottom: var(--sp-3);
+}
+
+.auth-confirm-note {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    line-height: var(--lh-body);
+    margin: 0 0 var(--sp-3);
+}
+
+.auth-confirm-note strong {
+    color: var(--text-strong);
+    font-weight: var(--fw-medium);
+}
+
+/* Invitation banner (signup?invite=…) */
+.auth-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    margin-bottom: var(--sp-6);
+    border-radius: var(--radius-sm);
+    background: var(--accent-tint);
+    border: 1px solid var(--accent-soft);
+    color: var(--text-2);
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+}
+
+.auth-notice .material-symbols-outlined {
+    font-size: 20px;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.auth-input[readonly] {
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
+   8. RESPONSIVE
+   ========================================================================== */
+
+/* Tablet: keep the split but tighten it. */
+@media (max-width: 1180px) {
+    .auth-shell {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .auth-brand {
+        padding: var(--sp-10);
+    }
+
+    .auth-brand-points {
+        margin-top: var(--sp-8);
+        gap: var(--sp-4);
+    }
+}
+
+/* Below this the brand pane costs more than it gives — drop it and put the
+   mark on the card instead. */
 @media (max-width: 900px) {
-    .auth-wrapper {
-        flex-direction: column;
+    .auth-shell {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .auth-left {
-        flex: 0 0 300px;
-        padding: 2rem;
+    .auth-brand {
+        display: none;
     }
 
-    .auth-left h1 {
-        font-size: 2.25rem;
+    .auth-card-mark {
+        display: flex;
     }
 
-    .auth-right {
-        padding: 3rem 1.5rem;
+    .auth-pane {
+        padding: var(--sp-16) var(--sp-6) var(--sp-10);
+        align-items: flex-start;
+    }
+
+    .auth-pane-tools {
+        top: var(--sp-4);
+        right: var(--sp-4);
     }
 
     .auth-card {
-        padding: 0;
+        max-width: 420px;
+        margin: 0 auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .auth-pane {
+        padding: var(--sp-12) var(--sp-4) var(--sp-8);
+    }
+
+    .auth-subtitle {
+        margin-bottom: var(--sp-6);
+    }
+}
+
+/* Short viewports: the pane scrolls rather than clipping the card. */
+@media (max-height: 720px) and (min-width: 901px) {
+    .auth-pane {
+        align-items: flex-start;
+        padding-top: var(--sp-12);
+        overflow-y: auto;
+    }
+
+    .auth-brand {
+        padding-block: var(--sp-10);
+        overflow-y: auto;
+    }
+}
+
+/* ==========================================================================
+   9. REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .auth-brand::before {
+        animation: none;
+    }
+
+    .auth-submit,
+    .primary-btn,
+    .auth-oauth,
+    .google-outline-btn,
+    .input-wrapper,
+    .auth-reveal,
+    .auth-theme-toggle {
+        transition: none;
     }
 }

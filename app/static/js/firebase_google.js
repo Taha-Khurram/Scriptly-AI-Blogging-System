@@ -25,6 +25,38 @@ document.addEventListener('DOMContentLoaded', () => {
         return domain.toLowerCase() === 'gmail.com' || domain.toLowerCase() === 'googlemail.com';
     }
 
+    // Firebase error codes are developer-facing ("FirebaseError: ... (auth/
+    // invalid-credential)"). Surface something a person can act on instead,
+    // through the app's toast system rather than a browser alert.
+    const AUTH_MESSAGES = {
+        'auth/invalid-credential': 'That email and password combination doesn\'t match an account.',
+        'auth/wrong-password': 'That password is incorrect. Try again or reset it.',
+        'auth/user-not-found': 'No account found with that email address.',
+        'auth/invalid-email': 'That email address doesn\'t look right.',
+        'auth/user-disabled': 'This account has been disabled. Contact your administrator.',
+        'auth/email-already-in-use': 'An account with that email already exists. Try signing in.',
+        'auth/weak-password': 'That password is too weak. Use at least 8 characters.',
+        'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
+        'auth/network-request-failed': 'Network problem — check your connection and try again.',
+        'auth/popup-closed-by-user': 'The Google sign-in window was closed before finishing.',
+        'auth/cancelled-popup-request': 'Another sign-in window is already open.',
+        'auth/popup-blocked': 'Your browser blocked the sign-in popup. Allow popups and retry.'
+    };
+
+    function notifyAuthError(error, title) {
+        const code = (error && error.code) || '';
+        const message = AUTH_MESSAGES[code] || (error && error.message) || 'Something went wrong. Please try again.';
+
+        // A closed popup is the user changing their mind, not a failure.
+        if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+
+        if (window.showToast) {
+            window.showToast({ type: 'error', title: title || 'Sign-in failed', message: message, duration: 6000 });
+        } else {
+            alert(message);
+        }
+    }
+
     function validatePassword(password) {
         const errors = [];
         if (password.length < 8) errors.push('At least 8 characters');
@@ -127,9 +159,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await response.json();
         if (data.success) {
             window.location.href = data.redirect;
-        } else {
-            alert("Login failed: " + data.error);
+            return true;
         }
+
+        // Returning false (rather than throwing) lets the caller put its button
+        // back — previously a rejected verify left the button spinning forever.
+        notifyAuthError({ message: data.error || 'We could not complete sign-in.' }, 'Sign-in failed');
+        return false;
     }
 
     // Helper functions for loading state
@@ -158,13 +194,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isSignup && !isValidGmail(result.user.email || '')) {
                 await auth.signOut();
                 setButtonLoading(btn, false);
-                alert('Only Gmail addresses (@gmail.com) are allowed to sign up.');
+                notifyAuthError(
+                    { message: 'Only Gmail addresses (@gmail.com) can be used to sign up.' },
+                    'Address not accepted'
+                );
                 return;
             }
-            await sendTokenToBackend(result.user);
+            const ok = await sendTokenToBackend(result.user);
+            if (!ok) setButtonLoading(btn, false);
         } catch (error) {
             setButtonLoading(btn, false);
-            alert(error.message);
+            notifyAuthError(error, btn.id === 'googleSignUp' ? 'Sign-up failed' : 'Sign-in failed');
         }
     });
 
@@ -196,10 +236,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     setButtonLoading(submitBtn, true);
                     userCred = await auth.signInWithEmailAndPassword(email, password);
                 }
-                await sendTokenToBackend(userCred.user);
+                const ok = await sendTokenToBackend(userCred.user);
+                if (!ok) setButtonLoading(submitBtn, false);
             } catch (error) {
                 setButtonLoading(submitBtn, false);
-                alert(error.message);
+                notifyAuthError(error, isSignup ? 'Sign-up failed' : 'Sign-in failed');
             }
         });
 
@@ -248,9 +289,29 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Live feedback while typing password
+                // Live feedback while typing. Where the requirements checklist
+                // is on screen (auth.js paints it) it carries the feedback, so
+                // we only clear stale errors here instead of flashing red on
+                // every keystroke.
+                const hasChecklist = !!document.getElementById('passwordRules');
                 passwordInput.addEventListener('input', () => {
                     const errors = validatePassword(passwordInput.value);
+
+                    if (hasChecklist) {
+                        if (errors.length === 0 && passwordInput.value) {
+                            clearError('password');
+                        } else {
+                            const errorEl = document.getElementById('passwordError');
+                            const wrapperEl = passwordInput.closest('.input-wrapper');
+                            if (errorEl) {
+                                errorEl.textContent = '';
+                                errorEl.classList.remove('show');
+                            }
+                            if (wrapperEl) wrapperEl.classList.remove('error', 'success');
+                        }
+                        return;
+                    }
+
                     if (passwordInput.value && errors.length > 0) {
                         showError('password', errors.join(', '));
                     } else if (passwordInput.value) {

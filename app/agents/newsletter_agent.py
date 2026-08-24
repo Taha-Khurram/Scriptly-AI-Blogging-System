@@ -1,6 +1,8 @@
 import json
-import google.generativeai as genai
-from config import Config
+from app.core.logging import get_logger
+from app.services.gemini_client import gemini
+
+logger = get_logger(__name__)
 
 
 class NewsletterAgent:
@@ -10,8 +12,7 @@ class NewsletterAgent:
     """
 
     def __init__(self):
-        genai.configure(api_key=Config.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
+        self.model = gemini.get_model()
 
     def generate_newsletter(self, blogs: list, site_name: str = "My Blog",
                             custom_intro: str = None, topic: str = None):
@@ -60,7 +61,7 @@ class NewsletterAgent:
             result["success"] = True
             return result
         except Exception as e:
-            print(f"Newsletter generation error: {e}")
+            logger.exception("Newsletter generation error")
             return {
                 "success": False,
                 "error": str(e),
@@ -125,8 +126,8 @@ Respond ONLY with valid JSON in this exact format:
             json_str = text[start:end]
             return json.loads(json_str)
 
-        except json.JSONDecodeError as e:
-            print(f"JSON parse error: {e}")
+        except json.JSONDecodeError:
+            logger.exception("JSON parse error")
             # Try to extract key fields manually
             return {
                 "subject": "Weekly Newsletter Update",
@@ -181,8 +182,8 @@ Respond with JSON array only:
             start = text.find('[')
             end = text.rfind(']') + 1
             return json.loads(text[start:end])
-        except Exception as e:
-            print(f"Subject variation error: {e}")
+        except Exception:
+            logger.exception("Subject variation error")
             return [main_subject]
 
     def improve_content(self, content: str, instruction: str = "Make it more engaging"):

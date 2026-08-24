@@ -1,1297 +1,1040 @@
-/* Optimization Page Styles */
+/* ==========================================================================
+   Optimization — optimize · reports · draft keywords · URL metrics · domain
+   keywords.
 
-/* Main Card (matches .settings-card pattern) */
-.optimization-card {
-    background: white;
-    border-radius: var(--radius-lg, 20px);
-    padding: 2rem;
-    box-shadow: 0px 2px 6px rgba(112, 144, 176, 0.08);
-    border: 1px solid rgba(0, 0, 0, 0.04);
-    min-width: 0;
-} 
+   The screen composes from the dashboard's shared primitives (.surface-card,
+   .card-head, .seg-tabs, .stat-card, .data-row, .list-empty, .select-pill,
+   .app-modal, .app-btn) and defines only what is specific to it. What it used
+   to define instead — a bespoke underlined tab bar, a bespoke custom select,
+   a bespoke dropdown menu, a bespoke empty state and a bespoke dashed empty
+   card — was ~600 lines re-implementing components that already existed, and
+   the select re-implementation had no keyboard support at all.
 
-.optimization-card h3 {
-    color: #1B2559;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 1.25rem;
-    font-weight: 700;
+   Nothing here hardcodes a colour.
+   ========================================================================== */
+
+/* ==================== SHELL ==================== */
+
+.dashboard-main>.opt-stats,
+.dashboard-main>.surface-card {
+    margin-bottom: var(--sp-5);
 }
 
-.optimization-card h3 i {
-    color: var(--primary-color, #4318FF);
-    font-size: 1.1rem;
-    padding: 0.5rem;
-    background: rgba(67, 24, 255, 0.1);
-    border-radius: 8px;
+.dashboard-main>.surface-card:last-of-type {
+    margin-bottom: 0;
 }
 
-/* Tabs */
-.optimization-tabs {
-    display: flex;
-    gap: 0.5rem;
-    border-bottom: 2px solid #e2e8f0;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
+.opt-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--sp-4);
 }
 
-.optimization-tabs .opt-tab {
-    padding: 0.85rem 1.25rem;
-    border: none;
-    background: transparent;
-    color: #64748b;
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    margin-bottom: -2px;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+/* Medallion colour is a page-level decision — what the tile *means* belongs to
+   the screen, not to the component. */
+.stat-icon.stat-runs {
+    background: var(--accent-tint);
+    color: var(--accent);
 }
 
-.optimization-tabs .opt-tab i {
-    font-size: 1rem;
+.stat-icon.stat-gain {
+    background: var(--success-soft);
+    color: var(--success);
 }
 
-.optimization-tabs .opt-tab:hover {
-    color: var(--primary-color, #4318FF);
-    background: rgba(67, 24, 255, 0.03);
+.stat-icon.stat-best {
+    background: var(--warning-soft);
+    color: var(--warning);
 }
 
-.optimization-tabs .opt-tab.active {
-    color: var(--primary-color, #4318FF);
-    border-bottom-color: var(--primary-color, #4318FF);
+.opt-tabs-bar {
+    padding: var(--sp-4);
 }
 
-/* Tab Content */
-.opt-tab-content {
+/* Only the active tab's panel is in the document flow. */
+[data-tab-panel][hidden] {
     display: none;
 }
 
-.opt-tab-content.active {
-    display: block;
-    animation: fadeIn 0.3s ease;
+/* A note under a card title. Sentence case, muted, and it wraps — it carries
+   what the screen does, which a title has no room for. */
+.card-note {
+    flex-basis: 100%;
+    margin: 0;
+    max-width: 62ch;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+.card-head:not(.is-stacked) .card-note {
+    flex-basis: auto;
+    text-align: right;
+    white-space: nowrap;
 }
 
-/* Input Section */
-.optimization-input-card {
-    background: #f8fafc;
-    border-radius: 16px;
-    padding: 1.5rem;
-    border: 1px solid #e2e8f0;
-    margin-bottom: 1.5rem;
-}
+/* ==================== CONTROL ROW ==================== */
+/* One row: the thing you are acting on, the parameter, then the verb. It wraps
+   before it shrinks, so the draft title never collapses to an ellipsis while
+   the region pill keeps its full width. */
 
-.optimization-input-card .input-label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #707EAE;
-    margin-bottom: 0.75rem;
-    display: block;
-}
-
-.optimization-input-group {
+.opt-controls {
     display: flex;
-    gap: 0.75rem;
-    align-items: stretch;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--sp-3);
+    padding: var(--sp-5) var(--sp-6) 0;
 }
 
-/* Keyword Research Input Layout */
-.kw-input-layout {
+.opt-picker {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-}
-
-.kw-input-layout .draft-select {
-    width: 100%;
-    max-width: none;
-}
-
-.kw-input-row {
-    display: flex;
-    gap: 0.75rem;
-    align-items: stretch;
-}
-
-.optimization-input-group input {
-    flex: 1;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 0.75rem 1.25rem;
-    font-size: 0.95rem;
-    background: white;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    outline: none;
-}
-
-.optimization-input-group input:focus {
-    border-color: #4318FF;
-    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
-}
-
-.optimization-input-group input::placeholder {
-    color: #a3aed0;
-}
-
-/* Country Select */
-.country-select {
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 0.75rem 2.5rem 0.75rem 1.25rem;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #1B2559;
-    background: white url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%234318FF' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") no-repeat right 0.85rem center;
-    background-size: 14px 10px;
-    cursor: pointer;
-    outline: none;
-    min-width: 180px;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.country-select:focus {
-    border-color: #4318FF;
-    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
-}
-
-/* Draft Select */
-.draft-select {
-    flex: 1;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 0.75rem 2.5rem 0.75rem 1.25rem;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #1B2559;
-    background: white url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%234318FF' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") no-repeat right 0.85rem center;
-    background-size: 14px 10px;
-    cursor: pointer;
-    outline: none;
+    gap: var(--sp-2);
     min-width: 0;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.draft-select:focus {
-    border-color: #4318FF;
-    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
+.opt-picker-grow {
+    flex: 1 1 260px;
 }
 
-/* ==================== CUSTOM SELECT ==================== */
-/* Native <select> kept as hidden source of truth once enhanced */
-select.cs-native {
-    display: none !important;
+.opt-label {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
 }
 
-.cs-wrap {
-    position: relative;
-    display: flex;
-}
-
-.cs-wrap--grow {
-    flex: 1;
+/* The pill states its own current value, so the chosen draft is readable
+   without opening anything. It fills its column and truncates, because a blog
+   title is long and the caret must stay pinned to the right edge. */
+.opt-picker .filter-pill {
     width: 100%;
+    justify-content: flex-start;
+    height: 42px;
 }
 
-.cs-wrap--fixed {
-    min-width: 180px;
-}
-
-.cs-trigger {
-    width: 100%;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 0.75rem 1.15rem;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #1B2559;
-    background: #fff;
-    cursor: pointer;
-    text-align: left;
-    outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.cs-trigger:hover {
-    border-color: #c7cede;
-}
-
-.cs-wrap.cs-open .cs-trigger {
-    border-color: #4318FF;
-    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
-}
-
-.cs-label {
+.opt-picker .filter-pill-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.cs-label.cs-placeholder {
-    color: #a3aed0;
-    font-weight: 500;
+.opt-picker .filter-pill-caret {
+    margin-left: auto;
 }
 
-.cs-caret {
-    flex-shrink: 0;
-    font-size: 0.8rem;
-    color: #4318FF;
-    transition: transform 0.2s ease;
-}
-
-.cs-wrap.cs-open .cs-caret {
-    transform: rotate(180deg);
-}
-
-.cs-panel {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
+/* The draft menus are as wide as their trigger — a list of blog titles in a
+   220px popover is a list of ellipses. */
+.opt-picker-grow .menu {
     right: 0;
-    z-index: 40;
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    box-shadow: 0 12px 32px rgba(27, 37, 89, 0.14);
-    padding: 0.4rem;
-    max-height: 260px;
-    overflow-y: auto;
+    min-width: 100%;
+}
+
+.opt-input {
+    width: 100%;
+    height: 42px;
+    padding: 0 var(--sp-4);
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+    transition: var(--transition-base);
+}
+
+.opt-input::placeholder {
+    color: var(--text-faint);
+}
+
+.opt-input:hover {
+    background: var(--surface-3);
+}
+
+.opt-input:focus {
+    outline: none;
+    background: var(--surface-1);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.opt-run {
+    height: 42px;
+    flex-shrink: 0;
+}
+
+/* ==================== PANEL STATE ==================== */
+/* One attribute decides which of empty / loading / error / results is on
+   screen. The old page ran two mechanisms side by side — `display:block` on the
+   empty state and a `.show` class on the results — which is two sources of
+   truth for one question, and had no error state at all: a failed lookup
+   returned the panel to "empty", so it looked exactly like a run you had never
+   started. */
+
+.opt-body {
+    padding: var(--sp-5) var(--sp-6) var(--sp-6);
+}
+
+.opt-state {
     display: none;
-    animation: csFadeIn 0.14s ease;
 }
 
-.cs-wrap.cs-open .cs-panel {
+.opt-body[data-state="empty"] .opt-state[data-for="empty"],
+.opt-body[data-state="loading"] .opt-state[data-for="loading"],
+.opt-body[data-state="error"] .opt-state[data-for="error"],
+.opt-body[data-state="results"] .opt-state[data-for="results"] {
     display: block;
+    animation: fadeInUp var(--dur-base) var(--ease-standard) backwards;
 }
 
-@keyframes csFadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to   { opacity: 1; transform: translateY(0); }
+.opt-error .list-empty-icon {
+    background: var(--danger-soft);
+    color: var(--danger);
 }
 
-.cs-option {
-    padding: 0.6rem 0.85rem;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #1B2559;
-    cursor: pointer;
+.opt-error p {
+    color: var(--text-2);
+}
+
+/* --- The agent-working surface ----------------------------------------- */
+/* The same pill-and-shimmer pair blog generation uses, so "the system is
+   thinking" looks identical wherever it happens. */
+
+.opt-working {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-10) var(--sp-4);
+    text-align: center;
+}
+
+.opt-working-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-5);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.opt-working-badge .spinner-border {
+    width: 16px;
+    height: 16px;
+    color: var(--accent);
+}
+
+.opt-working-note {
+    margin: 0;
+    max-width: 34rem;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-faint);
+}
+
+.opt-working-bar {
+    width: min(320px, 100%);
+    height: 4px;
+    margin-top: var(--sp-2);
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    overflow: hidden;
+}
+
+/* Names what was actually looked up, so a result set is never orphaned from
+   its query — you can leave the tab and come back and still know. */
+.opt-source {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    transition: background 0.12s ease, color 0.12s ease;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-4);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
 }
 
-.cs-option:hover {
-    background: rgba(67, 24, 255, 0.07);
-    color: #4318FF;
+.opt-source strong {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    overflow-wrap: anywhere;
 }
 
-.cs-option-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.opt-subhead {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-4);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
 }
 
-.cs-option.is-selected {
-    background: rgba(67, 24, 255, 0.1);
-    color: #4318FF;
-    font-weight: 600;
+.opt-subhead i {
+    color: var(--text-muted);
 }
 
-.cs-option-check {
-    flex-shrink: 0;
-    font-size: 0.95rem;
-    color: #4318FF;
-    opacity: 0;
+/* ==================== OPTIMIZE — RESULT ==================== */
+
+.opt-result-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-5);
+    padding: var(--sp-5) var(--sp-6);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    margin-bottom: var(--sp-5);
 }
 
-.cs-option.is-selected .cs-option-check {
-    opacity: 1;
+.opt-score {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
-/* Slim scrollbar for the option list */
-.cs-panel::-webkit-scrollbar {
-    width: 8px;
-}
-.cs-panel::-webkit-scrollbar-thumb {
-    background: #d6dbe8;
-    border-radius: 8px;
-}
-.cs-panel::-webkit-scrollbar-track {
-    background: transparent;
+.opt-score-label {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
 }
 
-/* Keyword Results Table */
-.kw-results-table-wrapper {
-    overflow-x: auto;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
+/* Proportional figures, not tabular: equal-width digits give every glyph the
+   width of a 0, which reads loose at display size. Tabular is for columns that
+   align vertically. */
+.opt-score-value {
+    font-size: var(--fs-display);
+    font-weight: var(--fw-regular);
+    line-height: 1;
+    color: var(--text-strong);
+    letter-spacing: -0.02em;
 }
 
-.kw-results-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.88rem;
+.opt-score-from {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
 }
 
-.kw-results-table thead {
-    background: #f8fafc;
+/* Direction is carried by the arrow glyph and the sign as well as by colour —
+   the status hues never mean anything on their own. */
+.opt-score-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px var(--sp-2);
+    border-radius: var(--radius-pill);
+    font-weight: var(--fw-medium);
 }
 
-.kw-results-table th {
-    padding: 0.85rem 1rem;
-    text-align: left;
-    font-weight: 700;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    color: #707EAE;
-    border-bottom: 1px solid #e2e8f0;
-    white-space: nowrap;
+.opt-score-delta.is-up {
+    background: var(--success-soft);
+    color: var(--success);
 }
 
-.kw-results-table td {
-    padding: 0.85rem 1rem;
-    border-bottom: 1px solid #f1f5f9;
-    color: #1B2559;
-    font-weight: 500;
+.opt-score-delta.is-down {
+    background: var(--danger-soft);
+    color: var(--danger);
 }
 
-.kw-results-table tbody tr:last-child td {
+.opt-score-delta.is-flat {
+    background: var(--surface-3);
+    color: var(--text-muted);
+}
+
+.opt-grade {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+}
+
+.opt-grade-letter {
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-medium);
+    line-height: 1;
+}
+
+.opt-grade-caption {
+    font-size: var(--fs-2xs);
+    color: var(--text-muted);
+}
+
+.opt-grade.grade-a .opt-grade-letter {
+    color: var(--success);
+}
+
+.opt-grade.grade-b .opt-grade-letter {
+    color: var(--info);
+}
+
+.opt-grade.grade-c .opt-grade-letter {
+    color: var(--warning);
+}
+
+.opt-grade.grade-d .opt-grade-letter,
+.opt-grade.grade-f .opt-grade-letter {
+    color: var(--danger);
+}
+
+.opt-export {
+    margin-left: auto;
+}
+
+/* --- Score breakdown ---------------------------------------------------- */
+/* A bullet chart per category: the bar is the score now, the tick is where it
+   started. Two stacked fills would hide the smaller of the pair whichever way
+   the run went; a tick reads the same in both directions and does not depend
+   on telling two tones apart.
+
+   The API has returned this breakdown all along and the screen never showed
+   it — it went straight into the exported HTML and nowhere else. */
+
+.opt-breakdown {
+    margin-bottom: var(--sp-6);
+}
+
+.opt-meters {
+    display: grid;
+    gap: var(--sp-3);
+}
+
+.opt-meter {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) 128px;
+    align-items: center;
+    gap: var(--sp-4);
+}
+
+.opt-meter-label {
+    font-size: var(--fs-sm);
+    color: var(--text-2);
+}
+
+/* No `overflow: hidden` — the tick deliberately overhangs the track, and
+   clipping it would take its ring with it. */
+.opt-meter-track {
+    display: block;
+    position: relative;
+    height: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-tint);
+}
+
+.opt-meter-fill {
+    display: block;
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    transition: width var(--dur-slow) var(--ease-standard);
+}
+
+/* The reference mark, and it can land anywhere on the bar. A single flat colour
+   fails on one side or the other — over the --accent fill in dark mode the
+   accent is itself a pale blue, so a light neutral all but vanishes. It takes
+   the sparkline dot's trick instead: a strong core inside a ring of the surface
+   colour, which separates it from whatever it happens to sit on. */
+.opt-meter-tick {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--text-strong);
+    box-shadow: 0 0 0 1px var(--surface-1);
+    transform: translateX(-1px);
+}
+
+.opt-meter-figures {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.opt-meter-figures strong {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+/* --- Facts and lists ---------------------------------------------------- */
+
+.opt-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-5);
+}
+
+.opt-fact {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.opt-fact-label {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.opt-fact-value {
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    overflow-wrap: anywhere;
+}
+
+.opt-lists {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--sp-4);
+    align-items: start;
+}
+
+.opt-list-card {
+    padding: var(--sp-5);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+
+.opt-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.opt-list li {
+    position: relative;
+    padding: var(--sp-3) 0 var(--sp-3) var(--sp-6);
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-1);
+}
+
+.opt-list li:first-child {
+    padding-top: 0;
+}
+
+.opt-list li:last-child {
+    padding-bottom: 0;
     border-bottom: none;
 }
 
-.kw-results-table tbody tr:hover {
-    background: #f8fafc;
+.opt-list li::before {
+    position: absolute;
+    left: 0;
+    font-family: 'bootstrap-icons';
+    font-size: 0.95em;
 }
 
-.kw-cell-keyword {
-    font-weight: 600;
-    color: #1B2559;
+.opt-list-done li::before {
+    content: '\f26e';
+    color: var(--success);
 }
 
-.kw-row-error td {
-    color: #94a3b8;
+.opt-list-todo li::before {
+    content: '\f467';
+    color: var(--warning);
+}
+
+/* ==================== REPORTS ==================== */
+
+.report-rows {
+    display: grid;
+    gap: 2px;
+}
+
+.report-row {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+}
+
+/* The monogram slot carries the grade, which is the one-glyph summary of the
+   whole run — exactly what a monogram is for. */
+.report-row .row-mark {
+    font-weight: var(--fw-strong);
+}
+
+.report-row .row-mark.grade-a {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.report-row .row-mark.grade-b {
+    background: var(--info-soft);
+    color: var(--info);
+}
+
+.report-row .row-mark.grade-c {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+.report-row .row-mark.grade-d,
+.report-row .row-mark.grade-f {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.report-trail {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+.report-score {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.report-score-after {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.report-score-delta.is-up {
+    color: var(--success);
+}
+
+.report-score-delta.is-down {
+    color: var(--danger);
+}
+
+/* Permanently visible rather than hover-revealed. A hover-only control is
+   unreachable on touch, and these two are the only route to export and delete
+   — the row's own click opens the detail, so there is no ⋮ menu holding a
+   duplicate the way the blog listings have. */
+.opt-row-btn {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.opt-row-btn:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.opt-row-btn.is-danger:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.opt-row-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* ==================== TABLES ==================== */
+/* Keyword data is genuinely tabular — the whole point is comparing volume and
+   difficulty down a column — so this stays a table rather than becoming the
+   row idiom. It sheds its low-value columns at narrow widths instead of
+   scrolling the page sideways. */
+
+.opt-table-scroll {
+    overflow-x: auto;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+
+.opt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-sm);
+}
+
+.opt-table th {
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--surface-3);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.opt-table td {
+    padding: var(--sp-3) var(--sp-4);
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-1);
+    font-variant-numeric: tabular-nums;
+}
+
+.opt-table tbody tr:hover td {
+    background: var(--surface-3);
+}
+
+.opt-table .is-num {
+    text-align: right;
+}
+
+.opt-table-keyword {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    font-variant-numeric: normal;
+    min-width: 12rem;
+}
+
+.opt-table-error td {
+    color: var(--text-faint);
     font-style: italic;
 }
 
-/* Difficulty Badge */
-.difficulty-badge {
-    display: inline-block;
-    padding: 0.25rem 0.65rem;
-    border-radius: 20px;
-    font-size: 0.78rem;
-    font-weight: 600;
+.opt-table-empty td {
+    padding: var(--sp-10) var(--sp-4);
+    text-align: center;
+    color: var(--text-faint);
 }
 
-.difficulty-easy {
-    background: rgba(5, 205, 153, 0.1);
-    color: #05CD99;
+/* The domain response is the provider's shape, so the column count is unknown
+   and the table can be genuinely wide. Pinning the first column keeps the
+   keyword — the only cell that identifies the row — readable while the rest
+   scrolls under it. */
+.opt-table-scroll.is-pinned .opt-table th:first-child,
+.opt-table-scroll.is-pinned .opt-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--surface-2);
 }
 
-.difficulty-medium {
-    background: rgba(255, 181, 71, 0.1);
-    color: #e6a23c;
+.opt-table-scroll.is-pinned .opt-table th:first-child {
+    z-index: 2;
+    background: var(--surface-3);
 }
 
-.difficulty-hard {
-    background: rgba(220, 53, 69, 0.1);
-    color: #dc3545;
+.opt-table-scroll.is-pinned .opt-table tbody tr:hover td:first-child {
+    background: var(--surface-3);
 }
 
-/* Analyze Button */
-.btn-analyze {
-    background: linear-gradient(135deg, #4318FF 0%, #6b4dff 100%);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 0.75rem 1.75rem;
-    font-weight: 600;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-    white-space: nowrap;
-}
-
-.btn-analyze:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(67, 24, 255, 0.3);
-}
-
-.btn-analyze:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-
-.btn-analyze .spinner-border {
-    width: 1rem;
-    height: 1rem;
-    border-width: 2px;
-}
-
-/* Results Section */
-.optimization-results {
-    display: none;
-}
-
-.optimization-results.show {
-    display: block;
-    animation: fadeUp 0.4s ease;
-}
-
-@keyframes fadeUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* URL/Keyword Badge */
-.analyzed-url-badge {
+/* Difficulty says the word as well as showing the hue, and carries a track so
+   the number has a scale to sit against. */
+.kw-difficulty {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    border: 1px solid #e2e8f0;
-    border-radius: 30px;
-    padding: 0.5rem 1.25rem;
-    font-size: 0.85rem;
-    color: #475569;
-    margin-bottom: 1.5rem;
-    font-weight: 500;
-}
-
-.analyzed-url-badge i {
-    color: #4318FF;
-}
-
-/* Metrics Grid */
-.optimization-metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.metric-card {
-    background: #f8fafc;
-    border-radius: 16px;
-    padding: 1.25rem;
-    border: 1px solid #e2e8f0;
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.metric-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0px 8px 24px rgba(112, 144, 176, 0.12);
-    background: white;
-}
-
-.metric-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.15rem;
-    flex-shrink: 0;
-}
-
-.metric-icon.purple { background: rgba(67, 24, 255, 0.1); color: #4318FF; }
-.metric-icon.green { background: rgba(5, 205, 153, 0.1); color: #05CD99; }
-.metric-icon.blue { background: rgba(56, 152, 236, 0.1); color: #3898EC; }
-.metric-icon.orange { background: rgba(255, 181, 71, 0.1); color: #FFB547; }
-.metric-icon.pink { background: rgba(232, 67, 147, 0.1); color: #E84393; }
-.metric-icon.teal { background: rgba(0, 206, 209, 0.1); color: #00CED1; }
-
-.metric-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.metric-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    color: #707EAE;
-    margin-bottom: 0.25rem;
-}
-
-.metric-value {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: #1B2559;
-    line-height: 1.2;
-}
-
-/* Details Card */
-.optimization-details-card {
-    background: #f8fafc;
-    border-radius: 16px;
-    padding: 1.5rem;
-    border: 1px solid #e2e8f0;
-}
-
-.details-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #1B2559;
-    margin-bottom: 1.25rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.details-title i {
-    color: #4318FF;
-}
-
-.details-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 0.75rem;
-}
-
-.detail-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.65rem 1rem;
-    border-radius: 10px;
-    background: white;
-    border: 1px solid #f1f5f9;
-}
-
-.detail-label {
-    font-size: 0.85rem;
-    color: #707EAE;
-    font-weight: 500;
-}
-
-.detail-value {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #1B2559;
-}
-
-/* Empty State */
-.optimization-empty {
-    text-align: center;
-    padding: 3.5rem 2rem;
-    color: #a3aed0;
-}
-
-.optimization-empty i {
-    font-size: 2.5rem;
-    margin-bottom: 0.75rem;
-    opacity: 0.4;
-}
-
-.optimization-empty p {
-    font-size: 0.9rem;
-    font-weight: 500;
-    margin: 0;
-}
-
-/* Audit Table Scroll */
-.audit-table-scroll {
-    overflow-x: scroll;
-    overflow-y: auto;
-    max-height: 420px;
-    width: 0;
-    min-width: 100%;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    -webkit-overflow-scrolling: touch;
-}
-
-.audit-table-scroll::-webkit-scrollbar {
-    height: 12px;
-    width: 8px;
-}
-
-.audit-table-scroll::-webkit-scrollbar-track {
-    background: #e2e8f0;
-    border-radius: 10px;
-}
-
-.audit-table-scroll::-webkit-scrollbar-thumb {
-    background: #6b7280;
-    border-radius: 10px;
-    border: 2px solid #e2e8f0;
-}
-
-.audit-table-scroll::-webkit-scrollbar-thumb:hover {
-    background: #4318FF;
-}
-
-.audit-table-scroll thead {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background: #f8fafc;
-}
-
-.audit-table-scroll .kw-results-table {
-    min-width: 1400px;
-    width: max-content;
-}
-
-.audit-table-scroll .kw-results-table td,
-.audit-table-scroll .kw-results-table th {
+    gap: var(--sp-2);
     white-space: nowrap;
 }
 
-#tabSiteAudit .optimization-results {
-    min-width: 0;
+/* Every track and fill on this page declares `display`. All of them are spans,
+   and an inline box drops width and height on the floor — which is exactly how
+   the shared .stat-meter-fill shipped empty at every value. Relying on a flex
+   parent to blockify them works until someone changes the parent. */
+.kw-difficulty-track {
+    display: block;
+    width: 44px;
+    height: 5px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-4);
     overflow: hidden;
 }
 
-/* Auto Optimize Tab */
-.btn-optimize-go {
-    background: linear-gradient(135deg, #05CD99 0%, #00b386 100%);
-}
-
-.btn-optimize-go:hover:not(:disabled) {
-    box-shadow: 0 4px 15px rgba(5, 205, 153, 0.3);
-}
-
-.optimize-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 3rem 2rem;
-}
-
-.optimize-loading-inner {
-    text-align: center;
-}
-
-.optimize-spinner {
-    width: 48px;
-    height: 48px;
-    border: 4px solid #e2e8f0;
-    border-top-color: #4318FF;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 1.25rem;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.optimize-loading-text {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #1B2559;
-    margin: 0 0 0.25rem;
-}
-
-.optimize-loading-sub {
-    font-size: 0.85rem;
-    color: #707EAE;
-    margin: 0;
-}
-
-.optimize-success-banner {
-    background: rgba(5, 205, 153, 0.08);
-    border: 1px solid rgba(5, 205, 153, 0.2);
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-    font-weight: 600;
-    color: #05CD99;
-    font-size: 0.95rem;
-}
-
-.optimize-success-banner i {
-    font-size: 1.25rem;
-}
-
-.optimize-score-comparison {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.optimize-score-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 1.25rem 1.5rem;
-    text-align: center;
-    min-width: 120px;
-    flex: 1;
-}
-
-.optimize-score-card.before {
-    border-color: rgba(220, 53, 69, 0.2);
-    background: rgba(220, 53, 69, 0.03);
-}
-
-.optimize-score-card.after {
-    border-color: rgba(5, 205, 153, 0.2);
-    background: rgba(5, 205, 153, 0.03);
-}
-
-.optimize-score-card.improvement {
-    border-color: rgba(67, 24, 255, 0.2);
-    background: rgba(67, 24, 255, 0.03);
-}
-
-.optimize-score-label {
+.kw-difficulty-fill {
     display: block;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #707EAE;
-    margin-bottom: 0.35rem;
+    height: 100%;
+    border-radius: var(--radius-pill);
 }
 
-.optimize-score-value {
-    display: block;
-    font-size: 1.75rem;
-    font-weight: 800;
-    color: #1B2559;
-    line-height: 1.2;
+.kw-difficulty-word {
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
 }
 
-.optimize-score-card.before .optimize-score-value {
-    color: #dc3545;
+.kw-difficulty.is-easy .kw-difficulty-fill {
+    background: var(--success);
 }
 
-.optimize-score-card.after .optimize-score-value {
-    color: #05CD99;
+.kw-difficulty.is-easy .kw-difficulty-word {
+    color: var(--success);
 }
 
-.optimize-score-card.improvement .optimize-score-value {
-    color: #4318FF;
+.kw-difficulty.is-medium .kw-difficulty-fill {
+    background: var(--warning);
 }
 
-.optimize-score-sub {
-    display: block;
-    font-size: 0.72rem;
-    color: #a3aed0;
-    font-weight: 500;
-    margin-top: 0.2rem;
+.kw-difficulty.is-medium .kw-difficulty-word {
+    color: var(--warning);
 }
 
-.optimize-score-arrow {
-    font-size: 1.25rem;
-    color: #a3aed0;
+.kw-difficulty.is-hard .kw-difficulty-fill {
+    background: var(--danger);
 }
 
-.optimize-details-section {
-    background: #f8fafc;
-    border-radius: 16px;
-    padding: 1.25rem;
-    border: 1px solid #e2e8f0;
-    margin-bottom: 1.5rem;
+.kw-difficulty.is-hard .kw-difficulty-word {
+    color: var(--danger);
 }
 
-.optimize-detail-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid #f1f5f9;
+/* ==================== URL METRIC TILES ==================== */
+/* Not .stat-card: a stat tile promises label · value · delta · trend, and this
+   API returns none of the comparison half. These say what they can — the
+   figure, its unit, and a meter where the figure is genuinely a ratio. */
+
+.opt-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-5);
 }
 
-.optimize-detail-row:last-child {
-    border-bottom: none;
-}
-
-.optimize-detail-label {
-    font-size: 0.85rem;
-    color: #707EAE;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.optimize-detail-label i {
-    color: #4318FF;
-}
-
-.optimize-detail-value {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #1B2559;
-    text-align: right;
-    max-width: 60%;
-    word-break: break-word;
-}
-
-.optimize-changes-card {
-    background: #f8fafc;
-    border-radius: 16px;
-    padding: 1.5rem;
-    border: 1px solid #e2e8f0;
-}
-
-.optimize-changes-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.optimize-changes-list li {
-    padding: 0.6rem 0 0.6rem 1.5rem;
-    position: relative;
-    font-size: 0.88rem;
-    color: #1B2559;
-    font-weight: 500;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-.optimize-changes-list li:last-child {
-    border-bottom: none;
-}
-
-.optimize-changes-list li::before {
-    content: '\2713';
-    position: absolute;
-    left: 0;
-    color: #05CD99;
-    font-weight: 700;
-}
-
-/* Export Report Button */
-.btn-export-report {
-    margin-left: auto;
-    background: linear-gradient(135deg, #4318FF 0%, #6b4dff 100%);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 0.45rem 1rem;
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-    white-space: nowrap;
-}
-
-.btn-export-report:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(67, 24, 255, 0.3);
-}
-
-.btn-export-report i {
-    font-size: 0.95rem;
-}
-
-/* Suggestions Card */
-.optimize-suggestions-card {
-    background: #f8fafc;
-    border-radius: 16px;
-    padding: 1.5rem;
-    border: 1px solid #e2e8f0;
-    margin-top: 1.5rem;
-}
-
-.optimize-suggestions-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.optimize-suggestions-list li {
-    padding: 0.6rem 0 0.6rem 1.75rem;
-    position: relative;
-    font-size: 0.88rem;
-    color: #1B2559;
-    font-weight: 500;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-.optimize-suggestions-list li:last-child {
-    border-bottom: none;
-}
-
-.optimize-suggestions-list li::before {
-    content: '\f472';
-    font-family: 'bootstrap-icons';
-    position: absolute;
-    left: 0;
-    color: #FFB547;
-    font-size: 0.9rem;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .optimization-card {
-        padding: 1.25rem;
-    }
-
-    .optimization-input-group {
-        flex-direction: column;
-    }
-
-    .kw-input-row {
-        flex-direction: column;
-    }
-
-    .btn-analyze {
-        justify-content: center;
-    }
-
-    .optimization-metrics-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    }
-
-    .details-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .country-select,
-    .cs-wrap--fixed {
-        min-width: unset;
-        width: 100%;
-    }
-
-    .draft-select {
-        max-width: none;
-    }
-
-    .optimization-tabs {
-        gap: 0.25rem;
-    }
-
-    .optimization-tabs .opt-tab {
-        padding: 0.7rem 0.85rem;
-        font-size: 0.82rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .optimization-metrics-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .metric-card {
-        padding: 1rem;
-    }
-
-    .metric-value {
-        font-size: 1.15rem;
-    }
-}
-
-/* Reports Tab */
-.report-list {
+.opt-metric {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--sp-1);
+    padding: var(--sp-4) var(--sp-5);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
 }
 
-.report-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 1.15rem 1.35rem;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+.opt-metric-label {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
 }
 
-.report-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(112, 144, 176, 0.12);
-    border-color: rgba(67, 24, 255, 0.15);
+.opt-metric-value {
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-medium);
+    line-height: 1.15;
+    color: var(--text-strong);
 }
 
-.report-card-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
+.opt-metric.is-missing .opt-metric-value {
+    color: var(--text-faint);
+    font-weight: var(--fw-regular);
 }
 
-.report-card-meta {
-    flex: 1;
-    min-width: 0;
+.opt-metric-note {
+    font-size: var(--fs-2xs);
+    color: var(--text-faint);
 }
 
-.report-card-title {
-    font-size: 0.92rem;
-    font-weight: 700;
-    color: #1B2559;
-    margin: 0 0 0.2rem;
-    white-space: nowrap;
+.opt-metric-track {
+    display: block;
+    height: 5px;
+    margin-top: var(--sp-2);
+    border-radius: var(--radius-pill);
+    background: var(--accent-tint);
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-.report-card-date {
-    font-size: 0.75rem;
-    color: #707EAE;
-    font-weight: 500;
-}
-
-.report-card-scores {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.report-score-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 20px;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #1B2559;
-}
-
-.report-score-pill .score-before {
-    color: #dc3545;
-}
-
-.report-score-pill .score-after {
-    color: #05CD99;
-}
-
-.report-score-pill .score-arrow {
-    color: #a3aed0;
-    font-size: 0.7rem;
-}
-
-.report-score-pill .score-diff {
-    color: #4318FF;
-    font-weight: 700;
-}
-
-.report-grade {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    font-size: 0.78rem;
-    font-weight: 800;
-}
-
-.report-grade.grade-a { background: rgba(5, 205, 153, 0.12); color: #05CD99; }
-.report-grade.grade-b { background: rgba(56, 152, 236, 0.12); color: #3898EC; }
-.report-grade.grade-c { background: rgba(255, 181, 71, 0.12); color: #e6a23c; }
-.report-grade.grade-d, .report-grade.grade-f { background: rgba(220, 53, 69, 0.12); color: #dc3545; }
-
-.report-card-actions {
-    position: relative;
-}
-
-.report-dots-btn {
-    width: 34px;
-    height: 34px;
-    border: 1px solid #e2e8f0;
-    background: white;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: #707EAE;
-    font-size: 1rem;
-    transition: all 0.15s ease;
-}
-
-.report-dots-btn:hover {
-    border-color: #4318FF;
-    color: #4318FF;
-    background: rgba(67, 24, 255, 0.04);
-}
-
-.report-dropdown {
-    display: none;
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 0.4rem;
-    min-width: 160px;
-    box-shadow: 0 8px 24px rgba(112, 144, 176, 0.16);
-    z-index: 50;
-}
-
-.report-dropdown.show {
+.opt-metric-fill {
     display: block;
-    animation: fadeIn 0.15s ease;
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
 }
 
-.report-dropdown button {
+/* --- Raw field dump ----------------------------------------------------- */
+
+.opt-raw {
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+
+.opt-raw-summary {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    width: 100%;
-    padding: 0.6rem 0.85rem;
-    border: none;
-    background: transparent;
-    border-radius: 8px;
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: #1B2559;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
     cursor: pointer;
-    transition: background 0.15s ease;
-}
-
-.report-dropdown button:hover {
-    background: #f8fafc;
-}
-
-.report-dropdown button i {
-    font-size: 0.95rem;
-    color: #707EAE;
-}
-
-.report-dropdown button.danger {
-    color: #dc3545;
-}
-
-.report-dropdown button.danger i {
-    color: #dc3545;
-}
-
-.report-dropdown button.danger:hover {
-    background: rgba(220, 53, 69, 0.05);
-}
-
-.report-details {
-    display: none;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #e2e8f0;
-}
-
-.report-details.show {
-    display: block;
-    animation: fadeIn 0.3s ease;
-}
-
-.report-details-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 0.6rem;
-    margin-bottom: 1rem;
-}
-
-.report-detail-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    background: white;
-    border-radius: 8px;
-    border: 1px solid #f1f5f9;
-}
-
-.report-detail-item .label {
-    font-size: 0.78rem;
-    color: #707EAE;
-    font-weight: 500;
-}
-
-.report-detail-item .value {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #1B2559;
-}
-
-.report-changes-list {
     list-style: none;
-    padding: 0;
+}
+
+.opt-raw-summary::-webkit-details-marker {
+    display: none;
+}
+
+.opt-raw-summary:hover {
+    color: var(--text-strong);
+}
+
+.opt-raw-caret {
+    transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.opt-raw[open] .opt-raw-caret {
+    transform: rotate(90deg);
+}
+
+.opt-raw-count {
+    color: var(--text-faint);
+}
+
+.opt-raw-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--sp-1) var(--sp-5);
+    padding: 0 var(--sp-4) var(--sp-4);
+}
+
+.opt-domain-extra {
+    margin-top: var(--sp-4);
+    padding: var(--sp-4);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+
+.opt-raw-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    padding: var(--sp-2) 0;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: var(--fs-xs);
+}
+
+.opt-raw-row:last-child {
+    border-bottom: none;
+}
+
+.opt-raw-key {
+    color: var(--text-muted);
+}
+
+.opt-raw-value {
+    font-family: var(--font-mono);
+    color: var(--text-strong);
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+/* ==================== MODALS ==================== */
+
+.opt-confirm-target {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.opt-confirm-copy {
     margin: 0;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-2);
 }
 
-.report-changes-list li {
-    padding: 0.4rem 0 0.4rem 1.25rem;
-    position: relative;
-    font-size: 0.82rem;
-    color: #1B2559;
-    font-weight: 500;
+.opt-confirm-copy strong {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
 }
 
-.report-changes-list li::before {
-    content: '\2713';
-    position: absolute;
-    left: 0;
-    color: #05CD99;
-    font-weight: 700;
+.opt-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-5);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
 }
 
-/* Reports Empty Card */
-.report-empty-card {
-    background: #f8fafc;
-    border: 1.5px dashed #d1d9e6;
-    border-radius: 16px;
-    padding: 3rem 2rem;
-    text-align: center;
+.opt-detail-section+.opt-detail-section {
+    margin-top: var(--sp-5);
+    padding-top: var(--sp-5);
+    border-top: 1px solid var(--border-subtle);
 }
 
-.report-empty-inner i {
-    font-size: 2.5rem;
-    color: #a3aed0;
-    margin-bottom: 0.75rem;
-    display: block;
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 900px) {
+    .opt-meter {
+        grid-template-columns: 96px minmax(0, 1fr);
+        row-gap: var(--sp-1);
+    }
+
+    .opt-meter-figures {
+        grid-column: 2;
+        justify-content: flex-start;
+    }
 }
 
-.report-empty-inner h4 {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #1B2559;
-    margin: 0 0 0.4rem;
+@media (max-width: 760px) {
+
+    /* CPC, clicks and traffic potential go before volume and difficulty do —
+       the first three columns are what the table is for. */
+    .opt-table .opt-col-wide {
+        display: none;
+    }
+
+    .opt-controls {
+        padding: var(--sp-4) var(--sp-4) 0;
+    }
+
+    .opt-body {
+        padding: var(--sp-4);
+    }
+
+    .card-head,
+    .card-head.is-stacked {
+        padding: var(--sp-5) var(--sp-4) 0;
+    }
+
+    .card-head:not(.is-stacked) .card-note {
+        white-space: normal;
+        text-align: left;
+    }
+
+    .opt-picker,
+    .opt-run {
+        flex: 1 1 100%;
+    }
+
+    .opt-result-head {
+        padding: var(--sp-4);
+        gap: var(--sp-4);
+    }
+
+    .opt-export {
+        margin-left: 0;
+        flex: 1 1 100%;
+        justify-content: center;
+    }
 }
 
-.report-empty-inner p {
-    font-size: 0.85rem;
-    color: #707EAE;
-    margin: 0;
-    max-width: 360px;
-    margin-inline: auto;
-    line-height: 1.5;
+@media (max-width: 520px) {
+    .opt-score-value {
+        font-size: var(--fs-h1);
+    }
+
+    .report-row {
+        grid-template-columns: 32px minmax(0, 1fr) auto;
+        gap: var(--sp-3);
+    }
+
+    .report-score {
+        display: none;
+    }
 }

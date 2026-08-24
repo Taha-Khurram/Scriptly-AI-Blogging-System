@@ -1,73 +1,102 @@
 {% extends 'base.html' %}
 
-{% block title %}Sign Up | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
+{% block title %}Create account | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
-<div class="auth-wrapper">
-    <!-- Left Side: Branding -->
-    <div class="auth-left">
-        <div class="auth-left-content">
-            <h1>Join the Future</h1>
-            <p>Unlock the power of AI to create, automate, and elevate your content strategy.</p>
+{% set brand_title = 'Your next post is <em>one prompt away</em>.' %}
+{% set brand_lede = 'Set up your studio in under a minute. Bring a topic — Scriptly handles the outline, the draft,
+the SEO and the schedule.' %}
+
+<div class="auth-shell">
+    {% include 'partials/auth_brand.html' %}
+
+    <section class="auth-pane">
+        <div class="auth-pane-tools">
+            <button type="button" class="auth-theme-toggle" data-theme-toggle aria-pressed="false"
+                aria-label="Switch to dark theme" title="Switch to dark theme">
+                <span class="material-symbols-outlined">dark_mode</span>
+            </button>
         </div>
-    </div>
 
-    <!-- Right Side: Signup Form -->
-    <div class="auth-right">
         <div class="auth-card">
-            <h2 class="mb-1">Create Account</h2>
-            <p class="auth-subtitle">Fill in your details to get started.</p>
+            <div class="auth-card-mark">
+                <img src="{{ url_for('static', filename='images/logo-lockup.png') }}"
+                    alt="{{ app_config.app_name if app_config else 'Scriptly' }}" class="logo-img">
+            </div>
 
-            <form id="signupForm">
-                <div class="input-group">
-                    <label>Full Name</label>
+            <!-- Invitation banner, revealed by auth.js when ?invite= is present -->
+            <div class="auth-notice" id="inviteNotice" hidden>
+                <span class="material-symbols-outlined">mark_email_read</span>
+                <span>You've been invited. Finish setting up your account below.</span>
+            </div>
+
+            <p class="auth-eyebrow">Get started</p>
+            <h1 class="auth-title">Create your account</h1>
+            <p class="auth-subtitle">Free to set up. No card, no configuration — just your first draft.</p>
+
+            <form id="signupForm" class="auth-form" novalidate>
+                <div class="auth-field">
+                    <label class="auth-label" for="username">Full name</label>
                     <div class="input-wrapper">
-                        <input type="text" name="username" id="username" placeholder="Your Full Name" required autofocus>
-                        <i class="bi bi-person input-icon"></i>
+                        <span class="material-symbols-outlined field-icon">person</span>
+                        <input type="text" id="username" name="username" class="auth-input" placeholder="Ada Lovelace"
+                            autocomplete="name" required autofocus>
                     </div>
                     <span class="error-message" id="usernameError"></span>
                 </div>
 
-                <div class="input-group">
-                    <label>Email Address</label>
+                <div class="auth-field">
+                    <label class="auth-label" for="email">Email address</label>
                     <div class="input-wrapper">
-                        <input type="email" name="email" id="email" placeholder="you@gmail.com" required>
-                        <i class="bi bi-envelope input-icon"></i>
+                        <span class="material-symbols-outlined field-icon">mail</span>
+                        <input type="email" id="email" name="email" class="auth-input" placeholder="you@gmail.com"
+                            autocomplete="email" required>
                     </div>
                     <span class="error-message" id="emailError"></span>
-                    <small class="password-hint">Only Gmail addresses (@gmail.com) are allowed</small>
+                    <small class="auth-hint">Gmail addresses only, for now.</small>
                 </div>
 
-                <div class="input-group">
-                    <label>Password</label>
+                <div class="auth-field">
+                    <label class="auth-label" for="password">Password</label>
                     <div class="input-wrapper">
-                        <input type="password" name="password" id="password" placeholder="Min. 8 characters" required>
-                        <i class="bi bi-lock input-icon"></i>
+                        <span class="material-symbols-outlined field-icon">lock</span>
+                        <input type="password" id="password" name="password" class="auth-input"
+                            placeholder="Create a password" autocomplete="new-password" required>
+                        <button type="button" class="auth-reveal" data-reveal="password" aria-label="Show password"
+                            aria-pressed="false">
+                            <span class="material-symbols-outlined">visibility</span>
+                        </button>
                     </div>
                     <span class="error-message" id="passwordError"></span>
-                    <small class="password-hint">Must contain: 8+ chars, 1 uppercase, 1 special character, no spaces</small>
+
+                    <ul class="pw-rules" id="passwordRules">
+                        <li data-rule="length">At least 8 characters</li>
+                        <li data-rule="upper">One uppercase letter</li>
+                        <li data-rule="special">One special character</li>
+                        <li data-rule="nospace">No spaces</li>
+                    </ul>
                 </div>
 
-                <button type="submit" class="primary-btn">Sign Up</button>
+                <button type="submit" class="auth-submit">Create account</button>
             </form>
 
-            <div class="divider">Or Join With</div>
+            <div class="auth-divider">or</div>
 
-            <button id="googleSignUp" class="google-outline-btn">
-                <i class="bi bi-google"></i>
-                Google
+            <button id="googleSignUp" type="button" class="auth-oauth">
+                {% include 'partials/google_mark.html' %}
+                Continue with Google
             </button>
 
-            <p class="auth-footer">
+            <p class="auth-alt">
                 Already have an account?
-                <a href="{{ url_for('auth_bp.login') }}">Login Here</a>
+                <a href="{{ url_for('auth_bp.login') }}">Sign in</a>
             </p>
         </div>
-    </div>
+    </section>
 </div>
 {% endblock %}
 
@@ -77,27 +106,6 @@
 <script id="firebase-config" type="application/json">
     {{ firebase_config | tojson }}
 </script>
-<script src="{{ url_for('static', filename='js/firebase_google.js') }}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const params = new URLSearchParams(window.location.search);
-        const inviteEmail = params.get('invite');
-        if (inviteEmail) {
-            const emailField = document.getElementById('email');
-            if (emailField) {
-                emailField.value = decodeURIComponent(inviteEmail);
-                emailField.readOnly = true;
-                emailField.style.backgroundColor = '#f1f5f9';
-            }
-            const card = document.querySelector('.auth-card');
-            if (card) {
-                const banner = document.createElement('div');
-                banner.style.cssText = 'background: rgba(67,24,255,0.06); border: 1px solid rgba(67,24,255,0.15); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.85rem; color: #4318FF; font-weight: 600;';
-                banner.innerHTML = '<i class="bi bi-envelope-check-fill"></i> You have been invited! Complete your registration below.';
-                const form = card.querySelector('form');
-                if (form) card.insertBefore(banner, form);
-            }
-        }
-    });
-</script>
+<script src="{{ url_for('static', filename='js/firebase_google.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/pages/auth.js') }}?v=1" defer></script>
 {% endblock %}

@@ -70,10 +70,10 @@ def backfill_embeddings(user_id=None, limit=100):
                         print(f"    [OK] Embedding generated ({len(embedding)} dimensions)")
                         success_count += 1
                     else:
-                        print(f"    [FAIL] Failed to store embedding")
+                        print("    [FAIL] Failed to store embedding")
                         error_count += 1
                 else:
-                    print(f"    [FAIL] Failed to generate embedding")
+                    print("    [FAIL] Failed to generate embedding")
                     error_count += 1
 
                 # Rate limiting to avoid API quota issues
@@ -84,7 +84,7 @@ def backfill_embeddings(user_id=None, limit=100):
                 error_count += 1
 
         print("\n" + "=" * 60)
-        print(f"Backfill Complete!")
+        print("Backfill Complete!")
         print(f"  Success: {success_count}")
         print(f"  Errors: {error_count}")
         print("=" * 60)

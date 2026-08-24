@@ -22,23 +22,77 @@ function generateSlug(title) {
 // Check if there are remaining drafts and show empty state if needed
 function checkEmptyState() {
   const container = document.querySelector('.drafts-container');
+  if (!container) return;
+
   const remainingRows = container.querySelectorAll('.draft-row');
 
   if (remainingRows.length === 0) {
-    // Remove the header too
-    const header = container.querySelector('.drafts-header');
-    if (header) header.remove();
-
-    // Add empty state
+    // Same empty state the template renders, so deleting the last draft leaves
+    // the card looking exactly as it would on a fresh load.
     container.innerHTML = `
-      <div class="text-center py-5">
-        <div class="mb-3 text-muted opacity-50"><i class="bi bi-file-earmark-text fs-1"></i></div>
-        <p class="text-secondary fw-bold">No drafts found.</p>
-        <a href="/create" class="btn btn-sm btn-outline-primary mt-2 rounded-pill px-4">Create New</a>
+      <div class="list-empty">
+        <span class="list-empty-icon"><i class="bi bi-file-earmark-text"></i></span>
+        <p>No drafts yet. Anything you generate lands here until you send it for approval.</p>
+        <a href="/create" class="page-header-action is-ghost">Create one</a>
       </div>
     `;
   }
 }
+
+// --------------------------------------------------------------------------
+// Header search — filters the rendered rows.
+//
+// Bound through an AbortController the next run of this file aborts first:
+// PJAX re-injects the script on every visit, and a `document` listener from a
+// previous visit would otherwise pile up and filter a list that no longer
+// exists. See the same pattern in home.js.
+// --------------------------------------------------------------------------
+(function draftsSearch() {
+  if (window.__draftsAbort) {
+    try { window.__draftsAbort.abort(); } catch (e) { }
+  }
+  const controller = new AbortController();
+  window.__draftsAbort = controller;
+
+  document.addEventListener('page-search', (e) => {
+    const q = ((e.detail && e.detail.value) || '').trim().toLowerCase();
+    const rows = document.querySelectorAll('.drafts-container .draft-row');
+    if (!rows.length) return;
+
+    let shown = 0;
+    rows.forEach((row) => {
+      const hit = !q || (row.dataset.search || '').indexOf(q) !== -1;
+      row.hidden = !hit;
+      if (hit) shown++;
+    });
+
+    const none = document.querySelector('.drafts-container [data-noresults]');
+    if (none) none.hidden = shown !== 0;
+  }, { signal: controller.signal });
+
+  // Relative timestamps, matching the dashboard's rows.
+  document.querySelectorAll('.drafts-container time[data-relative]').forEach((el) => {
+    const then = new Date(el.getAttribute('datetime'));
+    if (isNaN(then.getTime())) return;
+
+    const days = Math.round((Date.now() - then.getTime()) / 86400000);
+    const hours = Math.round((Date.now() - then.getTime()) / 3600000);
+
+    let text;
+    if (hours < 1) text = 'just now';
+    else if (hours < 24) text = hours === 1 ? 'an hour ago' : hours + ' hours ago';
+    else if (days === 1) text = 'yesterday';
+    else if (days < 7) text = days + ' days ago';
+    else if (days < 30) text = Math.round(days / 7) === 1 ? 'a week ago' : Math.round(days / 7) + ' weeks ago';
+    else text = then.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+
+    el.title = el.textContent.trim();
+    el.textContent = text;
+  });
+
+  // syncThemeControls only runs on DOMContentLoaded, which PJAX never fires.
+  if (typeof window.syncThemeControls === 'function') window.syncThemeControls();
+})();
 
 var initEditor = (initialContent) => {
   if (tinymce.get('editor-canvas')) {

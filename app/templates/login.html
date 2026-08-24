@@ -1,63 +1,80 @@
 {% extends 'base.html' %}
 
-{% block title %}Login | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
+{% block title %}Sign in | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
-<div class="auth-wrapper">
-  <!-- Left Side: Branding & Image Overlay -->
-  <div class="auth-left">
-    <div class="auth-left-content">
-      <h1>Welcome Back!</h1>
-      <p>Log in to access your AI-powered writing tools and continue creating amazing content.</p>
+{% set brand_title = 'Write, review and publish <em>in one place</em>.' %}
+{% set brand_lede = 'Scriptly drafts, optimises and schedules your blog content, then hands you the controls for
+everything that matters.' %}
+
+<div class="auth-shell">
+  {% include 'partials/auth_brand.html' %}
+
+  <section class="auth-pane">
+    <div class="auth-pane-tools">
+      <button type="button" class="auth-theme-toggle" data-theme-toggle aria-pressed="false"
+        aria-label="Switch to dark theme" title="Switch to dark theme">
+        <span class="material-symbols-outlined">dark_mode</span>
+      </button>
     </div>
-  </div>
 
-  <!-- Right Side: Login Form -->
-  <div class="auth-right">
     <div class="auth-card">
-      <h2 class="mb-1">Sign In</h2>
-      <p class="auth-subtitle">Please enter your details to continue.</p>
+      <div class="auth-card-mark">
+        <img src="{{ url_for('static', filename='images/logo-lockup.png') }}"
+          alt="{{ app_config.app_name if app_config else 'Scriptly' }}" class="logo-img">
+      </div>
 
-      <form class="no-loader">
-        <div class="input-group">
-          <label>Email Address</label>
+      <p class="auth-eyebrow">Welcome back</p>
+      <h1 class="auth-title">Sign in to your studio</h1>
+      <p class="auth-subtitle">Pick up where you left off — drafts, approvals and schedules are all waiting.</p>
+
+      <form class="auth-form no-loader" novalidate>
+        <div class="auth-field">
+          <label class="auth-label" for="email">Email address</label>
           <div class="input-wrapper">
-            <input type="email" name="email" placeholder="mail@example.com" required autofocus>
-            <i class="bi bi-envelope input-icon"></i>
+            <span class="material-symbols-outlined field-icon">mail</span>
+            <input type="email" id="email" name="email" class="auth-input" placeholder="you@example.com"
+              autocomplete="email" required autofocus>
           </div>
         </div>
 
-        <div class="input-group">
-          <label>Password</label>
+        <div class="auth-field">
+          <label class="auth-label" for="password">Password</label>
           <div class="input-wrapper">
-            <input type="password" name="password" placeholder="Min. 8 characters" required>
-            <i class="bi bi-lock input-icon"></i>
+            <span class="material-symbols-outlined field-icon">lock</span>
+            <input type="password" id="password" name="password" class="auth-input" placeholder="Enter your password"
+              autocomplete="current-password" required>
+            <button type="button" class="auth-reveal" data-reveal="password" aria-label="Show password"
+              aria-pressed="false">
+              <span class="material-symbols-outlined">visibility</span>
+            </button>
           </div>
         </div>
 
-        <div style="text-align: right; margin-top: -0.5rem; margin-bottom: 1rem;">
-          <a href="{{ url_for('auth_bp.forgot_password') }}" style="font-size: 0.82rem; color: var(--primary-color, #4318FF); font-weight: 600; text-decoration: none;">Forgot Password?</a>
+        <div class="auth-field-row">
+          <a class="auth-link" href="{{ url_for('auth_bp.forgot_password') }}">Forgot password?</a>
         </div>
 
-        <button type="submit" class="primary-btn">Sign In</button>
+        <button type="submit" class="auth-submit">Sign in</button>
       </form>
 
-      <div class="divider">Or Continue With</div>
+      <div class="auth-divider">or</div>
 
-      <button id="googleSignIn" class="google-outline-btn">
-        <i class="bi bi-google"></i>
-        Google
+      <button id="googleSignIn" type="button" class="auth-oauth">
+        {% include 'partials/google_mark.html' %}
+        Continue with Google
       </button>
 
-      <p class="auth-footer">
-        Not registered yet? <a href="{{ url_for('auth_bp.signup') }}">Create an Account</a>
+      <p class="auth-alt">
+        New to {{ app_config.app_name if app_config else 'Scriptly' }}?
+        <a href="{{ url_for('auth_bp.signup') }}">Create an account</a>
       </p>
     </div>
-  </div>
+  </section>
 </div>
 {% endblock %}
 
@@ -67,14 +84,15 @@
 <script id="firebase-config" type="application/json">
   {{ firebase_config | tojson }}
 </script>
-<script src="{{ url_for('static', filename='js/firebase_google.js') }}"></script>
+<script src="{{ url_for('static', filename='js/firebase_google.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/pages/auth.js') }}?v=1" defer></script>
 <script>
   if (new URLSearchParams(window.location.search).get('expired') === '1') {
     document.addEventListener('DOMContentLoaded', () => {
       if (window.showToast) {
         showToast({
           type: 'warning',
-          title: 'Session Expired',
+          title: 'Session expired',
           message: 'You were logged out due to inactivity. Please sign in again.',
           duration: 8000
         });

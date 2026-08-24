@@ -3,10 +3,58 @@ Date and Timezone Utilities
 
 Provides timezone-aware date formatting for the site.
 Uses Python's built-in zoneinfo module (Python 3.9+).
+
+``utcnow()`` and ``ensure_aware()`` exist because the codebase previously mixed
+``datetime.utcnow()`` -- which returns a *naive* datetime that merely happens to
+hold UTC -- with the timezone-aware values Firestore returns. Comparing the two
+raises ``TypeError``, and the workaround in use was ``.replace(tzinfo=None)``,
+which does not convert a timestamp to UTC: it discards the offset, so a value
+submitted as 10:00+05:00 was treated as 10:00 UTC, five hours off. Every "now"
+in the application goes through :func:`utcnow`, and anything arriving from
+outside goes through :func:`ensure_aware`, so the two kinds can never meet.
+``datetime.utcnow()`` is also deprecated from Python 3.12.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+
+
+def utcnow():
+    """The current instant as a timezone-aware UTC datetime."""
+    return datetime.now(timezone.utc)
+
+
+def ensure_aware(value, assume=timezone.utc):
+    """Return ``value`` as a timezone-aware datetime, or ``None``.
+
+    A naive input is *assumed* to be in ``assume`` and stamped, rather than
+    converted -- the only safe reading when the origin did not record an
+    offset. Accepts an ISO-8601 string so values read back from JSON or
+    Firestore do not each need their own parsing dance at the call site.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except (ValueError, TypeError):
+            return None
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=assume)
+    return value
+
+
+def to_utc(value):
+    """Convert ``value`` to UTC, *preserving the instant it names*.
+
+    The distinction that matters: ``astimezone`` moves 10:00+05:00 to
+    05:00+00:00 (same moment), whereas ``replace(tzinfo=utc)`` would call it
+    10:00 UTC (a different moment, five hours later).
+    """
+    aware = ensure_aware(value)
+    return aware.astimezone(timezone.utc) if aware else None
 
 # Common timezones for dropdown selection
 COMMON_TIMEZONES = [
@@ -187,7 +235,7 @@ def get_current_time_preview(timezone='UTC', date_format='MMM DD, YYYY', time_fo
     Returns:
         Dict with formatted date and time strings
     """
-    now = datetime.utcnow().replace(tzinfo=ZoneInfo('UTC'))
+    now = utcnow()
 
     return {
         'date': format_date(now, date_format, timezone),

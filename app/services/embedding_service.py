@@ -1,14 +1,25 @@
-import google.generativeai as genai
-from flask import current_app
+"""Text embeddings for semantic search over published posts."""
 import re
+
+from app.core.logging import get_logger
+from app.services.gemini_client import GeminiError, gemini
+
+logger = get_logger(__name__)
+
+# Ceiling on the text sent for one embedding. The model has its own token
+# limit; truncating here keeps a very long post from being rejected outright
+# and makes the cost per call predictable.
+MAX_EMBEDDING_CHARS = 8000
 
 
 class EmbeddingService:
-    """Service for generating text embeddings using Google's embedding model."""
+    """Generates embedding vectors through the shared Gemini client.
 
-    def __init__(self):
-        genai.configure(api_key=current_app.config['GEMINI_API_KEY'])
-        self.model = "models/gemini-embedding-001"
+    Routed through that client rather than calling the SDK directly so
+    embeddings get the same timeout and retry-with-jitter policy as every other
+    model call -- a 429 here silently returned None before, which showed up
+    later as a post that never appears in search results.
+    """
 
     def _clean_text(self, text):
         """Clean and normalize text for embedding."""
@@ -19,7 +30,7 @@ class EmbeddingService:
         # Remove extra whitespace
         text = ' '.join(text.split())
         # Limit length to avoid token limits
-        return text[:8000]
+        return text[:MAX_EMBEDDING_CHARS]
 
     def generate_embedding(self, text):
         """
@@ -31,14 +42,12 @@ class EmbeddingService:
             if not cleaned_text:
                 return None
 
-            result = genai.embed_content(
-                model=self.model,
-                content=cleaned_text,
-                task_type="retrieval_document"
-            )
-            return result['embedding']
-        except Exception as e:
-            print(f"❌ Error generating embedding: {e}")
+            return gemini.embed(cleaned_text, task_type='retrieval_document')
+        except GeminiError:
+            logger.warning('Embedding unavailable for document', exc_info=True)
+            return None
+        except Exception:
+            logger.exception("Error generating embedding")
             return None
 
     def generate_query_embedding(self, query):
@@ -51,14 +60,15 @@ class EmbeddingService:
             if not cleaned_query:
                 return None
 
-            result = genai.embed_content(
-                model=self.model,
-                content=cleaned_query,
-                task_type="retrieval_query"
-            )
-            return result['embedding']
-        except Exception as e:
-            print(f"❌ Error generating query embedding: {e}")
+            # retrieval_query rather than retrieval_document: the model
+            # embeds a short question differently from a long passage, and
+            # using the wrong task type measurably degrades match quality.
+            return gemini.embed(cleaned_query, task_type='retrieval_query')
+        except GeminiError:
+            logger.warning('Embedding unavailable for query', exc_info=True)
+            return None
+        except Exception:
+            logger.exception("Error generating query embedding")
             return None
 
     def generate_blog_embedding(self, blog):

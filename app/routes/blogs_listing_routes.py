@@ -1,19 +1,9 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, abort
+from flask import Blueprint, render_template, request, jsonify, session
 from app.firebase.firestore_service import FirestoreService
-from functools import wraps
+from app.core.security import login_required
 
 blogs_bp = Blueprint('blogs_listing', __name__)
 db_service = FirestoreService()
-
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('auth_bp.login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
 
 @blogs_bp.after_request
 def add_cache_headers(response):

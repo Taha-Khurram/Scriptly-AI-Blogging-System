@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, url_for, session, redirect, abort, current_app
+from flask import Blueprint, render_template, request, jsonify, url_for, session, redirect, current_app
 from app.agents.blog_agent import BlogAgent
 from app.agents.category_agent import CategoryAgent
 from app.agents.seo_agent import SEOAgent
@@ -7,33 +7,27 @@ from app.agents.humanize_agent import HumanizeAgent
 from app.firebase.firestore_service import FirestoreService
 from app.utils.date_utils import (
     COMMON_TIMEZONES, DATE_FORMATS, TIME_FORMATS, LOCALES,
-    get_current_time_preview
+    get_current_time_preview, utcnow
 )
 from app.utils.slug_utils import PERMALINK_STRUCTURES
 from app.utils.task_manager import task_manager
+from app.core.errors import AppError, ValidationError
+from app.core.extensions import limiter
+from app.core.security import api_login_required, current_user
 from datetime import datetime
 import math
 import markdown
-from functools import wraps
+from app.core.security import admin_required
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 blog_bp = Blueprint('blog', __name__)
 db_service = FirestoreService()
 
-
-# ---------------------------------------------------
-# SECURITY DECORATORS
-# ---------------------------------------------------
-
-def admin_required(f):
-    """Decorator to restrict routes to admin users only"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('auth_bp.login'))
-        if session.get('user_role') != 'ADMIN':
-            abort(404)  # Show 404 instead of 403 to hide the existence of the page
-        return f(*args, **kwargs)
-    return decorated_function
+# Ceiling on a generation prompt. Prompt length drives token spend, and the
+# field was previously unbounded -- a megabyte of text in one request.
+MAX_PROMPT_LENGTH = 2000
 
 
 # ---------------------------------------------------
@@ -130,8 +124,8 @@ def home():
             published_blogs=published_blogs[:5]
         )
 
-    except Exception as e:
-        print(f"Error in home route: {e}")
+    except Exception:
+        logger.exception("Error in home route")
         return render_template(
             'home.html',
             greeting="Welcome",
@@ -147,7 +141,15 @@ def home():
         
 @blog_bp.route('/create')
 def create_page():
-    return render_template('create_blog.html', username=session.get('user_name', 'User'))
+    # The role decides which destination the composer can offer: auto_submit
+    # publishes outright for an admin and routes to the approval queue for
+    # everyone else (see _run_generation_task), so the screen has to know which
+    # outcome it is naming.
+    return render_template(
+        'create_blog.html',
+        username=session.get('user_name', 'User'),
+        user_role=session.get('user_role', 'USER')
+    )
 
 
 @blog_bp.route('/drafts')
@@ -274,8 +276,8 @@ def get_blog(blog_id):
                     'toc': result.get('toc', []),
                     'toc_html': result.get('toc_html', '')
                 }
-            except Exception as e:
-                print(f"Markdown conversion error: {e}")
+            except Exception:
+                logger.exception("Markdown conversion error")
                 # Fallback: basic conversion using markdown library
                 html = markdown.markdown(markdown_text, extensions=['extra', 'tables', 'toc'])
                 return {'html': html, 'toc': [], 'toc_html': ''}
@@ -372,39 +374,53 @@ def update_blog(blog_id):
 
 
 @blog_bp.route('/api/generate', methods=['POST'])
+@api_login_required
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_AI_GENERATE', '30 per hour'))
 def generate_and_submit():
-    try:
-        user_id = session.get('user_id')
-        user_name = session.get('user_name', 'User')
-        user_role = session.get('user_role')
+    """Queue a blog generation and return a task id to poll.
 
-        if not user_id:
-            return jsonify({"success": False, "error": "User session expired"}), 401
+    Rate-limited per user rather than per IP: one call is minutes of model work,
+    so the budget belongs to the account, and keying by address would let one
+    user multiply their allowance by rotating networks.
 
-        data = request.get_json()
-        prompt = data.get('prompt')
-        auto_submit = data.get('auto_submit', False)
+    ``create_task`` raises CapacityError when the queue is full; that propagates
+    to the error handler as a 503 with a Retry-After. Deliberately not caught
+    here -- the previous code would have reported it as a generic 500, telling
+    the user something broke when in fact they should simply retry.
+    """
+    user = current_user()
+    data = request.get_json(silent=True) or {}
 
-        if not prompt:
-            return jsonify({"success": False, "error": "Prompt is required"}), 400
-
-        app = current_app._get_current_object()
-        task_id = task_manager.create_task(user_id)
-        task_manager.submit(
-            task_id, _run_generation_task,
-            app=app,
-            user_id=user_id,
-            user_name=user_name,
-            user_role=user_role,
-            prompt=prompt,
-            auto_submit=auto_submit
+    prompt = (data.get('prompt') or '').strip()
+    if not prompt:
+        raise ValidationError('A prompt is required.')
+    if len(prompt) > MAX_PROMPT_LENGTH:
+        raise ValidationError(
+            f'Prompt must be {MAX_PROMPT_LENGTH} characters or fewer.'
         )
 
-        return jsonify({"success": True, "task_id": task_id}), 202
+    app = current_app._get_current_object()
+    task_id = task_manager.create_task(user.id, kind='generation')
+    task_manager.submit(
+        task_id, _run_generation_task,
+        app=app,
+        user_id=user.id,
+        user_name=user.name or 'User',
+        user_role=user.role,
+        prompt=prompt,
+        auto_submit=bool(data.get('auto_submit', False)),
+    )
 
-    except Exception as e:
-        print(f"❌ Route Error in Generate: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+    logger.info(
+        'Blog generation queued',
+        extra={'task_id': task_id, 'user_id': user.id,
+               'prompt_chars': len(prompt)},
+    )
+    return jsonify({
+        'success': True,
+        'task_id': task_id,
+        'queue_position': task_manager.queue_position(task_id),
+    }), 202
 
 
 def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, auto_submit):
@@ -504,33 +520,41 @@ def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, au
             task_manager.complete_task(task_id, {"redirect": redirect_url})
 
         except Exception as e:
-            print(f"❌ Background Task Error: {e}")
+            logger.exception("Background Task Error")
             task_manager.fail_task(task_id, str(e))
 
 
 @blog_bp.route('/api/generate/status/<task_id>', methods=['GET'])
 def generation_status(task_id):
-    user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({"error": "Session expired"}), 401
+    """Progress for one background job.
 
-    task = task_manager.get_task(task_id)
-    if not task:
-        return jsonify({"error": "Task not found or expired"}), 404
+    get_task_for_user raises NotFound for both "no such task" and "not yours",
+    so polling cannot be used to discover that another user's task id exists.
+    The previous version returned 403 for someone else's task, which confirmed
+    it did.
+    """
+    task = task_manager.get_task_for_user(task_id, current_user().id)
 
-    if task['user_id'] != user_id:
-        return jsonify({"error": "Unauthorized"}), 403
+    payload = {
+        'status': task['status'],
+        'progress': task['progress'],
+        'stage': task['stage'],
+        'result': task.get('result'),
+        'error': task.get('error'),
+        'error_code': task.get('error_code'),
+    }
 
-    return jsonify({
-        "status": task['status'],
-        "progress": task['progress'],
-        "stage": task['stage'],
-        "result": task.get('result'),
-        "error": task.get('error')
-    })
+    # Tell a waiting user where they are instead of leaving them watching a
+    # progress bar that has not moved.
+    if task['status'] == 'pending':
+        payload['queue_position'] = task_manager.queue_position(task_id)
+
+    return jsonify(payload)
 
 
 @blog_bp.route('/api/humanize/<blog_id>', methods=['POST'])
+@api_login_required
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_AI_GENERATE', '30 per hour'))
 def humanize_draft(blog_id):
     """
     Kick off humanization of an existing draft in the background and return a
@@ -539,12 +563,21 @@ def humanize_draft(blog_id):
     by an HTTP/server timeout while the model runs.
     """
     try:
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({"success": False, "error": "User session expired"}), 401
+        user = current_user()
+        user_id = user.id
 
         blog_data = db_service.get_blog_by_id(blog_id)
         if not blog_data:
+            return jsonify({"success": False, "error": "Blog not found"}), 404
+
+        # Ownership, checked before any model spend. Without it, any signed-in
+        # account could burn the AI budget rewriting another user's drafts --
+        # and overwrite their content with the result.
+        if not user.is_admin and blog_data.get('author_id') != user_id:
+            logger.warning(
+                'Humanize refused: not the author',
+                extra={'user_id': user_id, 'blog_id': blog_id},
+            )
             return jsonify({"success": False, "error": "Blog not found"}), 404
 
         # Extract markdown content up-front so we can fail fast on empty drafts.
@@ -567,11 +600,26 @@ def humanize_draft(blog_id):
             title=blog_data.get('title', '')
         )
 
-        return jsonify({"success": True, "task_id": task_id}), 202
+        logger.info(
+            'Humanization queued',
+            extra={'task_id': task_id, 'blog_id': blog_id, 'user_id': user_id},
+        )
+        return jsonify({
+            "success": True,
+            "task_id": task_id,
+            "queue_position": task_manager.queue_position(task_id),
+        }), 202
 
-    except Exception as e:
-        print(f"❌ Humanize Route Error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+    except AppError:
+        # CapacityError and friends carry their own status code and a message
+        # that is safe to show; let the error handler render them.
+        raise
+    except Exception:
+        logger.exception("Humanize Route Error")
+        return jsonify({
+            "success": False,
+            "error": "Could not start humanization. Please try again.",
+        }), 500
 
 
 def _run_humanize_task(task_id, app, blog_id, markdown_text, title):
@@ -615,13 +663,13 @@ def _run_humanize_task(task_id, app, blog_id, markdown_text, title):
             doc_ref.update({
                 'content': updated_content,
                 'metadata.humanized': True,
-                'updated_at': datetime.utcnow()
+                'updated_at': utcnow()
             })
 
             task_manager.complete_task(task_id, {"humanized": True})
 
         except Exception as e:
-            print(f"❌ Background Humanize Task Error: {e}")
+            logger.exception("Background Humanize Task Error")
             task_manager.fail_task(task_id, str(e))
 
 
@@ -713,19 +761,19 @@ def update_status(blog_id):
 
                 # Update blog content with formatting
                 db_service.update_blog_content(blog_id, title, formatted_content)
-                print(f"✓ Formatting applied to blog: {title}")
+                logger.info(f"Formatting applied to blog: {title}")
 
                 # Generate embedding for semantic search
                 try:
                     from app.agents.semantic_search_agent import SemanticSearchAgent
                     search_agent = SemanticSearchAgent()
                     if search_agent.generate_and_store_embedding(blog_id):
-                        print(f"✓ Embedding generated for blog: {title}")
+                        logger.info(f"Embedding generated for blog: {title}")
                 except Exception as embed_error:
-                    print(f"⚠ Embedding generation warning (continuing): {embed_error}")
+                    logger.warning(f"Embedding generation warning (continuing): {embed_error}")
 
             except Exception as format_error:
-                print(f"⚠ Formatting warning (continuing): {format_error}")
+                logger.warning(f"Formatting warning (continuing): {format_error}")
                 # Continue with publish even if formatting fails
 
         success = db_service.update_blog_status(blog_id, new_status)
@@ -759,7 +807,7 @@ def update_status(blog_id):
         return jsonify({"success": True})
 
     except Exception as e:
-        print("❌ Status Update Error:", str(e))
+        logger.exception("Status Update Error:", str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -863,7 +911,7 @@ def edit_category(category_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print("❌ Edit Category Error:", e)
+        logger.exception("Edit Category Error:", e)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -898,7 +946,7 @@ def delete_category(category_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print("Delete Category Error:", e)
+        logger.exception("Delete Category Error:", e)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -949,7 +997,7 @@ def analyze_seo():
         })
 
     except Exception as e:
-        print(f"SEO Analysis Error: {e}")
+        logger.exception("SEO Analysis Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -998,7 +1046,7 @@ def research_keywords():
         })
 
     except Exception as e:
-        print(f"Keyword Research Error: {e}")
+        logger.exception("Keyword Research Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1025,7 +1073,7 @@ def analyze_url_seo():
         return jsonify(result)
 
     except Exception as e:
-        print(f"URL SEO Analysis Error: {e}")
+        logger.exception("URL SEO Analysis Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1141,7 +1189,7 @@ def optimize_existing_blog(blog_id):
         }), 400
 
     except Exception as e:
-        print(f"Blog SEO Optimization Error: {e}")
+        logger.exception("Blog SEO Optimization Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1179,7 +1227,7 @@ def format_content():
         })
 
     except Exception as e:
-        print(f"Formatting Error: {e}")
+        logger.exception("Formatting Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1214,7 +1262,7 @@ def get_drafts_for_seo():
         })
 
     except Exception as e:
-        print(f"Get Drafts Error: {e}")
+        logger.exception("Get Drafts Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1226,9 +1274,9 @@ def analyze_draft_seo(blog_id):
         if not user_id:
             return jsonify({"success": False, "error": "Unauthorized"}), 401
 
-        data = request.get_json() or {}
-        region = data.get('region', 'PK')
-
+        # No `region` here: analyze_only() scores existing content and takes
+        # no target region. Reading one from the body implied the caller could
+        # influence the result, which it could not.
         # Get the blog
         blog_data = db_service.get_blog_by_id(blog_id)
         if not blog_data:
@@ -1257,7 +1305,7 @@ def analyze_draft_seo(blog_id):
         })
 
     except Exception as e:
-        print(f"Draft SEO Analysis Error: {e}")
+        logger.exception("Draft SEO Analysis Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1406,7 +1454,14 @@ def update_site_settings():
             # RSS Feed Settings
             'rss': data.get('rss', {}),
 
-            # Legal Pages Settings
+            # Legal Pages Settings.
+            #
+            # The client did not send this key at all until the settings screen was
+            # rebuilt, so every save wrote {} here: the privacy policy, the terms
+            # and the cookie banner could be typed, saved, confirmed with a green
+            # toast, and never stored. The nested maps below are all written the
+            # same way, so an absent one must not look like an empty one — a
+            # caller that omits a section leaves it alone rather than blanking it.
             'legal': data.get('legal', {}),
 
             # Google Sheets
@@ -1419,6 +1474,17 @@ def update_site_settings():
             settings['show_reading_time'] = settings['show_reading_time'].lower() == 'true'
         if isinstance(settings['show_author'], str):
             settings['show_author'] = settings['show_author'].lower() == 'true'
+
+        # Drop the nested sections the caller did not send, rather than writing an
+        # empty map over one. Firestore's set(merge=True) merges maps field by
+        # field, so {} contributes nothing and existing keys survive — but only
+        # because of that detail, and relying on it means a future switch to a
+        # plain set() would silently erase whole sections. Being explicit here
+        # makes "omitted" and "cleared" different requests, which is what they are.
+        for section in ('seo', 'rss', 'legal', 'header', 'footer', 'permalinks',
+                        'hero_home', 'hero_about', 'hero_blog', 'hero_contact'):
+            if section not in data or not isinstance(data.get(section), dict) or not data.get(section):
+                settings.pop(section, None)
 
         if not settings['site_name']:
             return jsonify({"success": False, "error": "Site name is required"}), 400
@@ -1438,7 +1504,7 @@ def update_site_settings():
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Site Settings Error: {e}")
+        logger.exception("Site Settings Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1499,8 +1565,8 @@ def track_activity():
 
         return jsonify({"success": True, "tracked": len(enriched_events)})
 
-    except Exception as e:
-        print(f"Track activity error: {e}")
+    except Exception:
+        logger.exception("Track activity error")
         return jsonify({"success": True, "tracked": 0})
 
 
@@ -1515,7 +1581,7 @@ def get_sheets_recent_activity():
         spreadsheet_id = GoogleSheetsService.get_spreadsheet_id_for_user(user_id)
         recent = sheets.get_recent_activities(spreadsheet_id=spreadsheet_id, limit=10)
         return jsonify({"success": True, "activities": recent})
-    except Exception as e:
+    except Exception:
         return jsonify({"success": True, "activities": []})
 
 
@@ -1568,7 +1634,10 @@ def newsletter_page():
         published_count=published_count,
         subscriber_count=subscriber_count,
         sent_count=sent_count,
-        username=session.get('user_name', 'User')
+        username=session.get('user_name', 'User'),
+        # Pre-fills the test-send field, so trying the issue on yourself before
+        # blasting it is one click rather than one click and typing your address.
+        user_email=session.get('user_email', '')
     )
 
 
@@ -1610,7 +1679,7 @@ def unpublish_blog(blog_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Unpublish Error: {e}")
+        logger.exception("Unpublish Error")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1652,7 +1721,7 @@ def api_get_comments():
         return jsonify({"success": True, **result})
 
     except Exception as e:
-        print(f"Error fetching comments: {e}")
+        logger.exception("Error fetching comments")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1690,7 +1759,7 @@ def api_get_comment(comment_id):
         return jsonify({"success": True, "comment": comment})
 
     except Exception as e:
-        print(f"Error fetching comment: {e}")
+        logger.exception("Error fetching comment")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1726,7 +1795,7 @@ def api_edit_comment(comment_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Error editing comment: {e}")
+        logger.exception("Error editing comment")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1756,7 +1825,7 @@ def api_remove_comment(comment_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Error removing comment: {e}")
+        logger.exception("Error removing comment")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1781,7 +1850,7 @@ def api_restore_comment(comment_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Error restoring comment: {e}")
+        logger.exception("Error restoring comment")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1809,6 +1878,6 @@ def api_delete_comment(comment_id):
         return jsonify({"success": success})
 
     except Exception as e:
-        print(f"Error deleting comment: {e}")
+        logger.exception("Error deleting comment")
         return jsonify({"success": False, "error": str(e)}), 500
 

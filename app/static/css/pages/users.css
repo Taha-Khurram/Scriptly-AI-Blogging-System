@@ -4,7 +4,7 @@
 
 /* ==================== CONTAINER ==================== */
 .users-container {
-    background: white;
+    background: var(--surface-1);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     overflow: visible;
@@ -15,9 +15,9 @@
     display: flex;
     padding: 1rem 2rem;
     background: var(--bg-body);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid var(--border-subtle);
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--secondary-color);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -28,7 +28,7 @@
     display: flex;
     align-items: center;
     padding: 0.9rem 2rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    border-bottom: 1px solid var(--border-subtle);
     transition: all 0.15s ease;
 }
 
@@ -50,7 +50,7 @@
 
 .col-username .fw-bold {
     font-size: 0.85rem;
-    color: #1e293b;
+    color: var(--text-strong);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -62,7 +62,7 @@
     overflow: hidden;
     padding-right: 1rem;
     font-size: 0.82rem;
-    color: #475569;
+    color: var(--text-2);
     white-space: nowrap;
     text-overflow: ellipsis;
 }
@@ -99,8 +99,8 @@
     justify-content: center !important;
     text-align: center;
     line-height: 1;
-    background: #4318FF !important;
-    color: white !important;
+    background: var(--accent) !important;
+    color: var(--text-on-accent) !important;
     font-weight: 700 !important;
 }
 
@@ -109,21 +109,21 @@
     display: inline-flex;
     align-items: center;
     padding: 0.25rem 0.65rem;
-    border-radius: 50px;
+    border-radius: var(--radius-pill);
     font-size: 0.68rem;
-    font-weight: 700;
+    font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.02em;
 }
 
 .badge-admin {
-    background: rgba(67, 24, 255, 0.1);
+    background: var(--accent-tint);
     color: var(--primary-color);
 }
 
 .badge-editor {
-    background: rgba(59, 130, 246, 0.1);
-    color: #3b82f6;
+    background: var(--info-soft);
+    color: var(--info);
 }
 
 /* ==================== STATUS BADGES ==================== */
@@ -132,9 +132,9 @@
     align-items: center;
     gap: 0.3rem;
     padding: 0.25rem 0.65rem;
-    border-radius: 50px;
+    border-radius: var(--radius-pill);
     font-size: 0.68rem;
-    font-weight: 700;
+    font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.02em;
 }
@@ -142,13 +142,13 @@
 .badge-status .bi { font-size: 0.4rem; }
 
 .badge-active {
-    background: rgba(16, 185, 129, 0.1);
-    color: #059669;
+    background: var(--success-soft);
+    color: var(--success);
 }
 
 .badge-pending {
-    background: rgba(251, 191, 36, 0.12);
-    color: #d97706;
+    background: var(--warning-soft);
+    color: var(--warning);
 }
 
 /* ==================== ACTION DROPDOWN ==================== */
@@ -162,7 +162,7 @@
     border: none;
     border-radius: 0;
     background: transparent;
-    color: #94a3b8;
+    color: var(--text-faint);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -173,7 +173,7 @@
 }
 
 .action-dots-btn:hover {
-    color: #475569;
+    color: var(--text-2);
 }
 
 .action-menu {
@@ -181,10 +181,10 @@
     top: 100%;
     right: 0;
     margin-top: 0.5rem;
-    background: white;
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    border-radius: 12px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elev-3);
     min-width: 160px;
     padding: 0.5rem;
     z-index: 100;
@@ -208,16 +208,16 @@
     padding: 0.55rem 0.85rem;
     border: none;
     background: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     font-size: 0.82rem;
     font-weight: 500;
-    color: #334155;
+    color: var(--text-1);
     cursor: pointer;
     transition: all 0.12s ease;
 }
 
 .action-menu-item:hover {
-    background: #f8fafc;
+    background: var(--surface-2);
 }
 
 .action-menu-item i {
@@ -226,15 +226,15 @@
 }
 
 .action-menu-item-danger {
-    color: #ef4444;
+    color: var(--danger);
 }
 
 .action-menu-item-danger i {
-    color: #ef4444;
+    color: var(--danger);
 }
 
 .action-menu-item-danger:hover {
-    background: rgba(239, 68, 68, 0.05);
+    background: var(--danger-soft);
 }
 
 /* ==================== RESPONSIVE ==================== */

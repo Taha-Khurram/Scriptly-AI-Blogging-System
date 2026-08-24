@@ -1,12 +1,13 @@
-import google.generativeai as genai
-import os
 from app.firebase.firestore_service import FirestoreService
+from app.core.logging import get_logger
+from app.services.gemini_client import gemini
+
+logger = get_logger(__name__)
 
 class CategoryAgent:
     def __init__(self):
         self.db_service = FirestoreService()
-        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
+        self.model = gemini.get_model()
 
     def categorize_blog(self, title, content_body, categories=None):
         """
@@ -37,6 +38,6 @@ class CategoryAgent:
         try:
             response = self.model.generate_content(prompt)
             return response.text.strip()
-        except Exception as e:
-            print(f"❌ CategoryAgent Error: {e}")
+        except Exception:
+            logger.exception("CategoryAgent Error")
             return "General"

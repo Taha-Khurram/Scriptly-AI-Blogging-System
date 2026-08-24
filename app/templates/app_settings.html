@@ -5,17 +5,17 @@
 {% block extra_css %}
 <style>
     .app-settings-card {
-        background: white;
-        border-radius: 16px;
+        background: var(--surface-1);
+        border-radius: var(--radius-lg);
         padding: 2rem;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        box-shadow: var(--elev-2);
         margin-bottom: 1.5rem;
     }
 
     .app-settings-card h3 {
         font-size: 1.25rem;
-        font-weight: 700;
-        color: #1a1a2e;
+        font-weight: 500;
+        color: var(--text-strong);
         margin-bottom: 0.5rem;
         display: flex;
         align-items: center;
@@ -25,8 +25,8 @@
     .app-settings-card h3 i {
         color: var(--primary-color);
         padding: 0.5rem;
-        background: rgba(67, 24, 255, 0.08);
-        border-radius: 10px;
+        background: var(--accent-tint);
+        border-radius: var(--radius-sm);
     }
 
     .app-settings-card p.text-muted {
@@ -38,15 +38,15 @@
     }
 
     .form-label {
-        font-weight: 600;
-        color: #1a1a2e;
+        font-weight: 500;
+        color: var(--text-strong);
         margin-bottom: 0.5rem;
         display: block;
     }
 
     .form-control {
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
         padding: 0.75rem 1rem;
         font-size: 0.95rem;
         transition: all 0.2s;
@@ -54,18 +54,18 @@
 
     .form-control:focus {
         border-color: var(--primary-color);
-        box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.1);
+        box-shadow: 0 0 0 3px var(--focus-ring);
     }
 
     .form-hint {
         font-size: 0.85rem;
-        color: #64748b;
+        color: var(--text-muted);
         margin-top: 0.35rem;
     }
 
     .preview-box {
-        background: linear-gradient(135deg, rgba(67, 24, 255, 0.03) 0%, rgba(99, 102, 241, 0.08) 100%);
-        border-radius: 12px;
+        background: var(--surface-2);
+        border-radius: var(--radius-md);
         padding: 2rem;
         text-align: center;
         margin-top: 1.5rem;
@@ -74,20 +74,20 @@
     .preview-box .preview-logo {
         width: 80px;
         height: 80px;
-        border-radius: 16px;
-        background: linear-gradient(135deg, var(--primary-color) 0%, #6366f1 100%);
+        border-radius: var(--radius-lg);
+        background: var(--accent);
         display: flex;
         align-items: center;
         justify-content: center;
         margin: 0 auto 1rem;
-        box-shadow: 0 8px 25px rgba(67, 24, 255, 0.3);
+        box-shadow: var(--elev-2);
     }
 
     .preview-box .preview-logo img {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        border-radius: 16px;
+        border-radius: var(--radius-lg);
     }
 
     .preview-box .preview-logo i {
@@ -97,23 +97,23 @@
 
     .preview-box .preview-name {
         font-size: 1.5rem;
-        font-weight: 800;
-        color: #1a1a2e;
+        font-weight: 600;
+        color: var(--text-strong);
     }
 
     .preview-box .preview-tagline {
-        color: #64748b;
+        color: var(--text-muted);
         font-size: 1rem;
         margin-top: 0.25rem;
     }
 
     .btn-save {
-        background: linear-gradient(135deg, var(--primary-color) 0%, #6366f1 100%);
-        color: white;
+        background: var(--accent);
+        color: var(--text-on-accent);
         border: none;
         padding: 0.85rem 2rem;
-        border-radius: 25px;
-        font-weight: 600;
+        border-radius: var(--radius-xl);
+        font-weight: 500;
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
@@ -122,7 +122,7 @@
 
     .btn-save:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(67, 24, 255, 0.35);
+        box-shadow: var(--elev-2);
         color: white;
     }
 
@@ -141,8 +141,8 @@
     .image-preview {
         width: 60px;
         height: 60px;
-        border-radius: 12px;
-        background: #f1f5f9;
+        border-radius: var(--radius-md);
+        background: var(--surface-3);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -157,7 +157,7 @@
     }
 
     .image-preview i {
-        color: #94a3b8;
+        color: var(--text-faint);
         font-size: 1.5rem;
     }
 </style>

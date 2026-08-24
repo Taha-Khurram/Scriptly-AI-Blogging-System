@@ -1,7 +1,10 @@
 import json
 import re
 from google import generativeai as genai
-from flask import current_app
+from app.core.logging import get_logger
+from app.services.gemini_client import gemini
+
+logger = get_logger(__name__)
 
 
 class CommentAgent:
@@ -12,8 +15,10 @@ class CommentAgent:
     """
 
     def __init__(self):
-        genai.configure(api_key=current_app.config['GEMINI_API_KEY'])
-        self.model = genai.GenerativeModel('gemini-flash-lite-latest')
+        self.model = gemini.get_model()
+        # Low temperature: moderation must be repeatable. The same comment
+        # judged twice should get the same verdict, or an author sees their
+        # comment accepted on one submission and removed on a retry.
         self.generation_config = genai.types.GenerationConfig(
             temperature=0.3,
             top_p=0.9,
@@ -45,8 +50,8 @@ class CommentAgent:
                 result['reason'] = None
             return result
 
-        except Exception as e:
-            print(f"CommentAgent Error: {e}")
+        except Exception:
+            logger.exception("CommentAgent Error")
             # Fail-open: approve as-is if AI fails
             return {
                 "action": "approve",
@@ -118,7 +123,7 @@ Respond with ONLY valid JSON, no other text:
                 pass
 
         # If all parsing fails, approve as-is
-        print(f"CommentAgent: Failed to parse response: {text[:200]}")
+        logger.error(f"CommentAgent: Failed to parse response: {text[:200]}")
         return {
             "action": "approve",
             "moderated_text": original_text,

@@ -1,764 +1,1017 @@
 /* ==========================================================================
-   Analytics Dashboard Styles
+   Analytics — GA4 read as a dashboard
+
+   ╔ page header ══════════════════════════════════════════════════════════╗
+   ║ Insights · H1 Analytics                    ( ☾ )  ( ⚡ Disconnect )   ║
+   ╚═══════════════════════════════════════════════════════════════════════╝
+   ┌ filter bar — one row, scopes everything below ────────────────────────┐
+   │ (Today)(7 days)(30 days)     ⛁ property · 🌐 domain · ● Tracking live │
+   └───────────────────────────────────────────────────────────────────────┘
+   ┌ Page views ──────┐┌ Sessions ────────┐┌ Users ───────────┐
+   │ ▣ 12.4K ↑18%  ∿∿ ││ ▣ 8.1K  ↑9%   ∿∿ ││ ▣ 6.3K ↓2%   ∿∿ │ ← also the
+   └──────────────────┘└──────────────────┘└──────────────────┘   chart's
+   ┌ Page views · last 7 days (8fr) ──────┐┌ Right now (4fr) ──┐   selector
+   │ 4K ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈ ││        47         │
+   │    ╱‾╲    ╱‾‾╲___╱‾╲  ← 2px, 10% wash││  people active…   │
+   │ 0  ─────────────────────────────────  ││ ───────────────── │
+   │    Aug 16  18  20  22                 ││ Avg. session 2m14 │
+   │    ▸ Table view                       ││ Bounce  41% ▓▓░░  │
+   └───────────────────────────────────────┘└───────────────────┘
+   ┌ Top pages (7fr) ─────────────────────┐┌ Traffic sources (5fr) ───────┐
+   │ ▣ Home  /            4.2K ▓▓▓▓  34% ││ Organic search ▓▓▓▓▓▓ 1.2K 48%│
+   └───────────────────────────────────────┘└───────────────────────────────┘
+
+   COLOUR. There is no categorical palette on this screen. Every mark is
+   --accent, because nothing here encodes identity: the time series carries one
+   series at a time (the reader picks it), and channel names are nominal, so
+   colouring those bars by value would burn the identity channel re-encoding
+   what bar length already shows.
+
+   Verified rather than eyeballed, with the skill's own contrast function:
+
+     --accent      vs --surface-1   6.39:1 light · 9.60:1 dark  (marks, ≥3:1) ✓
+     --text-muted  vs --surface-1   6.05:1 light · 6.25:1 dark  (ticks, ≥4.5:1) ✓
+     --text-faint  vs --surface-1   3.68:1 light                 ✗ — which is
+       why no axis or tick text on this screen uses it, only larger copy.
+     --border-subtle vs --surface-1 1.21:1 light · 1.58:1 dark   (grid: low is
+       the point — gridlines are recessive by spec, one step off the surface)
+
+   MARKS follow the fixed specs: 2px line with round joins, a ~10% wash beneath
+   it (--accent-tint is 8% light / 12% dark), hairline *solid* gridlines, an 8px
+   endpoint dot carrying a 2px surface ring, and horizontal bars 10px thick with
+   a 4px rounded data-end and a square baseline.
+
+   Composes from dashboard.css: .surface-card, .filter-bar, .seg-tabs,
+   .stat-card (the full label · value · delta · trend contract), .stat-meter,
+   .setup-banner, .app-modal, .app-btn, .list-empty, .reveal.
    ========================================================================== */
 
-/* ==================== CONNECT CARD ==================== */
-.analytics-connect-card {
-    background: white;
+/* ==========================================================================
+   GATES — no OAuth / not connected / no property
+   ========================================================================== */
+
+.an-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 34rem;
+    margin: var(--sp-10) auto;
+    padding: var(--sp-10) var(--sp-8);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    padding: 3.5rem 2rem;
+    background: var(--surface-1);
+    box-shadow: var(--elev-1);
     text-align: center;
-    max-width: 520px;
-    margin: 2rem auto;
 }
 
-.connect-icon {
-    width: 72px;
-    height: 72px;
+/* The property picker is a list, not a paragraph — it needs the width. */
+.an-gate.is-wide {
+    max-width: 44rem;
+}
+
+.an-gate-icon {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    margin-bottom: var(--sp-5);
     border-radius: 50%;
-    background: rgba(67, 24, 255, 0.08);
-    color: var(--primary-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.75rem;
-    margin: 0 auto 1.5rem;
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-size: 24px;
 }
 
-.connect-icon.connected {
-    background: rgba(16, 185, 129, 0.1);
-    color: #059669;
+.an-gate-icon.is-done {
+    background: var(--success-soft);
+    color: var(--success);
 }
 
-.analytics-connect-card h3 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 0.5rem;
+.an-gate-title {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
 }
 
-.analytics-connect-card p {
-    font-size: 0.88rem;
-    color: #64748b;
-    line-height: 1.6;
-    margin-bottom: 1.5rem;
-    max-width: 380px;
-    margin-left: auto;
-    margin-right: auto;
+.an-gate-text {
+    margin: 0;
+    max-width: 30rem;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--text-2);
 }
 
-.analytics-connect-card code {
-    background: rgba(67, 24, 255, 0.06);
-    color: var(--primary-color);
-    padding: 0.15rem 0.4rem;
-    border-radius: 4px;
-    font-size: 0.78rem;
+.an-gate-text code {
+    padding: 1px 5px;
+    border-radius: var(--radius-xs);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    color: var(--text-strong);
 }
 
-.btn-connect {
+.an-gate-note {
+    margin: var(--sp-5) 0 0;
+    max-width: 30rem;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-faint);
+}
+
+/* The OAuth button, outlined with the official four-colour G — the same
+   treatment the auth screens give it, so "sign in with Google" is one thing. */
+.an-gate-cta {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.7rem 1.75rem;
-    background: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 50px;
-    font-size: 0.88rem;
-    font-weight: 600;
+    gap: var(--sp-3);
+    height: 46px;
+    margin-top: var(--sp-6);
+    padding: 0 var(--sp-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-1);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-1);
     text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 16px rgba(67, 24, 255, 0.3);
+    transition: var(--transition-base);
 }
 
-.btn-connect:hover {
-    opacity: 0.9;
-    color: white;
-    transform: translateY(-1px);
+.an-gate-cta:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text-strong);
+    box-shadow: var(--elev-1);
 }
 
-.btn-disconnect {
+.an-gate-cta svg {
+    width: 18px;
+    height: 18px;
+}
+
+.an-steps {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--sp-2) var(--sp-5);
+    margin: var(--sp-6) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.an-steps li {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 1.25rem;
-    background: white;
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    border-radius: 50px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
 }
 
-.btn-disconnect:hover {
-    background: rgba(239, 68, 68, 0.05);
-    border-color: #ef4444;
-}
-
-/* ==================== CONNECT STEPS ==================== */
-.connect-steps {
-    display: flex;
-    justify-content: center;
-    gap: 1.5rem;
-    margin-top: 2rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid #f1f5f9;
-}
-
-.connect-steps .step {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.78rem;
-    color: #64748b;
-    font-weight: 500;
-}
-
-.connect-steps .step span {
-    width: 22px;
-    height: 22px;
+.an-step-n {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    background: rgba(67, 24, 255, 0.08);
-    color: var(--primary-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.68rem;
-    font-weight: 700;
-    flex-shrink: 0;
+    background: var(--surface-3);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-2);
 }
 
-/* ==================== PROPERTY LIST ==================== */
-.property-list {
-    max-width: 400px;
-    margin: 0 auto;
+/* The reconnect banner's action sits opposite the copy rather than under it. */
+.setup-banner-action {
+    flex-shrink: 0;
+    align-self: center;
+    margin-left: auto;
+    text-decoration: none;
+    line-height: 40px;
+}
+
+/* --- Property list ----------------------------------------------------- */
+
+.an-properties {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    width: 100%;
+    margin-top: var(--sp-6);
     text-align: left;
 }
 
-.property-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    margin-bottom: 0.5rem;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.property-item:hover {
-    border-color: var(--primary-color);
-    background: rgba(67, 24, 255, 0.03);
-}
-
-.property-item-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.property-item-name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #1e293b;
-}
-
-.property-item-account {
-    font-size: 0.72rem;
-    color: #94a3b8;
-}
-
-.property-item i {
-    color: #cbd5e1;
-    transition: color 0.15s;
-}
-
-.property-item:hover i {
-    color: var(--primary-color);
-}
-
-/* ==================== PROPERTY BAR ==================== */
-.analytics-property-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: white;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 0.85rem 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.property-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: #1e293b;
-}
-
-.property-info i {
-    color: var(--primary-color);
-}
-
-.period-selector {
-    display: flex;
-    gap: 0.35rem;
-}
-
-.period-btn {
-    padding: 0.4rem 0.9rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 50px;
-    background: white;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #64748b;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.period-btn:hover {
-    border-color: #cbd5e1;
-    color: #475569;
-}
-
-.period-btn.active {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-    box-shadow: 0 4px 12px rgba(67, 24, 255, 0.25);
-}
-
-/* ==================== TRACKING STATUS BANNER ==================== */
-.tracking-status-banner {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-    background: white;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 1rem 1.5rem;
-    margin-bottom: 1rem;
-}
-
-.tracking-status-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.85rem;
-}
-
-.tracking-status-item i {
-    font-size: 1rem;
-    color: var(--text-muted);
-}
-
-.tracking-label {
-    color: var(--text-muted);
-    font-weight: 500;
-}
-
-.tracking-value {
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
-.tracking-value.tracking-active {
-    color: #10b981;
-}
-
-.tracking-value.tracking-inactive {
-    color: #ef4444;
-}
-
-/* ==================== STATS ROW ==================== */
-.analytics-stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1.25rem;
-    margin-bottom: 1rem;
-}
-
-.analytics-stats-row .stat-card {
-    background: white;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 1.25rem 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    transition: all 0.2s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.analytics-stats-row .stat-card:hover {
-    box-shadow: var(--shadow-card);
-    transform: translateY(-2px);
-}
-
-.analytics-stats-row .stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+.an-properties-loading,
+.an-rows-loading {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
-    flex-shrink: 0;
+    gap: var(--sp-3);
+    padding: var(--sp-8);
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
 }
 
-.stat-realtime { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-.stat-views { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-.stat-sessions { background: rgba(67, 24, 255, 0.1); color: var(--primary-color); }
-.stat-users { background: rgba(16, 185, 129, 0.1); color: #059669; }
+.an-properties-loading .spinner-border,
+.an-rows-loading .spinner-border,
+.an-chart-loading .spinner-border {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+    color: var(--accent);
+}
 
-.analytics-stats-row .stat-info {
+.an-property {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    width: 100%;
+    padding: var(--sp-4) var(--sp-5);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.an-property:hover {
+    border-color: var(--accent);
+    background: var(--accent-tint);
+}
+
+.an-property:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Selected and waiting on the round-trip. The whole list disables while one
+   row is being saved, so the busy row has to be the one that still reads as
+   active rather than as disabled along with the rest. */
+.an-property.is-busy {
+    border-color: var(--accent);
+    background: var(--accent-tint);
+    opacity: 1;
+}
+
+.an-property:disabled:not(.is-busy) {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.an-property-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.an-property-name {
+    display: block;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.an-property-account {
+    display: block;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.an-property>.bi-chevron-right {
+    flex-shrink: 0;
+    color: var(--text-faint);
+    font-size: 0.85rem;
+}
+
+/* ==========================================================================
+   FILTER BAR — the period, and what the numbers are of
+   ========================================================================== */
+
+.an-source {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-5);
+}
+
+.an-source-item {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    max-width: 18rem;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.an-source-item>i {
+    flex-shrink: 0;
+    color: var(--text-faint);
+}
+
+/* Status: the hue never carries it alone — there is a glyph and a word too. */
+.an-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: 2px var(--sp-3);
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+}
+
+.an-tag.is-live {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.an-tag.is-off {
+    background: var(--surface-3);
+    color: var(--text-muted);
+}
+
+.an-mid {
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-2xs);
+    color: var(--text-muted);
+}
+
+/* ==========================================================================
+   KPI ROW — stat tiles that double as the chart's selector
+   ========================================================================== */
+
+.an-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-6);
+}
+
+/* .stat-card is the shared grid (medallion · reading order · micro-viz); this
+   only turns it into a control. Scoped under .an-kpi rather than restyling
+   .stat-card, which six screens share. */
+.an-kpi {
+    border: 1px solid transparent;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: box-shadow var(--dur-base) var(--ease-standard),
+        border-color var(--dur-base) var(--ease-standard),
+        background-color var(--dur-base) var(--ease-standard);
+}
+
+.an-kpi:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Selected takes --accent-soft on the medallion and an accent hairline — the
+   same "this is the current one" language as the nav rail and .seg-tab, so the
+   link between the pressed tile and the chart below is not a guess. */
+.an-kpi.is-active {
+    border-color: var(--accent);
+    box-shadow: var(--elev-2);
+}
+
+.an-kpi-icon {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    transition: var(--transition-base);
+}
+
+.an-kpi.is-active .an-kpi-icon {
+    background: var(--accent-soft);
+    color: var(--accent-on-soft);
+}
+
+/* The tile's third column. Holds the sparkline .stat-trend svg the script
+   builds; sized so the box does not jump when the picture arrives. */
+.an-kpi-trend {
+    display: block;
+    width: 116px;
+    min-height: 40px;
+}
+
+/* ==========================================================================
+   LAYOUT
+   ========================================================================== */
+
+/* Stretch, so a row reads as one band: the shorter card absorbs the slack
+   internally rather than leaving a ragged edge under it. */
+.an-split {
+    display: grid;
+    gap: var(--sp-6);
+    margin-bottom: var(--sp-6);
+    align-items: stretch;
+}
+
+.an-split.is-chart {
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+}
+
+.an-split.is-lists {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    margin-bottom: 0;
+}
+
+.an-card {
     display: flex;
     flex-direction: column;
-}
-
-.analytics-stats-row .stat-count {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #1e293b;
-    line-height: 1.2;
-}
-
-.analytics-stats-row .stat-label {
-    font-size: 0.78rem;
-    color: #64748b;
-    font-weight: 500;
-}
-
-/* Real-time pulse */
-.realtime-pulse {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 8px;
-    height: 8px;
-    background: #ef4444;
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-    70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-
-/* ==================== SECONDARY STATS ==================== */
-.analytics-secondary-row {
-    display: flex;
-    gap: 1.25rem;
-    margin-bottom: 1.5rem;
-}
-
-.secondary-stat {
-    background: white;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 0.85rem 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex: 1;
-}
-
-.secondary-label {
-    font-size: 0.78rem;
-    color: #64748b;
-    font-weight: 500;
-}
-
-.secondary-value {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #1e293b;
-}
-
-/* ==================== ANALYTICS GRID ==================== */
-.analytics-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-}
-
-.analytics-card {
-    background: white;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    overflow: hidden;
-}
-
-.analytics-card-header {
-    padding: 1.15rem 1.5rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.analytics-card-header h3 {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.analytics-card-header h3 i {
-    color: var(--primary-color);
-    font-size: 1rem;
-}
-
-.analytics-card-body {
-    padding: 0;
-}
-
-/* ==================== TABLE ROWS ==================== */
-.analytics-table-header {
-    display: flex;
-    padding: 0.65rem 1.5rem;
-    background: var(--bg-body);
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: var(--secondary-color);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.analytics-table-row {
-    display: flex;
-    align-items: center;
-    padding: 0.7rem 1.5rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-    transition: background 0.15s ease;
-}
-
-.analytics-table-row:hover {
-    background: var(--bg-body);
-}
-
-.analytics-table-row:last-child {
-    border-bottom: none;
-}
-
-.col-page-path {
-    flex: 3;
     min-width: 0;
-    overflow: hidden;
-    padding-right: 1rem;
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: #1e293b;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    padding-bottom: var(--sp-5);
 }
 
-.col-page-views {
-    flex: 1;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #475569;
-    text-align: right;
+.an-card-sub {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
 }
 
-.col-page-time {
-    flex: 1;
-    font-size: 0.82rem;
-    color: #94a3b8;
-    text-align: right;
-}
-
-.col-source-name {
-    flex: 2;
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: #1e293b;
-    padding-right: 1rem;
-}
-
-.col-source-sessions {
-    flex: 1;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #475569;
-    text-align: right;
-}
-
-.col-source-users {
-    flex: 1;
-    font-size: 0.82rem;
-    color: #94a3b8;
-    text-align: right;
-}
-
-/* ==================== EMPTY STATE ==================== */
-.analytics-empty {
-    padding: 2.5rem 1rem;
-    text-align: center;
-}
-
-.analytics-empty i {
-    font-size: 2rem;
-    color: #cbd5e1;
-    margin-bottom: 0.5rem;
-    display: block;
-}
-
-.analytics-empty p {
-    color: #94a3b8;
-    font-weight: 500;
-    font-size: 0.85rem;
+.an-card-note {
     margin: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    text-align: right;
 }
 
-/* ==================== RESPONSIVE ==================== */
-@media (max-width: 1200px) {
-    .analytics-stats-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
+/* ==========================================================================
+   TIME SERIES
+
+   Inline SVG built by the page script at the container's real pixel size — not
+   a scaled viewBox, which would stretch the 2px stroke with the card. The
+   container's height covers the plot *and* the x-axis band: a height that fits
+   only the plot is what gives a chart card its own little scrollbar.
+   ========================================================================== */
+
+.an-chart {
+    position: relative;
+    height: 260px;
+    margin: var(--sp-5) var(--sp-6) 0;
 }
 
-@media (max-width: 768px) {
-    .analytics-stats-row {
-        grid-template-columns: 1fr;
-    }
-
-    .analytics-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .analytics-property-bar {
-        flex-direction: column;
-        gap: 0.75rem;
-        align-items: stretch;
-    }
-
-    .period-selector {
-        justify-content: center;
-    }
-
-    .connect-steps {
-        flex-direction: column;
-        gap: 0.75rem;
-        align-items: center;
-    }
-
-    .analytics-secondary-row {
-        flex-direction: column;
-    }
-
-    .analytics-connect-card {
-        padding: 2.5rem 1.25rem;
-    }
-
-    .tracking-status-banner {
-        flex-direction: column;
-        gap: 0.75rem;
-        align-items: flex-start;
-    }
+.an-chart:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+    border-radius: var(--radius-xs);
 }
 
-/* ==================== DISCONNECT MODAL ==================== */
-.analytics-modal-overlay {
-    position: fixed;
+.an-chart svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.an-chart-loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+}
+
+/* --- Marks ------------------------------------------------------------- */
+
+/* Hairline and SOLID. A dashed grid reads as "projection" or "threshold" when
+   it is only a grid, and adds noise the data has to compete with. */
+.an-grid {
+    stroke: var(--border-subtle);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+.an-tick {
+    fill: var(--text-muted);
+    font-size: 11px;
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+}
+
+.an-area {
+    fill: var(--accent-tint);
+    stroke: none;
+}
+
+.an-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* 8px across (r4) with a 2px ring in the surface colour, so the endpoint stays
+   legible where it crosses its own line. */
+.an-dot {
+    fill: var(--accent);
+    stroke: var(--surface-1);
+    stroke-width: 2;
+}
+
+/* The crosshair finds the X so the reader aims at a date, never at a 2px line. */
+/* The crosshair sits under the transparent hit rect in paint order, so it
+   would not steal a pointer event anyway — but a mark that exists only to be
+   looked at should say so, not rely on sibling ordering staying put. */
+.an-cursor-group {
+    pointer-events: none;
+}
+
+.an-cursor {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+.an-cursor-dot {
+    fill: var(--accent);
+    stroke: var(--surface-1);
+    stroke-width: 2;
+}
+
+/* --- Tooltip ----------------------------------------------------------- */
+
+/* Value first, label second: the reader already knows which series is on
+   screen — they came for the number. --inverse-surface is the same floating
+   ink the toasts use. */
+.an-tip {
+    position: absolute;
+    z-index: 5;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(15, 23, 42, 0.5);
-    backdrop-filter: blur(4px);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.analytics-modal {
-    background: white;
-    border-radius: var(--radius-lg);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-    padding: 2.5rem 2rem 2rem;
-    max-width: 400px;
-    width: 90%;
-    text-align: center;
-    animation: slideUp 0.25s ease;
-}
-
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.analytics-modal-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    margin: 0 auto 1.25rem;
-}
-
-.analytics-modal-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 0.5rem;
-}
-
-.analytics-modal-text {
-    font-size: 0.85rem;
-    color: #64748b;
-    line-height: 1.6;
-    margin-bottom: 1.75rem;
-}
-
-.analytics-modal-actions {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-}
-
-.btn-modal-cancel {
-    padding: 0.6rem 1.5rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 50px;
-    background: white;
-    color: #64748b;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.btn-modal-cancel:hover {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-    color: #475569;
-}
-
-.btn-modal-confirm {
-    padding: 0.6rem 1.5rem;
-    border: none;
-    border-radius: 50px;
-    background: #ef4444;
-    color: white;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    transition: all 0.15s ease;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-}
-
-.btn-modal-confirm:hover {
-    background: #dc2626;
-    transform: translateY(-1px);
-}
-
-/* ==================== AUTO-LINK TOAST ==================== */
-.analytics-toast {
-    position: fixed;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: #1e293b;
-    color: white;
-    padding: 0.75rem 1.5rem;
-    border-radius: 12px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-    opacity: 0;
-    transition: opacity 0.3s, transform 0.3s;
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.analytics-toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
-
-.analytics-toast i {
-    color: #10b981;
-}
-
-/* ==================== RECONNECT BANNER ==================== */
-.analytics-reconnect-banner {
-    display: flex;
-    align-items: center;
-    gap: 1.25rem;
-    background: #fff7ed;
-    border: 1px solid #fed7aa;
-    border-radius: var(--radius-lg);
-    padding: 2rem 2.5rem;
-    margin: 2rem auto;
-    max-width: 600px;
-}
-
-.analytics-reconnect-banner > i {
-    font-size: 2rem;
-    color: #f59e0b;
-    flex-shrink: 0;
-}
-
-.analytics-reconnect-banner div {
-    flex: 1;
-}
-
-.analytics-reconnect-banner strong {
-    display: block;
-    font-size: 1.05rem;
-    color: #92400e;
-    margin-bottom: 0.25rem;
-}
-
-.analytics-reconnect-banner p {
-    margin: 0;
-    font-size: 0.9rem;
-    color: #78350f;
-    opacity: 0.85;
-}
-
-.btn-reconnect {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.6rem 1.25rem;
-    background: var(--primary-color);
-    color: white;
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    font-size: 0.9rem;
-    text-decoration: none;
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-xs);
+    background: var(--inverse-surface);
+    color: var(--on-inverse);
+    font-size: var(--fs-xs);
+    line-height: 1.35;
     white-space: nowrap;
-    transition: opacity 0.15s;
+    pointer-events: none;
+    box-shadow: var(--elev-3);
+    transform: translate(-50%, -100%);
 }
 
-.btn-reconnect:hover {
-    opacity: 0.9;
-    color: white;
+.an-tip[hidden] {
+    display: none;
 }
+
+.an-tip-value {
+    display: block;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+}
+
+.an-tip-label {
+    display: block;
+    opacity: 0.75;
+}
+
+/* --- Table view -------------------------------------------------------- */
+
+.an-table-wrap {
+    margin: var(--sp-5) var(--sp-6) 0;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.an-table-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-3) 0 0;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    list-style: none;
+}
+
+.an-table-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.an-table-toggle:hover {
+    color: var(--text-strong);
+}
+
+.an-table-scroll {
+    max-height: 240px;
+    margin-top: var(--sp-3);
+    overflow: auto;
+}
+
+.an-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-xs);
+}
+
+.an-table th,
+.an-table td {
+    padding: var(--sp-2) var(--sp-3);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.an-table th:first-child,
+.an-table td:first-child {
+    text-align: left;
+}
+
+.an-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-1);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Tabular here and only here: these digits align vertically down a column,
+   which is exactly the case the proportional-figures rule carves out. */
+.an-table td {
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.an-table tbody tr:not(:last-child) td {
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+/* ==========================================================================
+   RIGHT NOW — the one hero figure on the screen
+   ========================================================================== */
+
+.an-live {
+    align-items: center;
+    text-align: center;
+}
+
+.an-live .card-head {
+    width: 100%;
+}
+
+.an-pulse {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--success);
+}
+
+/* Only pulses while the poll is actually succeeding — a heartbeat over a dead
+   connection is a lie the reader has no way to catch. */
+.an-pulse.is-live::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--success);
+    animation: anPulse 2s var(--ease-standard) infinite;
+}
+
+.an-pulse.is-stale {
+    background: var(--text-faint);
+}
+
+@keyframes anPulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+
+    100% {
+        transform: scale(3.2);
+        opacity: 0;
+    }
+}
+
+/* ≥48px, in the same sans as everything else. Proportional figures, never
+   tabular — equal-width digits make a number this size read loose. */
+.an-hero {
+    margin: var(--sp-6) 0 0;
+    font-size: clamp(3rem, 2rem + 2.5vw, 4rem);
+    font-weight: var(--fw-medium);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--text-strong);
+}
+
+.an-hero-note {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.an-facts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    width: 100%;
+    margin-top: auto;
+    padding: var(--sp-6) var(--sp-6) 0;
+}
+
+.an-fact {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-4);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--border-subtle);
+    text-align: left;
+}
+
+.an-fact-label {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.an-fact-value {
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.an-fact-meter {
+    grid-column: 1 / -1;
+    width: 100%;
+}
+
+/* ==========================================================================
+   TOP PAGES — rows with a share meter
+   ========================================================================== */
+
+.an-rows {
+    display: flex;
+    flex-direction: column;
+    padding: var(--sp-3) var(--sp-3) 0;
+}
+
+.an-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-4);
+    padding: var(--sp-3);
+    border-radius: var(--radius-sm);
+    transition: background-color var(--dur-fast) var(--ease-standard);
+}
+
+.an-row:hover {
+    background: var(--surface-2);
+}
+
+.an-row-title {
+    font-size: var(--fs-sm);
+    color: var(--text-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.an-row-path {
+    grid-column: 1;
+    font-family: var(--font-mono);
+    font-size: var(--fs-2xs);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.an-row-figures {
+    grid-row: 1 / 3;
+    grid-column: 2;
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+}
+
+.an-row-views {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-strong);
+}
+
+/* Average time on page — a duration, not a share, and quieter than the count
+   it sits beside so the row still reads views-first. */
+.an-row-time {
+    min-width: 3.4rem;
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.an-row-share {
+    min-width: 2.6rem;
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+/* The share as a magnitude, on the same accent-on-accent-tint pair the shared
+   .stat-meter uses, so a ratio looks the same wherever it appears. */
+.an-row-meter {
+    grid-column: 1 / -1;
+    height: 4px;
+    margin-top: var(--sp-1);
+    border-radius: var(--radius-pill);
+    background: var(--accent-tint);
+    overflow: hidden;
+}
+
+.an-row-meter-fill {
+    display: block;
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    transition: width var(--dur-slow) var(--ease-standard);
+}
+
+/* ==========================================================================
+   TRAFFIC SOURCES — horizontal bars, one hue, direct-labelled
+
+   Nominal categories: every bar takes the same hue and the label beside it
+   carries identity. Colouring them by value would double-encode the length.
+   ========================================================================== */
+
+.an-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-4) var(--sp-6) 0;
+}
+
+.an-bar-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-3);
+    padding: var(--sp-2) 0;
+}
+
+.an-bar-label {
+    font-size: var(--fs-sm);
+    color: var(--text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.an-bar-value {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-strong);
+}
+
+.an-bar-share {
+    min-width: 2.6rem;
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+/* The bar itself. 10px thick — well under the 24px cap, so the row's leftover
+   height stays as air — growing from one baseline at the left, with the 4px
+   radius on the data-end only and a square edge at the baseline. */
+.an-bar-track {
+    grid-column: 1 / -1;
+    height: 10px;
+    border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+    background: var(--surface-2);
+}
+
+.an-bar-fill {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+    border-radius: 0 4px 4px 0;
+    background: var(--accent);
+    transition: width var(--dur-slow) var(--ease-emphasized);
+}
+
+/* The tail, folded into one row rather than seated as more hues. Same length
+   scale, a step back in weight so it reads as "the rest" and not as a channel. */
+.an-bar-row.is-other .an-bar-label {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.an-bar-row.is-other .an-bar-fill {
+    background: var(--viz-stage-other);
+}
+
+/* ==========================================================================
+   FAILURE / EMPTY inside a card
+   ========================================================================== */
+
+.an-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    margin: var(--sp-5) var(--sp-6);
+    padding: var(--sp-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+}
+
+.an-note i {
+    color: var(--text-faint);
+}
+
+/* Stale data is dimmed in place rather than replaced by a skeleton: no layout
+   jump and no flash while the next period loads. */
+.an-stale {
+    opacity: 0.45;
+    transition: opacity var(--dur-base) var(--ease-standard);
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 1180px) {
+
+    .an-split.is-chart,
+    .an-split.is-lists {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Side by side the live card was a tall column; full width it is a row. */
+    .an-live {
+        align-items: stretch;
+        text-align: left;
+    }
+
+    .an-live .an-hero {
+        margin-top: var(--sp-5);
+        padding: 0 var(--sp-6);
+    }
+
+    .an-live .an-hero-note {
+        padding: 0 var(--sp-6);
+    }
+
+    .an-facts {
+        flex-direction: row;
+        margin-top: var(--sp-6);
+    }
+
+    .an-fact {
+        flex: 1;
+    }
+}
+
+@media (max-width: 760px) {
+    .an-filters {
+        align-items: flex-start;
+    }
+
+    .an-source {
+        gap: var(--sp-1) var(--sp-4);
+    }
+
+    .an-chart {
+        height: 220px;
+        margin-left: var(--sp-4);
+        margin-right: var(--sp-4);
+    }
+
+    .an-facts {
+        flex-direction: column;
+    }
+
+    .an-card-note {
+        display: none;
+    }
+}
+
+/* Below this the sparkline goes first — dashboard.css already hides
+   .stat-trend at 440px, and .an-kpi-trend has to follow it or the tile keeps
+   an empty 116px column. */
+@media (max-width: 440px) {
+    .an-kpi-trend {
+        display: none;
+    }
+}
+
+/* The pulse and the bar transitions are decoration; the global reduced-motion
+   block in dashboard.css collapses them. Every state on this screen is also a
+   number, a word and a glyph, so nothing here depends on motion. */

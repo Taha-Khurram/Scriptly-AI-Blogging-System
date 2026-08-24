@@ -65,6 +65,668 @@ function showToast(options) {
 window.showToast = showToast;
 
 // --------------------------------------------------------------------------
+// Theme (light / dark)
+//
+// The stored choice is applied to <html data-theme> by an inline script in
+// base.html before first paint; this layer only handles switching at runtime
+// and keeping every visible toggle in sync. No stored value means "follow the
+// OS", which is the default the token layer already implements.
+// --------------------------------------------------------------------------
+
+const THEME_KEY = 'scriptly-theme';
+
+function getStoredTheme() {
+    try {
+        return localStorage.getItem(THEME_KEY);
+    } catch (e) {
+        return null;
+    }
+}
+
+/** The theme actually on screen right now, resolving "system" to what it means. */
+function getActiveTheme() {
+    const explicit = document.documentElement.getAttribute('data-theme');
+    if (explicit === 'dark' || explicit === 'light') return explicit;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function syncThemeControls() {
+    const active = getActiveTheme();
+    const nextLabel = active === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+
+    document.querySelectorAll('[data-theme-toggle]').forEach((el) => {
+        el.setAttribute('aria-label', nextLabel);
+        el.setAttribute('title', nextLabel);
+        el.setAttribute('aria-pressed', active === 'dark' ? 'true' : 'false');
+
+        // The icon shows the theme you would switch *to*, which is the
+        // convention users read fastest.
+        const icon = el.querySelector('.material-symbols-outlined');
+        if (icon) icon.textContent = active === 'dark' ? 'light_mode' : 'dark_mode';
+
+        const label = el.querySelector('[data-theme-label]');
+        if (label) label.textContent = active === 'dark' ? 'Light theme' : 'Dark theme';
+    });
+
+    // Keep the browser chrome (address bar / title bar) on the same surface.
+    const chrome = active === 'dark' ? '#131314' : '#F0F4F9';
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+        m.setAttribute('content', chrome);
+    });
+}
+
+function setTheme(theme) {
+    if (theme === 'system') {
+        document.documentElement.removeAttribute('data-theme');
+        try { localStorage.removeItem(THEME_KEY); } catch (e) { }
+    } else {
+        document.documentElement.setAttribute('data-theme', theme);
+        try { localStorage.setItem(THEME_KEY, theme); } catch (e) { }
+    }
+    syncThemeControls();
+}
+
+function toggleTheme() {
+    setTheme(getActiveTheme() === 'dark' ? 'light' : 'dark');
+}
+
+window.setTheme = setTheme;
+window.toggleTheme = toggleTheme;
+window.getActiveTheme = getActiveTheme;
+
+document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-theme-toggle]')) {
+        e.preventDefault();
+        toggleTheme();
+    }
+});
+
+// While the user is on "system", follow the OS live.
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (!getStoredTheme()) syncThemeControls();
+});
+
+document.addEventListener('DOMContentLoaded', syncThemeControls);
+
+// --------------------------------------------------------------------------
+// Page header
+//
+// Drives partials/page_header.html: the condense-on-scroll state and the
+// search field's keyboard affordances.
+//
+// The header lives *inside* .dashboard-main, so PJAX destroys and rebuilds it
+// on every navigation. Everything here is therefore either delegated off
+// document/window or re-read at event time — nothing holds a reference to the
+// element across a page change. The search field owns no behaviour of its own:
+// it emits `page-search` and the page decides what that means.
+// --------------------------------------------------------------------------
+
+(function initPageHeader() {
+    const STUCK_ON = 12;   // px scrolled before the bar condenses…
+    const STUCK_OFF = 4;   // …and where it relaxes again. The gap is hysteresis,
+    // so a header sitting exactly on the threshold cannot
+    // flicker as its own height change nudges the scroll.
+    let ticking = false;
+
+    function applyStuck() {
+        ticking = false;
+        const header = document.querySelector('[data-page-header]');
+        if (!header) return;
+
+        const y = window.scrollY || document.documentElement.scrollTop || 0;
+        if (y > STUCK_ON) header.classList.add('is-stuck');
+        else if (y < STUCK_OFF) header.classList.remove('is-stuck');
+    }
+
+    function onScroll() {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(applyStuck);
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    function getSearchInput() {
+        return document.querySelector('[data-page-search] .page-search-input');
+    }
+
+    function emitSearch(value, submit) {
+        document.dispatchEvent(new CustomEvent('page-search', {
+            detail: { value: value, submit: !!submit }
+        }));
+    }
+
+    function syncSearchState(input) {
+        const box = input.closest('[data-page-search]');
+        if (box) box.classList.toggle('has-value', input.value.trim() !== '');
+    }
+
+    // ---- Results dropdown --------------------------------------------------
+    //
+    // The header renders it but does not know what a result *is*: a page
+    // answers `page-search` with `page-search-results` and this fills the
+    // panel from that. Pages that stay silent never open it, which is why the
+    // dropdown can ship in the shared partial without touching every screen.
+
+    const RESULT_LIMIT = 8;
+
+    function getSearchPanel() {
+        return document.querySelector('[data-page-search-panel]');
+    }
+
+    function resultsOpen() {
+        const panel = getSearchPanel();
+        return !!panel && !panel.hidden;
+    }
+
+    function setExpanded(open, active) {
+        const input = getSearchInput();
+        if (!input) return;
+        input.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open && active && active.id) input.setAttribute('aria-activedescendant', active.id);
+        else input.removeAttribute('aria-activedescendant');
+    }
+
+    function closeResults() {
+        const panel = getSearchPanel();
+        if (!panel || panel.hidden) return;
+        panel.hidden = true;
+        panel.innerHTML = '';
+        setExpanded(false);
+    }
+
+    function resultOptions() {
+        const panel = getSearchPanel();
+        if (!panel || panel.hidden) return [];
+        return Array.from(panel.querySelectorAll('.page-search-result, .page-search-foot'));
+    }
+
+    function activeOption() {
+        return resultOptions().find((el) => el.classList.contains('is-active')) || null;
+    }
+
+    function activate(target) {
+        resultOptions().forEach((el) => {
+            const on = el === target;
+            el.classList.toggle('is-active', on);
+            if (el.getAttribute('role') === 'option') {
+                el.setAttribute('aria-selected', on ? 'true' : 'false');
+            }
+        });
+        setExpanded(true, target);
+        if (target) target.scrollIntoView({ block: 'nearest' });
+    }
+
+    function moveActive(step) {
+        const opts = resultOptions();
+        if (!opts.length) return;
+        const at = opts.indexOf(activeOption());
+        // Wrap in both directions: from nothing selected, Down lands on the
+        // first row and Up on the last.
+        const next = ((at === -1 ? (step > 0 ? -1 : 0) : at) + step + opts.length) % opts.length;
+        activate(opts[next]);
+    }
+
+    // The query is user content coming back through the DOM, so matches are
+    // marked up by splicing text nodes rather than by building HTML.
+    function withHighlight(text, query) {
+        const frag = document.createDocumentFragment();
+        const needle = query.toLowerCase();
+        const hay = text.toLowerCase();
+
+        let from = 0;
+        let at = needle ? hay.indexOf(needle) : -1;
+        while (at !== -1) {
+            if (at > from) frag.appendChild(document.createTextNode(text.slice(from, at)));
+            const hit = document.createElement('mark');
+            hit.className = 'page-search-hit';
+            hit.textContent = text.slice(at, at + needle.length);
+            frag.appendChild(hit);
+            from = at + needle.length;
+            at = hay.indexOf(needle, from);
+        }
+        frag.appendChild(document.createTextNode(text.slice(from)));
+        return frag;
+    }
+
+    function resultNode(item, id, query) {
+        const row = document.createElement('a');
+        row.className = 'page-search-result';
+        row.id = id;
+        row.href = item.href || '#';
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', 'false');
+
+        if (item.mark) {
+            const mark = document.createElement('span');
+            mark.className = 'page-search-result-mark';
+            mark.setAttribute('aria-hidden', 'true');
+            mark.textContent = item.mark;
+            row.appendChild(mark);
+        }
+
+        const main = document.createElement('span');
+        main.className = 'page-search-result-main';
+
+        const title = document.createElement('span');
+        title.className = 'page-search-result-title';
+        title.appendChild(withHighlight(String(item.title || 'Untitled'), query));
+        main.appendChild(title);
+
+        if (item.meta) {
+            const meta = document.createElement('span');
+            meta.className = 'page-search-result-meta';
+            meta.textContent = item.meta;
+            main.appendChild(meta);
+        }
+
+        row.appendChild(main);
+
+        if (item.status) {
+            const pill = document.createElement('span');
+            pill.className = 'status-pill status-' + String(item.status).toLowerCase();
+            pill.textContent = item.statusLabel || item.status;
+            row.appendChild(pill);
+        }
+
+        return row;
+    }
+
+    function renderResults(detail) {
+        const panel = getSearchPanel();
+        const input = getSearchInput();
+        if (!panel || !input) return;
+
+        const query = String(detail.query != null ? detail.query : input.value).trim();
+        if (!query) {
+            closeResults();
+            return;
+        }
+
+        const items = (detail.items || []).slice(0, detail.limit || RESULT_LIMIT);
+        panel.innerHTML = '';
+
+        if (items.length) {
+            items.forEach((item, i) => {
+                panel.appendChild(resultNode(item, panel.id + '-opt-' + i, query));
+            });
+        } else {
+            const empty = document.createElement('p');
+            empty.className = 'page-search-empty';
+            empty.textContent = detail.empty || 'Nothing here matches “' + query + '”.';
+            panel.appendChild(empty);
+        }
+
+        if (detail.footer && detail.footer.href) {
+            const foot = document.createElement('a');
+            foot.className = 'page-search-foot';
+            foot.id = panel.id + '-foot';
+            foot.href = detail.footer.href;
+            foot.textContent = detail.footer.label || 'See all results';
+            panel.appendChild(foot);
+        }
+
+        panel.hidden = false;
+        setExpanded(true);
+        activate(null);
+
+        // Bound on the panel rather than the document so it costs nothing while
+        // the dropdown is closed. Re-adding the same function to the same
+        // element is a no-op, and PJAX throws the element away with its
+        // listener, so this stays a single live binding.
+        panel.addEventListener('mouseover', onPanelHover);
+    }
+
+    // Pointer and keyboard share one cursor: hovering a row makes it the row
+    // Enter would open, so the two cannot disagree about what is selected.
+    function onPanelHover(e) {
+        const row = e.target.closest('.page-search-result, .page-search-foot');
+        if (row) activate(row);
+    }
+
+    document.addEventListener('page-search-results', (e) => {
+        renderResults((e && e.detail) || {});
+    });
+
+    document.addEventListener('input', (e) => {
+        const input = e.target.closest('[data-page-search] .page-search-input');
+        if (!input) return;
+        syncSearchState(input);
+        if (!input.value.trim()) closeResults();
+        emitSearch(input.value, false);
+    });
+
+    // Re-ask on focus so returning to a field that still holds a query brings
+    // its results back instead of leaving the reader staring at a dead box.
+    document.addEventListener('focusin', (e) => {
+        const box = e.target.closest && e.target.closest('[data-page-search]');
+        if (!box) {
+            closeResults();
+            return;
+        }
+        const input = getSearchInput();
+        if (input && e.target === input && input.value.trim() && !resultsOpen()) {
+            emitSearch(input.value, false);
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('[data-page-search-clear]')) {
+            const input = getSearchInput();
+            if (!input) return;
+            input.value = '';
+            syncSearchState(input);
+            closeResults();
+            emitSearch('', false);
+            input.focus();
+            return;
+        }
+
+        // Closing tears the anchor out of the document, so it has to wait for
+        // the delegated PJAX handler further down this file to see the click.
+        if (e.target.closest('.page-search-result, .page-search-foot')) {
+            setTimeout(closeResults, 0);
+            return;
+        }
+
+        // A click on the panel's own padding or scrollbar is not a dismissal.
+        if (!e.target.closest('[data-page-search]')) closeResults();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        const input = getSearchInput();
+        if (!input) return;
+
+        const inField = document.activeElement === input;
+
+        if (inField && resultsOpen() && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            e.preventDefault();
+            moveActive(e.key === 'ArrowDown' ? 1 : -1);
+            return;
+        }
+
+        if (inField && e.key === 'Enter') {
+            e.preventDefault();
+            // A highlighted row wins over the page's own submit handling —
+            // the reader picked that result, not the query.
+            const chosen = activeOption();
+            if (chosen) {
+                chosen.click();
+                closeResults();
+                return;
+            }
+            emitSearch(input.value, true);
+            return;
+        }
+
+        if (inField && e.key === 'Escape') {
+            // One dismissal per press: the panel first, the query second.
+            if (resultsOpen()) {
+                closeResults();
+                return;
+            }
+            if (input.value) {
+                input.value = '';
+                syncSearchState(input);
+                emitSearch('', false);
+            } else {
+                input.blur();
+            }
+            return;
+        }
+
+        // ⌘K / Ctrl+K from anywhere, and a bare "/" when the user is not
+        // already typing into something.
+        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
+            || document.activeElement.isContentEditable;
+
+        if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            input.focus();
+            input.select();
+        } else if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+            e.preventDefault();
+            input.focus();
+        }
+    });
+
+    // The shortcut hint has to name the key the reader actually has.
+    function labelShortcut() {
+        const platform = (navigator.userAgentData && navigator.userAgentData.platform)
+            || navigator.platform || '';
+        if (!/mac|iphone|ipad|ipod/i.test(platform)) return;
+        document.querySelectorAll('[data-search-hint]').forEach((el) => {
+            el.textContent = '⌘ K';
+        });
+    }
+
+    function refresh() {
+        labelShortcut();
+        applyStuck();
+    }
+
+    document.addEventListener('DOMContentLoaded', refresh);
+    document.addEventListener('pjax:complete', refresh);
+})();
+
+// --------------------------------------------------------------------------
+// Select pill
+//
+// Drives the .select-pill / .menu pair: a listbox we own, wrapped around a
+// native <select> that stays the value holder. Choosing an item writes through
+// to the select and fires a real `change` event, so page code keeps reading
+// `.value` and listening for `change` exactly as it did with a bare select.
+//
+// Everything is delegated off `document` and re-read at event time — the pills
+// live inside .dashboard-main, which PJAX rebuilds on every navigation.
+// --------------------------------------------------------------------------
+
+(function initSelectPill() {
+
+    function pillOf(el) { return el.closest('[data-select-pill]'); }
+    function menuOf(pill) { return pill.querySelector('.menu'); }
+    function selectOf(pill) { return pill.querySelector('select'); }
+    function triggerOf(pill) { return pill.querySelector('[data-select-trigger]'); }
+
+    function closeAll(except) {
+        document.querySelectorAll('[data-select-pill]').forEach((pill) => {
+            if (pill === except) return;
+            const menu = menuOf(pill);
+            if (menu && !menu.hidden) {
+                menu.hidden = true;
+                const trigger = triggerOf(pill);
+                if (trigger) trigger.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    // Mark the item matching the select's current value. Done on every open so
+    // the menu is correct even when the value was changed elsewhere — a "Clear
+    // all" button, say, or a query string on load.
+    function syncItems(pill) {
+        const select = selectOf(pill);
+        if (!select) return;
+        pill.querySelectorAll('.menu-item').forEach((item) => {
+            const on = item.dataset.value === select.value;
+            item.classList.toggle('is-selected', on);
+            item.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+    }
+
+    function open(pill) {
+        const menu = menuOf(pill);
+        const trigger = triggerOf(pill);
+        if (!menu) return;
+
+        closeAll(pill);
+        syncItems(pill);
+        menu.hidden = false;
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+
+        const selected = menu.querySelector('.menu-item.is-selected') || menu.querySelector('.menu-item');
+        if (selected) selected.focus();
+    }
+
+    function close(pill, refocus) {
+        const menu = menuOf(pill);
+        const trigger = triggerOf(pill);
+        if (menu) menu.hidden = true;
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'false');
+            if (refocus) trigger.focus();
+        }
+    }
+
+    function choose(pill, item) {
+        const select = selectOf(pill);
+        if (select && select.value !== item.dataset.value) {
+            select.value = item.dataset.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        syncItems(pill);
+        close(pill, true);
+    }
+
+    document.addEventListener('click', (e) => {
+        const trigger = e.target.closest('[data-select-trigger]');
+        if (trigger) {
+            e.preventDefault();
+            const pill = pillOf(trigger);
+            const menu = menuOf(pill);
+            if (menu && menu.hidden) open(pill); else close(pill, false);
+            return;
+        }
+
+        const item = e.target.closest('.menu-item');
+        if (item && pillOf(item)) {
+            e.preventDefault();
+            choose(pillOf(item), item);
+            return;
+        }
+
+        // Anywhere else dismisses.
+        if (!e.target.closest('[data-select-pill]')) closeAll(null);
+    });
+
+    document.addEventListener('keydown', (e) => {
+        const pill = pillOf(e.target);
+        if (!pill) return;
+
+        const menu = menuOf(pill);
+        if (!menu) return;
+
+        if (e.key === 'Escape') {
+            if (!menu.hidden) { e.preventDefault(); close(pill, true); }
+            return;
+        }
+
+        const onTrigger = !!e.target.closest('[data-select-trigger]');
+
+        if (menu.hidden) {
+            if (onTrigger && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                open(pill);
+            }
+            return;
+        }
+
+        const items = Array.from(menu.querySelectorAll('.menu-item'));
+        const at = items.indexOf(e.target.closest('.menu-item'));
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            (items[at + 1] || items[0]).focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            (items[at - 1] || items[items.length - 1]).focus();
+        } else if (e.key === 'Home') {
+            e.preventDefault();
+            items[0].focus();
+        } else if (e.key === 'End') {
+            e.preventDefault();
+            items[items.length - 1].focus();
+        }
+    });
+
+    // A menu left open across a PJAX navigation would be orphaned mid-air.
+    document.addEventListener('pjax:complete', () => closeAll(null));
+})();
+
+// --------------------------------------------------------------------------
+// Account menu
+//
+// Lives in the sidebar, which sits outside .dashboard-main and so survives
+// PJAX navigation — everything here is delegated off `document` and bound once,
+// rather than re-wired per page.
+// --------------------------------------------------------------------------
+
+function getUserMenu() {
+    return document.getElementById('userMenu');
+}
+
+function setUserMenuOpen(open) {
+    const menu = getUserMenu();
+    if (!menu) return;
+
+    menu.hidden = !open;
+    document.querySelectorAll('[data-user-menu]').forEach((el) => {
+        if (el.hasAttribute('aria-expanded')) {
+            el.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+    });
+
+    if (open) {
+        // Send focus into the menu so keyboard users land somewhere useful.
+        const first = menu.querySelector('a, button');
+        if (first) first.focus();
+    }
+}
+
+function closeUserMenu(refocus) {
+    const menu = getUserMenu();
+    if (!menu || menu.hidden) return;
+    setUserMenuOpen(false);
+    if (refocus) {
+        const trigger = document.querySelector('.user-card-avatar[data-user-menu]');
+        if (trigger) trigger.focus();
+    }
+}
+
+document.addEventListener('click', (e) => {
+    const menu = getUserMenu();
+    if (!menu) return;
+
+    if (e.target.closest('[data-user-menu]')) {
+        e.preventDefault();
+        setUserMenuOpen(menu.hidden);
+        return;
+    }
+
+    if (e.target.closest('[data-user-menu-close]')) {
+        e.preventDefault();
+        closeUserMenu(true);
+        return;
+    }
+
+    // A click on a link inside the menu should navigate, not just close.
+    if (menu.contains(e.target)) {
+        if (e.target.closest('a')) closeUserMenu(false);
+        return;
+    }
+
+    closeUserMenu(false);
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeUserMenu(true);
+});
+
+// Deliberately no resize handler: the menu is anchored to the rail in CSS, so
+// it follows the rail width on its own. Closing it on resize only meant it
+// vanished whenever the browser fired a spurious resize — a device-pixel-ratio
+// change, or a mobile address bar sliding away mid-interaction.
+
+// --------------------------------------------------------------------------
 // Page Loader Functions
 // --------------------------------------------------------------------------
 
@@ -305,25 +967,38 @@ const Pjax = (() => {
                 <div class="skeleton-table-row"><div class="skeleton skeleton-text" style="width:32%;"></div><div class="skeleton" style="width:40px;height:22px;border-radius:12px;"></div><div class="skeleton skeleton-text" style="width:12%;"></div><div class="skeleton skeleton-text" style="width:8%;"></div></div>
             </div>`,
 
-        // Gallery: header + upload zone + image grid
+        // Gallery: header + filter/sort toolbar + tile grid with captions.
+        // The upload zone this used to draw is gone — uploading is a header
+        // action and a drag-anywhere overlay now, so a 110px block at the top
+        // would promise a control the real page does not have.
         gallery: `
             <header class="dashboard-header skeleton-header">
                 <div><div class="skeleton skeleton-text" style="height:14px;width:100px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:150px;"></div></div>
+                <div class="skeleton" style="width:120px;height:40px;border-radius:999px;"></div>
             </header>
-            <div class="skeleton" style="width:100%;height:110px;border-radius:12px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:center;">
+            <div class="skeleton-filter-bar">
+                <div class="skeleton" style="width:56px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:62px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:62px;height:34px;border-radius:999px;"></div>
+                <div style="flex:1"></div>
+                <div class="skeleton" style="width:150px;height:38px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:76px;height:38px;border-radius:999px;"></div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;">
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
-                <div class="skeleton" style="width:100%;height:160px;border-radius:12px;"></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:70%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:55%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:65%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:60%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:72%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:58%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:66%;margin-top:10px;"></div></div>
+                <div><div class="skeleton" style="width:100%;aspect-ratio:1;border-radius:16px;"></div><div class="skeleton skeleton-text sm" style="width:62%;margin-top:10px;"></div></div>
             </div>`,
 
         // Newsletter: header + 3 stat cards + newsletter creation card + subscribers
+        // Newsletter: header + 3 stat tiles + the section tabs + the composer's
+        // split editor/preview. The old skeleton drew a tall stacked form
+        // because that is what the page used to be.
         newsletter: `
             <header class="dashboard-header skeleton-header">
                 <div><div class="skeleton skeleton-text" style="height:14px;width:90px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:140px;"></div></div>
@@ -333,19 +1008,22 @@ const Pjax = (() => {
                 <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:50px;"></div></div></div>
                 <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:50px;"></div></div></div>
             </div>
-            <div class="skeleton-card" style="margin-bottom:1.5rem;">
-                <div class="skeleton skeleton-text" style="height:18px;width:180px;margin-bottom:1.25rem;"></div>
-                <div class="skeleton skeleton-text sm" style="margin-bottom:0.5rem;"></div>
-                <div class="skeleton" style="width:100%;height:40px;border-radius:8px;margin-bottom:1rem;"></div>
-                <div class="skeleton skeleton-text sm" style="margin-bottom:0.5rem;"></div>
-                <div class="skeleton" style="width:100%;height:80px;border-radius:8px;margin-bottom:1rem;"></div>
-                <div class="skeleton" style="width:140px;height:38px;border-radius:8px;"></div>
+            <div class="skeleton-filter-bar" style="margin-bottom:1.5rem;">
+                <div class="skeleton" style="width:96px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:124px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:98px;height:34px;border-radius:999px;"></div>
             </div>
             <div class="skeleton-card">
-                <div class="skeleton skeleton-text" style="height:18px;width:130px;margin-bottom:1rem;"></div>
-                <div class="skeleton-list-item"><div class="skeleton skeleton-text md"></div><div class="skeleton skeleton-text sm"></div></div>
-                <div class="skeleton-list-item"><div class="skeleton skeleton-text lg"></div><div class="skeleton skeleton-text sm"></div></div>
-                <div class="skeleton-list-item"><div class="skeleton skeleton-text md"></div><div class="skeleton skeleton-text sm"></div></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+                    <div>
+                        <div class="skeleton skeleton-text sm" style="margin-bottom:0.5rem;"></div>
+                        <div class="skeleton" style="width:100%;height:40px;border-radius:12px;margin-bottom:1.25rem;"></div>
+                        <div class="skeleton skeleton-text sm" style="margin-bottom:0.5rem;"></div>
+                        <div class="skeleton" style="width:100%;height:88px;border-radius:12px;margin-bottom:1.25rem;"></div>
+                        <div class="skeleton" style="width:100%;height:72px;border-radius:12px;"></div>
+                    </div>
+                    <div class="skeleton" style="width:100%;height:320px;border-radius:16px;"></div>
+                </div>
             </div>`,
 
         // Leads: header + 3 stats + filter tabs + table (status, name, email, subject, date, actions)
@@ -583,22 +1261,34 @@ const Pjax = (() => {
                 <div class="skeleton-table-row"><div style="display:flex;align-items:center;gap:10px;width:25%;"><div class="skeleton skeleton-circle" style="width:36px;height:36px;flex-shrink:0;"></div><div class="skeleton skeleton-text" style="width:75%;"></div></div><div class="skeleton skeleton-text" style="width:26%;"></div><div class="skeleton skeleton-text" style="width:11%;"></div><div class="skeleton" style="width:60px;height:22px;border-radius:12px;"></div><div class="skeleton skeleton-text" style="width:8%;"></div></div>
             </div>`,
 
-        // Optimization: header + input card + metrics grid
+        // Optimization: header + three stat tiles + tab bar + the control row.
+        // A skeleton is a promise about the shape that is coming, so it moves
+        // whenever the screen does — this one still drew the old six-tile
+        // metrics grid and an input card, neither of which the page opens on.
         optimization: `
             <header class="dashboard-header skeleton-header">
-                <div><div class="skeleton skeleton-text" style="height:14px;width:80px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:180px;"></div></div>
+                <div><div class="skeleton skeleton-text" style="height:14px;width:130px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:180px;"></div></div>
             </header>
-            <div class="skeleton-card" style="margin-bottom:1.5rem;">
-                <div class="skeleton skeleton-text" style="height:14px;width:180px;margin-bottom:1rem;"></div>
-                <div style="display:flex;gap:0.75rem;"><div class="skeleton" style="flex:1;height:44px;border-radius:12px;"></div><div class="skeleton" style="width:130px;height:44px;border-radius:12px;"></div></div>
+            <div class="skeleton-stat-grid">
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:50px;"></div></div></div>
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:50px;"></div></div></div>
+                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:50px;"></div></div></div>
             </div>
-            <div class="skeleton-stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
-                <div class="skeleton-stat"><div class="skeleton skeleton-circle" style="width:48px;height:48px;border-radius:14px;"></div><div style="flex:1"><div class="skeleton skeleton-text sm"></div><div class="skeleton skeleton-text" style="height:28px;width:60px;"></div></div></div>
+            <div class="skeleton-filter-bar" style="margin-bottom:1.5rem;">
+                <div class="skeleton" style="width:92px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:104px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:136px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:118px;height:34px;border-radius:999px;"></div>
+                <div class="skeleton" style="width:148px;height:34px;border-radius:999px;"></div>
+            </div>
+            <div class="skeleton-card">
+                <div class="skeleton skeleton-text" style="height:18px;width:170px;margin-bottom:0.75rem;"></div>
+                <div class="skeleton skeleton-text" style="height:12px;width:100%;max-width:520px;margin-bottom:1.5rem;"></div>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+                    <div class="skeleton" style="flex:1;min-width:220px;height:42px;border-radius:999px;"></div>
+                    <div class="skeleton" style="width:180px;height:42px;border-radius:999px;"></div>
+                    <div class="skeleton" style="width:130px;height:42px;border-radius:999px;"></div>
+                </div>
             </div>`
     };
 

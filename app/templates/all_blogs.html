@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}All Blogs | ScriptlyAI{% endblock %}
+{% block title %}All Blogs | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/drafts.css') }}?v=2">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/all_blogs.css') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/drafts.css') }}?v=3">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/all_blogs.css') }}?v=8">
 {% endblock %}
 
 {% block content %}
@@ -13,158 +14,250 @@
   {% include 'partials/sidebar.html' %}
 
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <div class="header-welcome-text">Content Management</div>
-        <h1 class="header-title">All Blogs</h1>
+
+    {# search_id is the id all_blogs.js already binds its debounced query to, so
+       the header field *is* the page's search rather than a second one beside
+       it. Filtering here hits the API, not the rendered rows. #}
+    {% call page_header(
+    title='All Blogs',
+    eyebrow='Content management',
+    search=true,
+    search_placeholder='Search blogs',
+    search_id='searchInput') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-primary">
+      <i class="bi bi-stars" aria-hidden="true"></i>
+      <span class="page-header-label">New blog</span>
+    </a>
+    {% endcall %}
+
+    {#
+      Filter bar. Status is the primary dimension so it stays a permanently
+      visible segmented control; everything else is a filter pill that shows its
+      own current value rather than a bare control you have to open to read.
+      "Clear all" only exists while something is actually applied.
+    #}
+    <section class="surface-card filter-bar reveal" aria-label="Filter blogs">
+      <div class="seg-tabs blogs-filter-tabs" role="group" aria-label="Filter by status">
+        <button type="button" class="seg-tab is-active" data-filter="all">All</button>
+        <button type="button" class="seg-tab" data-filter="DRAFT">Draft</button>
+        <button type="button" class="seg-tab" data-filter="UNDER_REVIEW">Under review</button>
+        <button type="button" class="seg-tab" data-filter="PUBLISHED">Published</button>
+        <button type="button" class="seg-tab" data-filter="REJECTED">Rejected</button>
       </div>
-    </header>
 
-    <div class="dashboard-content-wrapper animate-fade-up">
+      <div class="filter-bar-controls">
+        {# A listbox we own rather than a native select popup: the browser draws
+           that one itself, so it cannot take our surfaces or radius and renders
+           white-on-blue on a dark theme. The <select> stays as the value holder
+           so every existing `.value` read and `change` listener still works. #}
+        <div class="select-pill" data-select-pill>
+          <button type="button" class="filter-pill" data-pill="category" data-select-trigger
+            aria-haspopup="listbox" aria-expanded="false" aria-labelledby="categoryFilterLabel">
+            <i class="bi bi-tag" aria-hidden="true"></i>
+            <span class="visually-hidden" id="categoryFilterLabel">Filter by category</span>
+            <span class="filter-pill-label" aria-hidden="true">Category</span>
+            <span class="filter-pill-value" id="categoryFilterValue" aria-hidden="true" hidden></span>
+            <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+          </button>
 
-      <!-- Filter Bar -->
-      <div class="blogs-filters">
-        <div class="blogs-filter-tabs">
-          <button class="filter-tab active" data-filter="all">All</button>
-          <button class="filter-tab" data-filter="DRAFT">Draft</button>
-          <button class="filter-tab" data-filter="UNDER_REVIEW">Under Review</button>
-          <button class="filter-tab" data-filter="PUBLISHED">Published</button>
-          <button class="filter-tab" data-filter="REJECTED">Rejected</button>
-        </div>
-        <div class="blogs-filter-controls">
-          <select id="categoryFilter" class="filter-select">
-            <option value="all">All Categories</option>
+          <div class="menu is-end" role="listbox" aria-labelledby="categoryFilterLabel" hidden>
+            <button type="button" class="menu-item" role="option" data-value="all">
+              <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+              <span class="menu-label">All categories</span>
+            </button>
+            {% for cat in categories %}
+            <button type="button" class="menu-item" role="option" data-value="{{ cat.name }}">
+              <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+              <span class="menu-label">{{ cat.name }}</span>
+            </button>
+            {% endfor %}
+          </div>
+
+          <select id="categoryFilter" tabindex="-1" aria-hidden="true">
+            <option value="all">All categories</option>
             {% for cat in categories %}
             <option value="{{ cat.name }}">{{ cat.name }}</option>
             {% endfor %}
           </select>
-          <div class="filter-search-wrap">
-            <i class="bi bi-search"></i>
-            <input type="text" id="searchInput" class="filter-search" placeholder="Search blogs...">
-          </div>
-          <button class="filter-date-btn" id="dateFilterBtn" onclick="openDateModal()">
-            <i class="bi bi-calendar3"></i> <span id="dateFilterLabel">Date Range</span>
+        </div>
+
+        <button type="button" class="filter-pill" id="dateFilterBtn" onclick="openDateModal()">
+          <i class="bi bi-calendar3" aria-hidden="true"></i>
+          <span id="dateFilterLabel">Date range</span>
+          <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+        </button>
+
+        <button type="button" class="filter-clear" id="clearFiltersBtn" onclick="clearAllFilters()" hidden>
+          <i class="bi bi-x-lg" aria-hidden="true"></i> Clear all
+        </button>
+      </div>
+    </section>
+
+    <!-- Blogs -->
+    <section class="surface-card blogs-container reveal" style="--reveal-delay: 60ms" aria-labelledby="blogsHeading">
+      <header class="card-head">
+        <h2 class="card-title" id="blogsHeading">
+          Blogs <span class="card-count" id="blogsCount">{{ initial_data.total if initial_data else 0 }}</span>
+        </h2>
+        <span class="card-note" id="blogsPageNote">
+          {% if initial_data and initial_data.total_pages > 1 %}Page 1 of {{ initial_data.total_pages }}{% endif %}
+        </span>
+      </header>
+
+      <div id="blogsList" class="data-rows blogs-list">
+        {% if initial_data and initial_data.blogs %}
+        {% for blog in initial_data.blogs %}
+        {% set title = blog.title or 'Untitled' %}
+        {% set author = blog.author_name or 'Unknown' %}
+        {% set st = (blog.status or 'DRAFT') | upper %}
+        {% set st_labels = {'PUBLISHED': 'Published', 'UNDER_REVIEW': 'Under review', 'REJECTED': 'Rejected', 'DRAFT':
+        'Draft'} %}
+        {# The blog's initial, not the author's: on a single-author site every
+           row would otherwise carry the same letter. Leading markdown asterisks
+           are stripped first so the mark is a letter rather than "*". #}
+        {% set mark = title | replace('*', '') | trim %}
+        <div class="data-row blog-row" id="row-{{ blog.id }}">
+          <span class="row-mark" aria-hidden="true">{{ (mark[0] if mark else '?') | upper }}</span>
+
+          <button type="button" class="row-open" onclick="openEditModal('{{ blog.id }}')" title="Edit “{{ title }}”">
+            <span class="row-title blog-title-cell">{{ title }}</span>
+            <span class="row-meta">
+              <span>{{ author }}</span>
+              <span class="row-sep" aria-hidden="true">·</span>
+              <span>{{ blog.category or 'Uncategorized' }}</span>
+            </span>
           </button>
-        </div>
-      </div>
 
-      <!-- Blogs Table -->
-      <div class="blogs-container">
-        <div class="blogs-list-header">
-          <div class="col-blog-title">Title</div>
-          <div class="col-blog-author">Author</div>
-          <div class="col-blog-category">Category</div>
-          <div class="col-blog-status">Status</div>
-          <div class="col-blog-date">Updated</div>
-          <div class="col-blog-actions"></div>
-        </div>
-        <div id="blogsList">
-          {% if initial_data and initial_data.blogs %}
-            {% for blog in initial_data.blogs %}
-            <div class="blog-row" id="row-{{ blog.id }}">
-              <div class="col-blog-title">
-                <span class="blog-title-cell" title="{{ blog.title or 'Untitled' }}">{{ (blog.title or 'Untitled')[:45] }}</span>
-              </div>
-              <div class="col-blog-author">
-                <div class="blog-author-cell">
-                  <div class="blog-author-avatar">{{ (blog.author_name or 'U')[0]|upper }}</div>
-                  <span class="blog-author-name">{{ (blog.author_name or 'Unknown')[:20] }}</span>
-                </div>
-              </div>
-              <div class="col-blog-category">
-                <span class="blog-category-badge">{{ blog.category or 'Uncategorized' }}</span>
-              </div>
-              <div class="col-blog-status">
-                {% set status = blog.status or 'DRAFT' %}
-                {% if status == 'PUBLISHED' %}
-                  <span class="blog-status-badge status-badge-published"><i class="bi bi-circle-fill"></i> Published</span>
-                {% elif status == 'UNDER_REVIEW' %}
-                  <span class="blog-status-badge status-badge-under_review"><i class="bi bi-circle-fill"></i> Under Review</span>
-                {% elif status == 'REJECTED' %}
-                  <span class="blog-status-badge status-badge-rejected"><i class="bi bi-circle-fill"></i> Rejected</span>
-                {% else %}
-                  <span class="blog-status-badge status-badge-draft"><i class="bi bi-circle-fill"></i> Draft</span>
-                {% endif %}
-              </div>
-              <div class="col-blog-date">
-                <span class="blog-date-cell">{{ blog.updated_at[:10] if blog.updated_at else '' }}</span>
-              </div>
-              <div class="col-blog-actions">
-                <div class="dropdown">
-                  <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-three-dots-vertical"></i>
+          <span class="status-pill status-{{ st | lower }}">{{ st_labels.get(st, st | title) }}</span>
+          {# data-relative: the same conversion renderBlogRow does for every
+             page after the first, so the first paint does not read differently. #}
+          <time class="row-time blog-date-cell" datetime="{{ blog.updated_at or '' }}"
+            data-relative>{{ blog.updated_at[:10] if blog.updated_at else '' }}</time>
+
+          <div class="row-trail">
+            <div class="dropdown">
+              <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                aria-label="More actions for {{ title }}">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <button class="dropdown-item" onclick="openEditModal('{{ blog.id }}')">
+                    <i class="bi bi-pencil-square" style="color: var(--primary-color);"></i> Edit Blog
                   </button>
-                  <ul class="dropdown-menu dropdown-menu-end">
-                    <li>
-                      <button class="dropdown-item" onclick="openEditModal('{{ blog.id }}')">
-                        <i class="bi bi-pencil-square" style="color: var(--primary-color);"></i> Edit Blog
-                      </button>
-                    </li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li>
-                      <button class="dropdown-item text-danger" onclick="deleteBlog('{{ blog.id }}')">
-                        <i class="bi bi-x-circle"></i> Delete
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-              </div>
+                </li>
+                <li>
+                  <hr class="dropdown-divider">
+                </li>
+                <li>
+                  <button class="dropdown-item text-danger" onclick="deleteBlog('{{ blog.id }}')">
+                    <i class="bi bi-x-circle"></i> Delete
+                  </button>
+                </li>
+              </ul>
             </div>
-            {% endfor %}
-          {% else %}
-            <div class="blogs-empty">
-              <i class="bi bi-journals"></i>
-              <p>No blogs found.</p>
-            </div>
-          {% endif %}
+          </div>
         </div>
-      </div>
-
-      <!-- Pagination -->
-      <div class="blogs-pagination" id="blogsPagination">
-        {% if initial_data and initial_data.total_pages > 1 %}
-          {% for p in range(1, initial_data.total_pages + 1) %}
-            {% if p <= 5 or p == initial_data.total_pages %}
-              <button class="page-btn{{ ' active' if p == 1 else '' }}" onclick="goToPage({{ p }})">{{ p }}</button>
-            {% elif p == 6 %}
-              <span class="page-ellipsis">...</span>
-            {% endif %}
-          {% endfor %}
+        {% endfor %}
+        {% else %}
+        <div class="list-empty">
+          <span class="list-empty-icon"><i class="bi bi-journals"></i></span>
+          <p>No blogs found. Try a different status, category or date range.</p>
+        </div>
         {% endif %}
       </div>
 
-    </div>
+      <nav class="pager" id="blogsPagination" aria-label="Blog pages">
+        {% if initial_data and initial_data.total_pages > 1 %}
+        {% for p in range(1, initial_data.total_pages + 1) %}
+        {% if p <= 5 or p == initial_data.total_pages %}
+        <button type="button" class="pager-btn{{ ' is-active' if p == 1 else '' }}"
+          onclick="goToPage({{ p }})">{{ p }}</button>
+        {% elif p == 6 %}
+        <span class="pager-dots">…</span>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+      </nav>
+    </section>
 
-<!-- Date Range Modal -->
-<div class="modal fade" id="dateRangeModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content custom-modal">
-      <div class="custom-modal-header">
-        <h5 class="custom-modal-title"><i class="bi bi-calendar3"></i> Select Date Range</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="custom-modal-body">
-        <div class="date-range-field">
-          <label class="form-label">From</label>
-          <input type="date" id="dateFrom" class="form-control">
-        </div>
-        <div class="date-range-field">
-          <label class="form-label">To</label>
-          <input type="date" id="dateTo" class="form-control">
-        </div>
-        <div class="date-range-presets">
-          <button class="preset-btn" onclick="setDatePreset('today')">Today</button>
-          <button class="preset-btn" onclick="setDatePreset('week')">Last 7 days</button>
-          <button class="preset-btn" onclick="setDatePreset('month')">Last 30 days</button>
-          <button class="preset-btn" onclick="setDatePreset('all')">All Time</button>
-        </div>
-      </div>
-      <div class="custom-modal-footer">
-        <button class="btn-modal btn-modal-secondary" onclick="clearDateFilter()">Clear</button>
-        <button class="btn-modal btn-modal-primary" onclick="applyDateFilter()">
-          <i class="bi bi-check-lg"></i> Apply
+{#
+  Date range. Presets come first because that is what most people actually
+  want; the custom fields are the escape hatch below them. A live summary line
+  states what Apply will do, and Apply is disabled while the range is
+  backwards, so an impossible query can never be submitted.
+#}
+<div class="modal fade" id="dateRangeModal" tabindex="-1" aria-hidden="true" aria-labelledby="dateRangeTitle">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content date-modal">
+
+      <header class="date-modal-head">
+        <h2 class="date-modal-title" id="dateRangeTitle">Date range</h2>
+        <button type="button" class="date-modal-close" data-bs-dismiss="modal" aria-label="Close">
+          <i class="bi bi-x-lg" aria-hidden="true"></i>
         </button>
+      </header>
+
+      {# Presets rail on the left, calendar on the right — the arrangement every
+         analytics tool converged on, because the two are alternatives rather
+         than steps: most sessions end at the rail and never touch the grid. #}
+      <div class="date-modal-body">
+
+        <div class="date-presets" role="group" aria-label="Quick ranges">
+          <button type="button" class="date-preset" data-preset="today" onclick="setDatePreset('today')">Today</button>
+          <button type="button" class="date-preset" data-preset="week" onclick="setDatePreset('week')">Last 7
+            days</button>
+          <button type="button" class="date-preset" data-preset="month" onclick="setDatePreset('month')">Last 30
+            days</button>
+          <button type="button" class="date-preset" data-preset="quarter" onclick="setDatePreset('quarter')">Last 90
+            days</button>
+          <button type="button" class="date-preset" data-preset="year" onclick="setDatePreset('year')">This
+            year</button>
+          <button type="button" class="date-preset" data-preset="all" onclick="setDatePreset('all')">All time</button>
+        </div>
+
+        {# Our own calendar. `<input type="date">` brings the browser's popup,
+           which is drawn by the browser and so cannot take our surfaces, type
+           or spacing — and it can only ever pick one date, so a *range* meant
+           two disconnected pickers. The hidden inputs below are the value
+           holders the rest of the JS already reads; the grid is the control. #}
+        <div class="date-custom">
+          <div class="cal" data-calendar>
+            <div class="cal-head">
+              <button type="button" class="cal-nav" data-cal-prev aria-label="Previous month">
+                <i class="bi bi-chevron-left" aria-hidden="true"></i>
+              </button>
+              <span class="cal-title" data-cal-title aria-live="polite"></span>
+              <button type="button" class="cal-nav" data-cal-next aria-label="Next month">
+                <i class="bi bi-chevron-right" aria-hidden="true"></i>
+              </button>
+            </div>
+
+            <div class="cal-dow" aria-hidden="true">
+              <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
+              <span>Th</span><span>Fr</span><span>Sa</span>
+            </div>
+
+            <div class="cal-grid" data-cal-grid role="grid" aria-label="Choose a date range"></div>
+          </div>
+        </div>
+
+        <input type="hidden" id="dateFrom">
+        <input type="hidden" id="dateTo">
       </div>
+
+      <footer class="date-modal-foot">
+        <p class="date-summary" id="dateSummary" role="status">Showing all time</p>
+        <div class="date-actions">
+          <button type="button" class="date-btn is-ghost" onclick="clearDateFilter()">Clear</button>
+          <button type="button" class="date-btn is-primary" id="dateApplyBtn" onclick="applyDateFilter()">Apply</button>
+        </div>
+      </footer>
+
     </div>
   </div>
 </div>
@@ -273,7 +366,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.2/tinymce.min.js" referrerpolicy="origin"></script>
-<script src="{{ url_for('static', filename='js/pages/all_blogs.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/pages/all_blogs.js') }}?v=9"></script>
   </main>
 </div>
 

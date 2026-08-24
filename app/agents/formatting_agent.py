@@ -5,7 +5,10 @@ Handles markdown processing, TOC generation, reading time, and HTML conversion
 
 import re
 import markdown
-from typing import Dict, List, Optional
+from typing import Dict, List
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class FormattingAgent:
@@ -234,8 +237,8 @@ class FormattingAgent:
 
             return html
 
-        except Exception as e:
-            print(f"Markdown conversion error: {e}")
+        except Exception:
+            logger.exception("Markdown conversion error")
             # Fallback: basic conversion
             return f'<article class="blog-content">{content.replace(chr(10), "<br>")}</article>'
 
@@ -374,7 +377,7 @@ Some content here with **bold** and *italic* text.
 More content with a code block:
 
 ```python
-print("Hello World")
+logger.info("Hello World")
 ```
 
 ## Conclusion
@@ -384,12 +387,12 @@ Final thoughts here.
 
     result = agent.format_blog(sample_content, "My Blog Title")
 
-    print("=== READING TIME ===")
-    print(result['reading_time_text'])
+    logger.info("READING TIME ===")
+    logger.info(result['reading_time_text'])
 
-    print("\n=== TABLE OF CONTENTS ===")
+    logger.info("n=== TABLE OF CONTENTS ===")
     for item in result['toc']:
-        print(f"{'  ' * (item['level']-1)}- {item['text']}")
+        logger.info(f"{'  ' * (item['level']-1)}- {item['text']}")
 
-    print("\n=== STATISTICS ===")
-    print(result['statistics'])
+    logger.info("n=== STATISTICS ===")
+    logger.info(result['statistics'])

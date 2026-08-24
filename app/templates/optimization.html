@@ -1,283 +1,633 @@
 {% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
 
-{% block title %}Optimization | ScriptlyAI{% endblock %}
+{% block title %}Optimization | {{ app_config.app_name if app_config else 'ScriptlyAI' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/optimization.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/optimization.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
+{% set summary = report_summary | default({}) %}
+{% set report_count = summary.get('count', 0) %}
+{% set avg_gain = summary.get('avg_gain', 0) %}
+{% set best_score = summary.get('best_score', 0) %}
+
+{# The country lists are the API's, not ours — keyword research takes lowercase
+   codes and the optimizer takes uppercase, so the two are kept separate rather
+   than folded into one list and case-converted at the call site. #}
+{% set kw_countries = [
+  ('us', 'United States'), ('uk', 'United Kingdom'), ('ca', 'Canada'),
+  ('au', 'Australia'), ('de', 'Germany'), ('fr', 'France'), ('es', 'Spain'),
+  ('it', 'Italy'), ('br', 'Brazil'), ('in', 'India'), ('jp', 'Japan'),
+  ('nl', 'Netherlands'), ('se', 'Sweden'), ('no', 'Norway'), ('dk', 'Denmark'),
+  ('mx', 'Mexico')
+] %}
+{% set opt_regions = [
+  ('US', 'United States'), ('UK', 'United Kingdom'), ('CA', 'Canada'),
+  ('AU', 'Australia'), ('DE', 'Germany'), ('FR', 'France'), ('ES', 'Spain'),
+  ('IT', 'Italy'), ('BR', 'Brazil'), ('IN', 'India'), ('PK', 'Pakistan'),
+  ('JP', 'Japan'), ('NL', 'Netherlands'), ('MX', 'Mexico')
+] %}
+
 <div class="dashboard-layout">
 
   {% include 'partials/sidebar.html' %}
 
-  <!-- MAIN CONTENT -->
+  {#
+    Everything below — the tabs, all three modals and the page script — lives
+    inside .dashboard-main. PJAX swaps only that element's innerHTML, so a modal
+    placed outside it is dropped on every in-app navigation and stays broken
+    until a hard reload; a script placed outside it survives only because PJAX
+    happens to scrape <script> tags from the whole document, which is the more
+    confusing half of the same fault.
+  #}
   <main class="dashboard-main">
-    <header class="dashboard-header">
-      <div>
-        <h1 class="header-title">Optimization</h1>
-      </div>
-    </header>
 
-    <div class="dashboard-content-wrapper animate-fade-up">
+    {% call page_header(title='Optimization', eyebrow='Search performance') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    {% endcall %}
 
-      <!-- Optimization Card -->
-      <div class="optimization-card">
-        <h3><i class="bi bi-graph-up-arrow"></i> Search Engine Optimization</h3>
-
-        <!-- Tabs -->
-        <div class="optimization-tabs">
-          <button class="opt-tab active" data-tab="url-metrics"><i class="bi bi-globe2"></i> URL Metrics</button>
-          <button class="opt-tab" data-tab="keyword-research"><i class="bi bi-key-fill"></i> Keyword Research</button>
-          <button class="opt-tab" data-tab="site-audit"><i class="bi bi-shield-check"></i> Site Audit</button>
-          <button class="opt-tab" data-tab="auto-optimize"><i class="bi bi-magic"></i> Auto Optimize</button>
-          <button class="opt-tab" data-tab="reports"><i class="bi bi-clock-history"></i> Reports</button>
-        </div>
-
-        <!-- URL Metrics Tab -->
-        <div class="opt-tab-content active" id="tabUrlMetrics">
-          <div class="optimization-input-card">
-            <label class="input-label">Analyze URL</label>
-            <div class="optimization-input-group">
-              <input type="text" id="urlInput" placeholder="Enter a URL (e.g., medium.com)" autocomplete="off">
-              <button class="btn-analyze" id="analyzeUrlBtn" onclick="analyzeUrl()">
-                <i class="bi bi-search"></i> Analyze
-              </button>
-            </div>
-          </div>
-
-          <div class="optimization-results" id="urlResultsSection">
-            <div class="analyzed-url-badge" id="analyzedUrl">
-              <i class="bi bi-link-45deg"></i>
-              <span id="analyzedUrlText"></span>
-            </div>
-            <div class="optimization-metrics-grid" id="urlMetricsGrid"></div>
-            <div class="optimization-details-card" id="urlDetailsCard">
-              <div class="details-title"><i class="bi bi-info-circle-fill"></i> Full Metrics Breakdown</div>
-              <div class="details-grid" id="urlDetailsGrid"></div>
-            </div>
-          </div>
-
-          <div class="optimization-empty" id="urlEmptyState">
-            <i class="bi bi-speedometer2"></i>
-            <p>Enter a URL above to analyze its SEO performance metrics</p>
-          </div>
-        </div>
-
-        <!-- Keyword Research Tab -->
-        <div class="opt-tab-content" id="tabKeywordResearch">
-          <div class="optimization-input-card">
-            <label class="input-label">Select Draft Blog</label>
-            <div class="kw-input-layout">
-              <select id="draftSelect" class="draft-select">
-                <option value="">-- Select a draft --</option>
-              </select>
-              <div class="kw-input-row">
-                <select id="countrySelect" class="country-select">
-                  <option value="us">United States</option>
-                  <option value="uk">United Kingdom</option>
-                  <option value="ca">Canada</option>
-                  <option value="au">Australia</option>
-                  <option value="de">Germany</option>
-                  <option value="fr">France</option>
-                  <option value="es">Spain</option>
-                  <option value="it">Italy</option>
-                  <option value="br">Brazil</option>
-                  <option value="in">India</option>
-                  <option value="jp">Japan</option>
-                  <option value="nl">Netherlands</option>
-                  <option value="se">Sweden</option>
-                  <option value="no">Norway</option>
-                  <option value="dk">Denmark</option>
-                  <option value="mx">Mexico</option>
-                </select>
-                <button class="btn-analyze" id="analyzeKeywordBtn" onclick="analyzeKeyword()">
-                  <i class="bi bi-search"></i> Research
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="optimization-results" id="kwResultsSection">
-            <div class="analyzed-url-badge" id="analyzedKeyword">
-              <i class="bi bi-file-text-fill"></i>
-              <span id="analyzedKeywordText"></span>
-            </div>
-            <div class="kw-results-table-wrapper">
-              <table class="kw-results-table" id="kwResultsTable">
-                <thead>
-                  <tr>
-                    <th>Keyword</th>
-                    <th>Search Volume</th>
-                    <th>Difficulty</th>
-                    <th>CPC</th>
-                    <th>Clicks</th>
-                    <th>Traffic Potential</th>
-                  </tr>
-                </thead>
-                <tbody id="kwResultsBody"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="optimization-empty" id="kwEmptyState">
-            <i class="bi bi-file-earmark-text"></i>
-            <p>Select a draft blog to analyze its content and discover keyword opportunities</p>
-          </div>
-        </div>
-
-        <!-- Site Audit Tab -->
-        <div class="opt-tab-content" id="tabSiteAudit">
-          <div class="optimization-input-card">
-            <label class="input-label">Site Domain</label>
-            <div class="optimization-input-group">
-              <input type="text" id="auditDomainInput" placeholder="Enter a domain (e.g., codeconia.com)" autocomplete="off">
-              <button class="btn-analyze" id="auditBtn" onclick="runSiteAudit()">
-                <i class="bi bi-shield-check"></i> Audit
-              </button>
-            </div>
-          </div>
-
-          <div class="optimization-results" id="auditResultsSection">
-            <div class="analyzed-url-badge" id="auditedDomain">
-              <i class="bi bi-globe2"></i>
-              <span id="auditedDomainText"></span>
-            </div>
-            <div class="audit-table-scroll">
-              <table class="kw-results-table" id="auditResultsTable">
-                <thead id="auditResultsHead"></thead>
-                <tbody id="auditResultsBody"></tbody>
-              </table>
-            </div>
-            <div class="optimization-details-card" id="auditDetailsCard" style="display:none; margin-top: 1.5rem;">
-              <div class="details-title"><i class="bi bi-info-circle-fill"></i> Additional Information</div>
-              <div class="details-grid" id="auditDetailsGrid"></div>
-            </div>
-          </div>
-
-          <div class="optimization-empty" id="auditEmptyState">
-            <i class="bi bi-shield-check"></i>
-            <p>Enter a domain above to discover its top search keywords</p>
-          </div>
-        </div>
-
-        <!-- Auto Optimize Tab -->
-        <div class="opt-tab-content" id="tabAutoOptimize">
-          <div class="optimization-input-card">
-            <label class="input-label">Select Draft to Optimize</label>
-            <div class="kw-input-layout">
-              <select id="optimizeDraftSelect" class="draft-select">
-                <option value="">-- Select a draft --</option>
-              </select>
-              <div class="kw-input-row">
-                <select id="optimizeRegionSelect" class="country-select">
-                  <option value="US">United States</option>
-                  <option value="UK">United Kingdom</option>
-                  <option value="CA">Canada</option>
-                  <option value="AU">Australia</option>
-                  <option value="DE">Germany</option>
-                  <option value="FR">France</option>
-                  <option value="ES">Spain</option>
-                  <option value="IT">Italy</option>
-                  <option value="BR">Brazil</option>
-                  <option value="IN">India</option>
-                  <option value="PK">Pakistan</option>
-                  <option value="JP">Japan</option>
-                  <option value="NL">Netherlands</option>
-                  <option value="MX">Mexico</option>
-                </select>
-                <button class="btn-analyze btn-optimize-go" id="optimizeBtn" onclick="runAutoOptimize()">
-                  <i class="bi bi-magic"></i> Optimize
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="optimize-loading" id="optimizeLoading" style="display:none;">
-            <div class="optimize-loading-inner">
-              <div class="optimize-spinner"></div>
-              <p class="optimize-loading-text">AI is analyzing and optimizing your blog...</p>
-              <p class="optimize-loading-sub">This may take 15-30 seconds</p>
-            </div>
-          </div>
-
-          <div class="optimization-results" id="optimizeResultsSection">
-            <div class="optimize-success-banner">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Blog optimized and saved successfully!</span>
-              <button class="btn-export-report" onclick="exportOptimizeReport()">
-                <i class="bi bi-file-earmark-arrow-down"></i> Report
-              </button>
-            </div>
-
-            <div class="optimize-score-comparison">
-              <div class="optimize-score-card before">
-                <span class="optimize-score-label">Before</span>
-                <span class="optimize-score-value" id="optimizeScoreBefore">0</span>
-                <span class="optimize-score-sub">SEO Score</span>
-              </div>
-              <div class="optimize-score-arrow">
-                <i class="bi bi-arrow-right"></i>
-              </div>
-              <div class="optimize-score-card after">
-                <span class="optimize-score-label">After</span>
-                <span class="optimize-score-value" id="optimizeScoreAfter">0</span>
-                <span class="optimize-score-sub">SEO Score</span>
-              </div>
-              <div class="optimize-score-card improvement">
-                <span class="optimize-score-label">Improvement</span>
-                <span class="optimize-score-value" id="optimizeScoreImprovement">+0</span>
-                <span class="optimize-score-sub">Points</span>
-              </div>
-            </div>
-
-            <div class="optimize-details-section">
-              <div class="optimize-detail-row">
-                <span class="optimize-detail-label"><i class="bi bi-fonts"></i> New Title</span>
-                <span class="optimize-detail-value" id="optimizeNewTitle"></span>
-              </div>
-              <div class="optimize-detail-row">
-                <span class="optimize-detail-label"><i class="bi bi-key-fill"></i> Primary Keyword</span>
-                <span class="optimize-detail-value" id="optimizePrimaryKw"></span>
-              </div>
-              <div class="optimize-detail-row">
-                <span class="optimize-detail-label"><i class="bi bi-trophy-fill"></i> SEO Grade</span>
-                <span class="optimize-detail-value" id="optimizeGrade"></span>
-              </div>
-            </div>
-
-            <div class="optimize-changes-card" id="optimizeChangesCard">
-              <div class="details-title"><i class="bi bi-list-check"></i> Changes Made</div>
-              <ul class="optimize-changes-list" id="optimizeChangesList"></ul>
-            </div>
-
-            <div class="optimize-suggestions-card" id="optimizeSuggestionsCard" style="display:none;">
-              <div class="details-title"><i class="bi bi-lightbulb-fill"></i> Suggestions to Improve Further</div>
-              <ul class="optimize-suggestions-list" id="optimizeSuggestionsList"></ul>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Reports Tab -->
-        <div class="opt-tab-content" id="tabReports">
-          <div class="report-list" id="reportsList"></div>
-          <div class="report-empty-card" id="reportsEmptyState">
-            <div class="report-empty-inner">
-              <i class="bi bi-clock-history"></i>
-              <h4>No Existing Reports</h4>
-              <p>Run Auto Optimize on a draft to generate your first SEO report. All reports will be saved here automatically.</p>
-            </div>
-          </div>
-        </div>
-
+    {#
+      Server-rendered from the saved reports, so the figures are true on first
+      paint. They are re-derived in the browser after an optimize run or a
+      delete — the same numbers from the same data, never animated over.
+    #}
+    <div class="opt-stats reveal">
+      <div class="stat-card">
+        <span class="stat-icon stat-runs"><i class="bi bi-magic" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">{{ 'Optimization run' if report_count == 1 else 'Optimizations run' }}</span>
+          <span class="stat-count" data-stat-runs title="{{ report_count }}">{{ report_count }}</span>
+          <span class="stat-delta" data-delta-runs></span>
+        </span>
+        <span data-trend-runs></span>
       </div>
 
+      <div class="stat-card">
+        <span class="stat-icon stat-gain"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Average gain</span>
+          <span class="stat-count" data-stat-gain title="{{ avg_gain }}">{{ '+' if avg_gain > 0 }}{{ avg_gain }}</span>
+          <span class="stat-delta">points per run</span>
+        </span>
+        <span data-trend-gain></span>
+      </div>
+
+      {# A score out of 100 is a ratio, not a series, so this slot is a meter
+         rather than a sparkline. #}
+      <div class="stat-card">
+        <span class="stat-icon stat-best"><i class="bi bi-trophy" aria-hidden="true"></i></span>
+        <span class="stat-info">
+          <span class="stat-label">Best SEO score</span>
+          <span class="stat-count" data-stat-best title="{{ best_score }}">{{ best_score }}</span>
+          <span class="stat-delta">out of 100</span>
+        </span>
+        <span class="stat-meter" data-meter-best{{ ' hidden' if report_count == 0 else '' }}>
+          <span class="stat-meter-track">
+            <span class="stat-meter-fill" data-meter-fill style="width: {{ best_score }}%"></span>
+          </span>
+          <span class="stat-meter-note" data-meter-note>{{ best_score }} / 100</span>
+        </span>
+      </div>
     </div>
+
+    {#
+      Five jobs behind one segmented control. Optimize leads because it is the
+      only tab that changes anything — the other four report on the world. The
+      old bar opened on URL Metrics, a third-party lookup, and buried the
+      product's own capability fourth.
+    #}
+    <section class="surface-card opt-tabs-bar reveal" style="--reveal-delay: 60ms" aria-label="Optimization tools">
+      <div class="seg-tabs opt-tabs" role="tablist" aria-label="Optimization tools">
+        <button type="button" class="seg-tab is-active" role="tab" aria-selected="true"
+          aria-controls="panelOptimize" data-tab="optimize">Optimize</button>
+        <button type="button" class="seg-tab" role="tab" aria-selected="false" aria-controls="panelReports"
+          data-tab="reports">Reports <span class="seg-count" data-report-count>{{ report_count }}</span></button>
+        <button type="button" class="seg-tab" role="tab" aria-selected="false" aria-controls="panelDraftKeywords"
+          data-tab="draft-keywords">Draft keywords</button>
+        <button type="button" class="seg-tab" role="tab" aria-selected="false" aria-controls="panelUrlMetrics"
+          data-tab="url-metrics">URL metrics</button>
+        <button type="button" class="seg-tab" role="tab" aria-selected="false" aria-controls="panelDomainKeywords"
+          data-tab="domain-keywords">Domain keywords</button>
+      </div>
+    </section>
+
+    <!-- ===================== OPTIMIZE ===================== -->
+    <section class="surface-card reveal" style="--reveal-delay: 120ms" id="panelOptimize" role="tabpanel"
+      data-tab-panel="optimize" aria-labelledby="optimizeHeading">
+
+      <header class="card-head is-stacked">
+        <h2 class="card-title" id="optimizeHeading">Optimize a draft</h2>
+        <p class="card-note">
+          Scriptly researches the keyword landscape for your region, then rewrites the title, meta
+          description, headings and keyword placement — and <strong>saves over the draft</strong>.
+          Export a report afterwards if you want a record of what changed.
+        </p>
+      </header>
+
+      <div class="opt-controls">
+        <div class="opt-picker opt-picker-grow">
+          <label class="opt-label" id="optimizeDraftLabel">Draft</label>
+          <div class="select-pill" data-select-pill>
+            <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
+              aria-expanded="false" aria-labelledby="optimizeDraftLabel">
+              <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+              <span class="filter-pill-label" data-pill-text>Loading drafts…</span>
+              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+            </button>
+            <select id="optimizeDraftSelect" data-drafts-for="optimize" aria-labelledby="optimizeDraftLabel">
+              <option value="">Select a draft</option>
+            </select>
+            <div class="menu" role="listbox" aria-labelledby="optimizeDraftLabel" hidden></div>
+          </div>
+        </div>
+
+        <div class="opt-picker">
+          <label class="opt-label" id="optimizeRegionLabel">Region</label>
+          <div class="select-pill" data-select-pill>
+            <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
+              aria-expanded="false" aria-labelledby="optimizeRegionLabel">
+              <i class="bi bi-globe2" aria-hidden="true"></i>
+              <span class="filter-pill-label" data-pill-text>United States</span>
+              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+            </button>
+            <select id="optimizeRegionSelect" aria-labelledby="optimizeRegionLabel">
+              {% for code, name in opt_regions %}
+              <option value="{{ code }}">{{ name }}</option>
+              {% endfor %}
+            </select>
+            <div class="menu is-end" role="listbox" aria-labelledby="optimizeRegionLabel" hidden>
+              {% for code, name in opt_regions %}
+              <button type="button" class="menu-item{{ ' is-selected' if loop.first }}" role="option"
+                aria-selected="{{ 'true' if loop.first else 'false' }}" data-value="{{ code }}">
+                <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                <span class="menu-label">{{ name }}</span>
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="app-btn is-primary opt-run" data-action="optimize">
+          <i class="bi bi-magic" aria-hidden="true"></i> Optimize
+        </button>
+      </div>
+
+      <div class="opt-body" data-body="optimize" data-state="empty">
+
+        <div class="opt-state" data-for="empty">
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-magic" aria-hidden="true"></i></span>
+            <p>Pick a draft and a region, and Scriptly will research it, rewrite it for search, and
+              show you every change it made.</p>
+          </div>
+        </div>
+
+        {# The agent-working surface: the pill status card and the indeterminate
+           bar running brandShimmer, so "the system is thinking" looks the same
+           here as it does during blog generation. #}
+        <div class="opt-state" data-for="loading">
+          <div class="opt-working" role="status" aria-live="polite">
+            <span class="opt-working-badge">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              Researching and rewriting…
+            </span>
+            <p class="opt-working-note">This usually takes 15–30 seconds. Leaving the tab is fine — the
+              draft is saved server-side.</p>
+            <div class="progress opt-working-bar">
+              <div class="progress-bar bg-primary" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+
+        {# Errors used to be a toast and nothing else, so a failed run left the
+           panel looking exactly like a run you never started. #}
+        <div class="opt-state" data-for="error">
+          <div class="list-empty opt-error">
+            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <p data-error-text>Something went wrong.</p>
+            <button type="button" class="app-btn is-ghost" data-action="optimize">Try again</button>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="results">
+          <div class="opt-result-head">
+            <div class="opt-score">
+              <span class="opt-score-label">SEO score after</span>
+              <span class="opt-score-value" data-score-after>0</span>
+              <span class="opt-score-from">
+                was <span data-score-before>0</span>
+                <span class="opt-score-delta" data-score-delta></span>
+              </span>
+            </div>
+            <span class="opt-grade" data-grade-pill>
+              <span class="opt-grade-letter" data-grade>—</span>
+              <span class="opt-grade-caption">grade</span>
+            </span>
+            <button type="button" class="app-btn is-ghost opt-export" data-action="export-current">
+              <i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i> Export report
+            </button>
+          </div>
+
+          {# The per-category before/after the API has always returned and the
+             screen has never shown — it went only into the exported HTML. #}
+          <div class="opt-breakdown" data-breakdown hidden>
+            <h3 class="opt-subhead">Score breakdown</h3>
+            <div class="opt-meters" data-breakdown-rows></div>
+          </div>
+
+          <div class="opt-facts">
+            <div class="opt-fact">
+              <span class="opt-fact-label">New title</span>
+              <span class="opt-fact-value" data-new-title>—</span>
+            </div>
+            <div class="opt-fact">
+              <span class="opt-fact-label">Primary keyword</span>
+              <span class="opt-fact-value" data-primary-kw>—</span>
+            </div>
+          </div>
+
+          <div class="opt-lists">
+            <div class="opt-list-card" data-changes-card hidden>
+              <h3 class="opt-subhead"><i class="bi bi-list-check" aria-hidden="true"></i> Changes made</h3>
+              <ul class="opt-list opt-list-done" data-changes-list></ul>
+            </div>
+            <div class="opt-list-card" data-recs-card hidden>
+              <h3 class="opt-subhead"><i class="bi bi-lightbulb" aria-hidden="true"></i> Go further</h3>
+              <ul class="opt-list opt-list-todo" data-recs-list></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== REPORTS ===================== -->
+    <section class="surface-card reveal" id="panelReports" role="tabpanel" data-tab-panel="reports"
+      aria-labelledby="reportsHeading" hidden>
+      <header class="card-head">
+        <h2 class="card-title" id="reportsHeading">Reports <span class="card-count" data-report-total>{{ report_count }}</span></h2>
+        <span class="card-note">Saved automatically on every optimize run</span>
+      </header>
+
+      <div class="opt-body" data-body="reports" data-state="empty">
+        <div class="opt-state" data-for="empty">
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
+            <p>No reports yet. Run Optimize on a draft and the record of what changed lands here.</p>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="loading">
+          <div class="list-empty">
+            <span class="list-empty-icon"><span class="spinner-border spinner-border-sm"></span></span>
+            <p>Loading reports…</p>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="error">
+          <div class="list-empty opt-error">
+            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <p data-error-text>Could not load your reports.</p>
+            <button type="button" class="app-btn is-ghost" data-action="reload-reports">Try again</button>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="results">
+          <div class="data-rows report-rows" data-report-rows></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== DRAFT KEYWORDS ===================== -->
+    <section class="surface-card reveal" id="panelDraftKeywords" role="tabpanel" data-tab-panel="draft-keywords"
+      aria-labelledby="kwHeading" hidden>
+      <header class="card-head is-stacked">
+        <h2 class="card-title" id="kwHeading">Keyword opportunities</h2>
+        <p class="card-note">Scriptly reads a draft, pulls the terms it is really about, and looks each
+          one up. Nothing is written back — this is research.</p>
+      </header>
+
+      <div class="opt-controls">
+        <div class="opt-picker opt-picker-grow">
+          <label class="opt-label" id="kwDraftLabel">Draft</label>
+          <div class="select-pill" data-select-pill>
+            <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
+              aria-expanded="false" aria-labelledby="kwDraftLabel">
+              <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+              <span class="filter-pill-label" data-pill-text>Loading drafts…</span>
+              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+            </button>
+            <select id="draftSelect" data-drafts-for="keywords" aria-labelledby="kwDraftLabel">
+              <option value="">Select a draft</option>
+            </select>
+            <div class="menu" role="listbox" aria-labelledby="kwDraftLabel" hidden></div>
+          </div>
+        </div>
+
+        <div class="opt-picker">
+          <label class="opt-label" id="kwCountryLabel">Country</label>
+          <div class="select-pill" data-select-pill>
+            <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
+              aria-expanded="false" aria-labelledby="kwCountryLabel">
+              <i class="bi bi-globe2" aria-hidden="true"></i>
+              <span class="filter-pill-label" data-pill-text>United States</span>
+              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+            </button>
+            <select id="countrySelect" aria-labelledby="kwCountryLabel">
+              {% for code, name in kw_countries %}
+              <option value="{{ code }}">{{ name }}</option>
+              {% endfor %}
+            </select>
+            <div class="menu is-end" role="listbox" aria-labelledby="kwCountryLabel" hidden>
+              {% for code, name in kw_countries %}
+              <button type="button" class="menu-item{{ ' is-selected' if loop.first }}" role="option"
+                aria-selected="{{ 'true' if loop.first else 'false' }}" data-value="{{ code }}">
+                <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                <span class="menu-label">{{ name }}</span>
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="app-btn is-primary opt-run" data-action="keywords">
+          <i class="bi bi-search" aria-hidden="true"></i> Research
+        </button>
+      </div>
+
+      <div class="opt-body" data-body="keywords" data-state="empty">
+        <div class="opt-state" data-for="empty">
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-key" aria-hidden="true"></i></span>
+            <p>Select a draft to see the search volume, difficulty and value of the keywords it already
+              targets.</p>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="loading">
+          <div class="opt-working" role="status" aria-live="polite">
+            <span class="opt-working-badge">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              Reading the draft and looking up terms…
+            </span>
+            <div class="progress opt-working-bar">
+              <div class="progress-bar bg-primary" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="error">
+          <div class="list-empty opt-error">
+            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <p data-error-text>Something went wrong.</p>
+            <button type="button" class="app-btn is-ghost" data-action="keywords">Try again</button>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="results">
+          <p class="opt-source" data-kw-source></p>
+          <div class="opt-table-scroll">
+            <table class="opt-table">
+              <thead>
+                <tr>
+                  <th scope="col">Keyword</th>
+                  <th scope="col" class="is-num">Volume</th>
+                  <th scope="col">Difficulty</th>
+                  <th scope="col" class="is-num opt-col-wide">CPC</th>
+                  <th scope="col" class="is-num opt-col-wide">Clicks</th>
+                  <th scope="col" class="is-num opt-col-wide">Traffic potential</th>
+                </tr>
+              </thead>
+              <tbody data-kw-rows></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== URL METRICS ===================== -->
+    <section class="surface-card reveal" id="panelUrlMetrics" role="tabpanel" data-tab-panel="url-metrics"
+      aria-labelledby="urlHeading" hidden>
+      <header class="card-head is-stacked">
+        <h2 class="card-title" id="urlHeading">URL metrics</h2>
+        <p class="card-note">Authority, backlinks and organic reach for any page on the web — yours or a
+          competitor's.</p>
+      </header>
+
+      <div class="opt-controls">
+        <div class="opt-picker opt-picker-grow">
+          <label class="opt-label" for="urlInput">URL</label>
+          <input type="text" id="urlInput" class="opt-input" placeholder="medium.com/some-article"
+            autocomplete="off" spellcheck="false" data-submit="url">
+        </div>
+        <button type="button" class="app-btn is-primary opt-run" data-action="url">
+          <i class="bi bi-search" aria-hidden="true"></i> Analyze
+        </button>
+      </div>
+
+      <div class="opt-body" data-body="url" data-state="empty">
+        <div class="opt-state" data-for="empty">
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
+            <p>Enter a URL to see its domain rating, backlink profile and organic traffic.</p>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="loading">
+          <div class="opt-working" role="status" aria-live="polite">
+            <span class="opt-working-badge">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              Fetching metrics…
+            </span>
+            <div class="progress opt-working-bar">
+              <div class="progress-bar bg-primary" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="error">
+          <div class="list-empty opt-error">
+            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <p data-error-text>Something went wrong.</p>
+            <button type="button" class="app-btn is-ghost" data-action="url">Try again</button>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="results">
+          <p class="opt-source" data-url-source></p>
+          <div class="opt-metrics" data-url-metrics></div>
+
+          {# The old screen printed every remaining key of the API response as a
+             flat label/value grid directly under the tiles — a debug view
+             shipped as product UI. It is still reachable, but it is now behind
+             a disclosure and labelled as what it is. #}
+          <details class="opt-raw" data-url-raw hidden>
+            <summary class="opt-raw-summary">
+              <i class="bi bi-chevron-right opt-raw-caret" aria-hidden="true"></i>
+              Everything else the API returned <span class="opt-raw-count" data-url-raw-count></span>
+            </summary>
+            <div class="opt-raw-grid" data-url-raw-grid></div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== DOMAIN KEYWORDS ===================== -->
+    <section class="surface-card reveal" id="panelDomainKeywords" role="tabpanel" data-tab-panel="domain-keywords"
+      aria-labelledby="domainHeading" hidden>
+      <header class="card-head is-stacked">
+        {# Called "Site Audit" until now, which is not what the endpoint does:
+           it returns the search terms a domain already ranks for. A tab that
+           promises an audit and delivers a keyword list is a label that lies. #}
+        <h2 class="card-title" id="domainHeading">Domain keywords</h2>
+        <p class="card-note">The search terms a domain already ranks for. Point it at a competitor to see
+          what is working for them.</p>
+      </header>
+
+      <div class="opt-controls">
+        <div class="opt-picker opt-picker-grow">
+          <label class="opt-label" for="auditDomainInput">Domain</label>
+          <input type="text" id="auditDomainInput" class="opt-input" placeholder="codeconia.com"
+            autocomplete="off" spellcheck="false" data-submit="domain">
+        </div>
+        <button type="button" class="app-btn is-primary opt-run" data-action="domain">
+          <i class="bi bi-diagram-3" aria-hidden="true"></i> Look up
+        </button>
+      </div>
+
+      <div class="opt-body" data-body="domain" data-state="empty">
+        <div class="opt-state" data-for="empty">
+          <div class="list-empty">
+            <span class="list-empty-icon"><i class="bi bi-diagram-3" aria-hidden="true"></i></span>
+            <p>Enter a domain to see the keywords it ranks for.</p>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="loading">
+          <div class="opt-working" role="status" aria-live="polite">
+            <span class="opt-working-badge">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              Looking up the domain…
+            </span>
+            <div class="progress opt-working-bar">
+              <div class="progress-bar bg-primary" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="error">
+          <div class="list-empty opt-error">
+            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <p data-error-text>Something went wrong.</p>
+            <button type="button" class="app-btn is-ghost" data-action="domain">Try again</button>
+          </div>
+        </div>
+
+        <div class="opt-state" data-for="results">
+          <p class="opt-source" data-domain-source></p>
+          {# The response shape is the provider's and varies, so the table is
+             built from whatever keys come back. The first column is pinned so
+             the keyword stays readable while the rest scrolls under it. #}
+          <div class="opt-table-scroll is-pinned">
+            <table class="opt-table" data-domain-table>
+              <thead data-domain-head></thead>
+              <tbody data-domain-rows></tbody>
+            </table>
+          </div>
+          <div class="opt-raw-grid opt-domain-extra" data-domain-extra hidden></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== MODALS ===================== -->
+
+    {#
+      Optimize confirmation. The run rewrites the draft's title, meta and body
+      and saves over it — there is no undo, and the old screen fired it from a
+      single unguarded click on a button labelled "Optimize". Following the
+      newsletter's rule: the irreversible action names its own blast radius, in
+      the body and again in the button's own label.
+    #}
+    <div class="modal fade" id="optimizeConfirmModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="optimizeConfirmTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="optimizeConfirmTitle">Optimize this draft?</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <p class="opt-confirm-target">“<span data-confirm-draft></span>”</p>
+            <p class="opt-confirm-copy">
+              Scriptly will rewrite the title, meta description, headings and keyword placement for
+              <strong data-confirm-region>United States</strong>, then save the result over this draft.
+              The current version is not kept.
+            </p>
+          </div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-primary" data-confirm-optimize>Optimize and save</button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- Report detail -->
+    <div class="modal fade" id="reportDetailModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="reportDetailTitle">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="reportDetailTitle" data-detail-title>Report</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body" data-detail-body></div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="app-btn is-primary" data-detail-export>
+              <i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i> Export report
+            </button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    {# Replaces a bare window.confirm() — the only browser-native confirm left
+       in the product, and the only destructive action that did not say what it
+       was about to destroy. #}
+    <div class="modal fade" id="reportDeleteModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="reportDeleteTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content app-modal">
+          <header class="app-modal-head">
+            <h2 class="app-modal-title" id="reportDeleteTitle">Delete this report?</h2>
+            <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="app-modal-body">
+            <p class="opt-confirm-copy">
+              The report for “<span data-delete-title></span>” will be removed. The optimized draft
+              itself is unaffected — this only deletes the record of the run.
+            </p>
+          </div>
+          <footer class="app-modal-foot">
+            <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="app-btn is-danger" data-confirm-delete>Delete report</button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/pages/optimization.js') }}?v=2"></script>
   </main>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/optimization.js') }}"></script>
 {% endblock %}

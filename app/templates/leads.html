@@ -125,7 +125,7 @@
         <button class="page-btn {{ 'active' if i == 1 else '' }}" onclick="goToPage({{ i }})">{{ i }}</button>
         {% endfor %}
         {% if initial_total_pages > 5 %}
-        <span style="color:#94a3b8;padding:0 0.3rem;">...</span>
+        <span style="color:var(--text-faint);padding:0 0.3rem;">...</span>
         <button class="page-btn" onclick="goToPage({{ initial_total_pages }})">{{ initial_total_pages }}</button>
         {% endif %}
         <button class="page-btn {{ 'disabled' if initial_total_pages <= 1 else '' }}" onclick="goToPage(2)" {{ 'disabled' if initial_total_pages <= 1 else '' }}><i class="bi bi-chevron-right"></i></button>

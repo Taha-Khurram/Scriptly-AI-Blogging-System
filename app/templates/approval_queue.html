@@ -54,17 +54,17 @@
               <ul class="dropdown-menu dropdown-menu-end">
                 <li>
                   <button class="dropdown-item" onclick="openViewModal('{{ blog.id }}')">
-                    <i class="bi bi-eye" style="color: #06b6d4;"></i> View Content
+                    <i class="bi bi-eye" style="color: var(--info);"></i> View Content
                   </button>
                 </li>
                 <li>
                   <button class="dropdown-item" onclick="openReviewModal('{{ blog.id }}')">
-                    <i class="bi bi-check-circle" style="color: #10b981;"></i> Review & Publish
+                    <i class="bi bi-check-circle" style="color: var(--success);"></i> Review & Publish
                   </button>
                 </li>
                 <li>
                   <button class="dropdown-item" onclick="openScheduleModal('{{ blog.id }}')">
-                    <i class="bi bi-calendar-event" style="color: #4318FF;"></i> Schedule
+                    <i class="bi bi-calendar-event" style="color: var(--accent);"></i> Schedule
                   </button>
                 </li>
                 <li>
@@ -176,7 +176,7 @@
         <button type="button" class="btn-modal btn-modal-danger" id="view-reject-btn">
           <i class="bi bi-arrow-return-left"></i> Reject
         </button>
-        <button type="button" class="btn-modal btn-modal-primary" id="view-schedule-btn" style="background: var(--primary-color, #4318FF); color: #fff;">
+        <button type="button" class="btn-modal btn-modal-primary" id="view-schedule-btn" style="background: var(--accent); color: var(--text-on-accent);">
           <i class="bi bi-calendar-event"></i> Schedule
         </button>
         <button type="button" class="btn-modal btn-modal-success" id="view-approve-btn">
@@ -248,7 +248,7 @@
         <button type="button" class="btn-modal btn-modal-danger" id="modalRejectBtn">
           <i class="bi bi-arrow-return-left"></i> Reject
         </button>
-        <button type="button" class="btn-modal btn-modal-primary" id="modalScheduleBtn" style="background: var(--primary-color, #4318FF); color: #fff;">
+        <button type="button" class="btn-modal btn-modal-primary" id="modalScheduleBtn" style="background: var(--accent); color: var(--text-on-accent);">
           <i class="bi bi-calendar-event"></i> Schedule
         </button>
         <button type="button" class="btn-modal btn-modal-success" id="modalApproveBtn">
@@ -274,7 +274,7 @@
         <p class="text-muted mb-3">Choose when this blog should be published:</p>
         <p class="fw-bold mb-3" id="schedule-modal-title">Blog Title</p>
         <input type="datetime-local" class="form-control" id="scheduleDateTime"
-               style="padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid #e2e8f0;">
+               style="padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
         <div id="bestTimeSuggestions" class="best-time-container mt-3">
           <div class="best-time-header">
             <i class="bi bi-robot"></i>

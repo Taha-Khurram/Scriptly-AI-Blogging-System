@@ -1,21 +1,9 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, abort
+from flask import Blueprint, render_template, request, jsonify, session
 from app.firebase.firestore_service import FirestoreService
-from functools import wraps
+from app.core.security import admin_required
 
 leads_bp = Blueprint('leads', __name__)
 db_service = FirestoreService()
-
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('auth_bp.login'))
-        if session.get('user_role') != 'ADMIN':
-            abort(404)
-        return f(*args, **kwargs)
-    return decorated_function
-
 
 @leads_bp.route('/leads')
 @admin_required

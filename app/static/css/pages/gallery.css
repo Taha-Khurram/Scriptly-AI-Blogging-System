@@ -1,470 +1,1063 @@
 /* ==========================================================================
-   Gallery Page Styles
+   Gallery — the media library
+
+   Composes from the shared primitives in dashboard.css: .surface-card,
+   .seg-tabs, .filter-pill / .select-pill / .menu, .data-row, .list-empty,
+   .pager, .app-modal, .app-btn. What lives here is only what a library of
+   images needs and a library of records does not — the tile, the drag
+   overlay, the upload tray and the preview stage.
+
+   .filter-pill / .filter-clear moved into dashboard.css §12 when this screen
+   became the second to use them; only the one property this bar needs
+   differently is restated below.
    ========================================================================== */
 
-/* ==================== UPLOAD ZONE ==================== */
-.gallery-upload-zone {
-    background: white;
-    border: 2px dashed #e2e8f0;
-    border-radius: var(--radius-lg);
-    padding: 2.5rem 1.5rem;
-    text-align: center;
-    transition: all 0.2s ease;
+/* ==================== TOOLBAR ====================
+
+   File type is the primary dimension the way status is on the listings, so it
+   is a permanently visible segmented control; sort is a pill that renders its
+   own value. While a selection exists the whole row is replaced by the
+   selection bar — filtering and acting on a selection are never wanted at the
+   same moment, and stacking both would push the grid down the page.
+   ==================================================================== */
+
+.gallery-toolbar {
+    padding: var(--sp-4);
+    margin-bottom: var(--sp-6);
+}
+
+.gallery-toolbar-filters,
+.gallery-selection-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+}
+
+/* `[hidden]` is a UA `display: none`, which any author `display` declaration
+   outranks — .seg-tab is inline-flex and .gallery-toolbar-filters is flex, so
+   each needs the attribute restated to actually hide. */
+.gallery-toolbar-filters[hidden],
+.gallery-selection-bar[hidden],
+.gallery-type-tabs .seg-tab[hidden] {
+    display: none;
+}
+
+.gallery-toolbar-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+}
+
+/* The sort pill always carries a value, so unlike the listings' category pill
+   it never shows a bare label — and it should not read as "applied" for simply
+   being at its default. It stays neutral and only the caret marks it as a
+   control you can open. */
+.gallery-toolbar .filter-pill-value {
+    max-width: 10rem;
+}
+
+/* --- View toggle -------------------------------------------------------- */
+.view-toggle {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+}
+
+.view-toggle-btn {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    font-size: 0.85rem;
     cursor: pointer;
-    margin-bottom: 1.5rem;
+    transition: var(--transition-base);
 }
 
-.gallery-upload-zone:hover,
-.gallery-upload-zone.drag-over {
-    border-color: var(--primary-color);
-    background: rgba(67, 24, 255, 0.02);
+.view-toggle-btn:hover {
+    color: var(--text-strong);
 }
 
-.gallery-upload-zone.drag-over {
-    transform: scale(1.01);
-    box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.08);
+.view-toggle-btn.is-active {
+    background: var(--surface-1);
+    color: var(--accent);
+    box-shadow: var(--elev-1);
 }
 
-.upload-zone-icon {
-    font-size: 2.5rem;
-    color: var(--primary-color);
-    margin-bottom: 0.75rem;
-    opacity: 0.7;
+.view-toggle-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
 }
 
-.upload-zone-text {
-    font-size: 0.9rem;
-    color: #64748b;
-    margin-bottom: 0.75rem;
+/* --- Selection bar ------------------------------------------------------ */
+.gallery-selection-lead {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
 }
 
-.upload-zone-btn {
+.selection-close {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--surface-3);
+    color: var(--text-2);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.selection-close:hover {
+    background: var(--surface-4);
+    color: var(--text-strong);
+}
+
+.selection-close:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.selection-count {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.gallery-selection-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+}
+
+.gallery-selection-actions .app-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.6rem 1.25rem;
-    border-radius: 10px;
-    border: none;
-    background: var(--primary-color);
-    color: white;
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s ease;
+    gap: var(--sp-2);
+    height: 36px;
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-xs);
 }
 
-.upload-zone-btn:hover {
-    background: #3510d0;
-    box-shadow: 0 4px 12px rgba(67, 24, 255, 0.3);
-}
-
-.upload-zone-hint {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    margin-top: 0.6rem;
-}
-
-/* ==================== UPLOAD PROGRESS ==================== */
-.upload-progress-area {
-    background: white;
-    border-radius: var(--radius-lg);
-    padding: 1rem 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: var(--shadow-sm);
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.upload-progress-bar {
-    flex: 1;
-    height: 6px;
-    background: #e2e8f0;
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-.upload-progress-fill {
-    height: 100%;
-    background: var(--primary-color);
-    border-radius: 6px;
-    width: 0%;
-    transition: width 0.3s ease;
-}
-
-.upload-progress-text {
-    font-size: 0.78rem;
-    color: #64748b;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-/* ==================== GALLERY GRID ==================== */
-.gallery-container {
-    background: white;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    padding: 1.5rem;
-    min-height: 300px;
-}
-
-.gallery-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1rem;
-}
-
-.gallery-loading {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 1rem;
-    text-align: center;
-}
-
+/* ==================== LIBRARY CARD ==================== */
 .gallery-card {
+    padding-bottom: var(--sp-6);
+    /* the sort menu and the row menus escape the card */
+    overflow: visible;
+}
+
+.gallery-body {
+    padding: var(--sp-4) var(--sp-4) 0;
+    min-height: 220px;
+}
+
+/* Held during a fetch so the grid does not flash empty between two pages —
+   the tiles that are already correct stay on screen, dimmed, until the
+   replacement arrives. */
+.gallery-body.is-loading {
+    opacity: 0.45;
+    pointer-events: none;
+    transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.gallery-empty-hint {
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+/* ==================== MEDIA TILE ====================
+
+   Square thumbnail with the name and weight *always* visible beneath it,
+   rather than a hover overlay that hides both. Hover-only captions fail
+   twice over: touch has no hover, and the filename is exactly what you came
+   to the tile to read.
+   ==================================================================== */
+
+.media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+    gap: var(--sp-2);
+}
+
+/* The tile is transparent at rest and fills only on hover or selection — the
+   Drive/Photos idiom. A permanent --surface-2 block behind every tile put a
+   second card inside the card, which in dark mode is a muddy 4% step against
+   --surface-1 that reads as grime rather than structure. */
+.media-tile {
     position: relative;
-    border-radius: 12px;
-    overflow: hidden;
-    background: white;
-    box-shadow: var(--shadow-sm);
+    margin: 0;
+    padding: var(--sp-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    transition: var(--transition-base);
+}
+
+.media-tile:hover {
+    background: var(--surface-2);
+}
+
+/* Selection is stated three times over — fill, border and the checked mark —
+   because on a grid of photographs a single thin ring is easy to lose against
+   whatever the image happens to be. */
+.media-tile.is-selected {
+    background: var(--accent-tint);
+    border-color: var(--accent);
+}
+
+/* Square frame every overlay control positions against. */
+.media-frame {
+    position: relative;
     aspect-ratio: 1;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
 }
 
-.gallery-card:hover {
-    box-shadow: var(--shadow-card);
-    transform: translateY(-2px);
+.media-thumb {
+    position: absolute;
+    inset: 0;
+    /* Checkerboard, so a transparent PNG reads as transparent instead of
+       borrowing whatever surface happens to sit behind it. Kept low-contrast
+       and coarse: it is a background note, not a pattern to look at. */
+    background-color: var(--surface-2);
+    background-image:
+        linear-gradient(45deg, var(--surface-3) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--surface-3) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--surface-3) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--surface-3) 75%);
+    background-size: 24px 24px;
+    background-position: 0 0, 0 12px, 12px -12px, -12px 0;
 }
 
-.gallery-card img {
+.media-thumb img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block;
+    transition: transform var(--dur-base) var(--ease-standard);
 }
 
-.gallery-card-overlay {
+.media-tile:hover .media-thumb img {
+    transform: scale(1.04);
+}
+
+/* The tile's own hit area, stretched over the thumbnail. A button rather than
+   a click handler on the figure, so Enter and Space open the preview and the
+   focus ring is the browser's.
+
+   A scrim rides on it: the checkbox and the copy button sit over an arbitrary
+   photograph, and neither can be relied on to land on something dark. */
+.media-open {
     position: absolute;
     inset: 0;
-    background: rgba(15, 23, 42, 0.6);
+    border: 0;
+    border-radius: 0;
+    background: linear-gradient(to bottom,
+            var(--media-scrim-strong) 0%,
+            var(--media-scrim-soft) 34%,
+            transparent 62%);
     opacity: 0;
-    transition: opacity 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.75rem;
+    cursor: pointer;
+    transition: opacity var(--dur-fast) var(--ease-standard);
 }
 
-.gallery-card:hover .gallery-card-overlay {
+.media-tile:hover .media-open,
+.media-tile:focus-within .media-open,
+.media-tile.is-selected .media-open {
     opacity: 1;
 }
 
-.gallery-card-actions {
-    display: flex;
-    gap: 0.5rem;
+.media-open:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
 }
 
-.gallery-card-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.9rem;
+/* --- Selection ---------------------------------------------------------- */
+.media-check {
+    position: absolute;
+    top: var(--sp-2);
+    left: var(--sp-2);
+    z-index: 2;
+    width: 22px;
+    height: 22px;
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.media-tile:hover .media-check,
+.media-tile:focus-within .media-check,
+.media-tile.is-selected .media-check {
+    opacity: 1;
+}
+
+/* Touch has no hover, so a checkbox that only appears on hover would be
+   permanently unreachable there. */
+@media (hover: none) {
+    .media-check {
+        opacity: 1;
+    }
+}
+
+/* The input is the control, invisible and on top; .media-check-box beside it
+   is the visual. An `appearance: none` input cannot contain the tick as a
+   child, and pseudo-elements on a replaced element are not guaranteed to
+   render — which is why the mark used to be painted as two full-length
+   diagonal gradients, i.e. an ✗ rather than a ✓. */
+.media-checkbox {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    opacity: 0;
     cursor: pointer;
-    transition: all 0.15s ease;
 }
 
-.gallery-card-btn.copy-btn {
-    background: white;
-    color: #475569;
+.media-check-box {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border: 2px solid var(--media-control-edge);
+    border-radius: 50%;
+    background: var(--media-control-fill);
+    box-shadow: var(--media-control-shadow);
+    transition: var(--transition-base);
 }
 
-.gallery-card-btn.copy-btn:hover {
-    background: #f1f5f9;
+/* A real tick: the two adjacent sides of a box, rotated 45°. Crisp at any
+   size, and it takes its colour from `currentColor`, so it follows the
+   accent's paired foreground when the accent inverts in dark mode. */
+.media-check-box::after {
+    content: "";
+    width: 5px;
+    height: 9px;
+    margin-top: -2px;
+    border: solid currentColor;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) scale(0.6);
+    opacity: 0;
+    transition: transform var(--dur-fast) var(--ease-emphasized), opacity var(--dur-fast) var(--ease-standard);
 }
 
-.gallery-card-btn.delete-btn {
-    background: #ef4444;
-    color: white;
+.media-checkbox:checked+.media-check-box {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--text-on-accent);
 }
 
-.gallery-card-btn.delete-btn:hover {
-    background: #dc2626;
+.media-checkbox:checked+.media-check-box::after {
+    opacity: 1;
+    transform: rotate(45deg) scale(1);
 }
 
-.gallery-card-name {
-    font-size: 0.72rem;
-    color: white;
-    text-align: center;
+.media-checkbox:focus-visible+.media-check-box {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.media-checkbox:hover+.media-check-box {
+    border-color: var(--on-media);
+    background: var(--media-control-fill-hover);
+}
+
+.media-checkbox:checked:hover+.media-check-box {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.media-tile.is-selected .media-thumb img {
+    opacity: 0.85;
+}
+
+/* --- Quick copy --------------------------------------------------------- */
+/* Glass rather than a solid chip: it rides the same scrim the checkbox does,
+   so both corners read as one layer over the photograph instead of two
+   unrelated blobs. */
+.media-quick {
+    position: absolute;
+    top: var(--sp-2);
+    right: var(--sp-2);
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--media-chip-edge);
+    border-radius: 50%;
+    background: var(--media-chip);
+    backdrop-filter: blur(6px);
+    color: var(--on-media);
+    font-size: 0.8rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: var(--transition-base);
+}
+
+.media-tile:hover .media-quick,
+.media-tile:focus-within .media-quick {
+    opacity: 1;
+}
+
+.media-quick:hover {
+    background: var(--media-chip-hover);
+    border-color: var(--media-chip-edge-hover);
+    transform: scale(1.06);
+}
+
+.media-quick:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+@media (hover: none) {
+    .media-quick {
+        opacity: 1;
+    }
+}
+
+/* --- Caption ------------------------------------------------------------ */
+/* No fixed height any more. The opener is positioned inside .media-frame, so
+   the caption is free to be sized by its own content instead of matching a
+   number written into .media-open's offset. */
+.media-caption {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--sp-3) var(--sp-1) var(--sp-1);
+}
+
+.media-name {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    line-height: 1.35;
+    color: var(--text-strong);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 100%;
-    margin-top: 0.25rem;
 }
 
-/* ==================== EMPTY STATE ==================== */
-.gallery-empty {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 4rem 1rem;
+.media-tile.is-selected .media-name {
+    color: var(--accent);
+}
+
+.media-sub {
+    font-size: var(--fs-2xs);
+    line-height: 1.3;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+}
+
+/* ==================== LIST VIEW ====================
+
+   The same records as .data-row, so an image reads like every other row in
+   the product — only the monogram is replaced by a thumbnail of the thing
+   itself, which is a better identifier than its first letter.
+   ==================================================================== */
+
+.media-list .data-row {
+    grid-template-columns: 72px minmax(0, 1fr) 72px 88px auto;
+}
+
+.media-list .data-row.is-selected {
+    background: var(--accent-tint);
+}
+
+.media-row-lead {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+/* A list row has room to show the checkbox at all times, so unlike the grid
+   tile it does not hide behind hover — and it sits on a surface rather than on
+   a photograph, so it drops the scrim treatment for the token palette. */
+.media-row-lead .media-check {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    opacity: 1;
+}
+
+.media-row-lead .media-check-box {
+    border-color: var(--border-strong);
+    background: var(--surface-1);
+    box-shadow: none;
+}
+
+.media-row-lead .media-check-box::after {
+    width: 4px;
+    height: 8px;
+    border-width: 0 2px 2px 0;
+}
+
+.media-row-lead .media-checkbox:hover+.media-check-box {
+    border-color: var(--accent);
+    background: var(--surface-1);
+}
+
+.media-row-lead .media-checkbox:checked+.media-check-box,
+.media-row-lead .media-checkbox:checked:hover+.media-check-box {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.media-row-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-xs);
+    object-fit: cover;
+    background: var(--surface-3);
+    display: block;
+}
+
+.media-row-type,
+.media-row-size {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+@media (max-width: 820px) {
+
+    .media-list .data-row {
+        grid-template-columns: 72px minmax(0, 1fr) auto;
+    }
+
+    .media-row-type,
+    .media-row-size {
+        display: none;
+    }
+}
+
+/* ==================== DRAG-ANYWHERE OVERLAY ====================
+
+   The old page kept a dashed dropzone pinned above the grid at all times,
+   which cost ~200px of the first screen and was only useful for the seconds
+   an upload was actually starting. The whole canvas is the target instead,
+   and it only appears while files are over the window.
+   ==================================================================== */
+
+.drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1090;
+    display: grid;
+    place-items: center;
+    padding: var(--sp-8);
+    background: var(--scrim);
+    backdrop-filter: blur(3px);
+    animation: dropFade var(--dur-fast) var(--ease-standard);
+}
+
+.drop-overlay[hidden] {
+    display: none;
+}
+
+.drop-overlay-inner {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    gap: var(--sp-2);
+    width: min(560px, 100%);
+    padding: var(--sp-12) var(--sp-8);
+    border: 2px dashed var(--accent);
+    border-radius: var(--radius-xl);
+    background: var(--surface-1);
+    box-shadow: var(--elev-3);
+    text-align: center;
 }
 
-.gallery-empty-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: rgba(67, 24, 255, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 1rem;
-    font-size: 1.5rem;
-    color: var(--primary-color);
+.drop-overlay-inner i {
+    font-size: 2.5rem;
+    color: var(--accent);
 }
 
-.gallery-empty-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #1e293b;
-    margin-bottom: 0.3rem;
+.drop-overlay-title {
+    margin: 0;
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
 }
 
-.gallery-empty-text {
-    font-size: 0.85rem;
-    color: #94a3b8;
+.drop-overlay-hint {
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
 }
 
-/* ==================== PAGINATION ==================== */
-.gallery-pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 1.5rem 0 0.5rem;
+@keyframes dropFade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
-.gallery-pagination .page-btn {
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    background: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #64748b;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
+/* ==================== UPLOAD TRAY ====================
 
-.gallery-pagination .page-btn:hover {
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-}
+   Docked bottom-right, one row per file. Uploading never covers the library
+   you are uploading into, and a failure names the file that failed instead of
+   moving a shared bar backwards.
+   ==================================================================== */
 
-.gallery-pagination .page-btn.active {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: white;
-}
-
-.gallery-pagination .page-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-/* ==================== CUSTOM MODAL ==================== */
-.gallery-modal-overlay {
+.upload-tray {
     position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(4px);
+    right: var(--sp-6);
+    bottom: var(--sp-6);
+    /* Under Bootstrap's modal (1055) so a dialog covers the tray rather than
+       being straddled by it, but over the page. The drop overlay above sits
+       higher on purpose — dropping files has to stay possible either way. */
+    z-index: 1040;
+    width: min(360px, calc(100vw - var(--sp-8)));
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    box-shadow: var(--elev-3);
+    overflow: hidden;
+    animation: trayIn var(--dur-base) var(--ease-emphasized);
+}
+
+.upload-tray[hidden] {
+    display: none;
+}
+
+@keyframes trayIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.upload-tray-head {
     display: flex;
     align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.2s ease;
-    padding: 1rem;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
-.gallery-modal-overlay.active {
-    opacity: 1;
-    visibility: visible;
+.upload-tray-title {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.gallery-modal {
-    background: white;
-    border-radius: 16px;
-    width: 100%;
-    max-width: 380px;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.16);
-    transform: translateY(10px) scale(0.97);
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+.upload-tray-btn {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.upload-tray-btn:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.upload-tray-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.upload-tray.is-collapsed .upload-tray-list {
+    display: none;
+}
+
+.upload-tray.is-collapsed [data-tray-toggle] i {
+    transform: rotate(180deg);
+}
+
+[data-tray-toggle] i {
+    transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.upload-tray-list {
+    list-style: none;
+    margin: 0;
+    padding: var(--sp-2);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.upload-item {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 24px;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-2);
+    border-radius: var(--radius-xs);
+}
+
+.upload-item-thumb {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-xs);
+    object-fit: cover;
+    background: var(--surface-3);
+}
+
+.upload-item-main {
+    min-width: 0;
+}
+
+.upload-item-name {
+    display: block;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.upload-item-note {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--fs-2xs);
+    color: var(--text-faint);
+}
+
+.upload-item.is-error .upload-item-note {
+    color: var(--danger);
+}
+
+.upload-item-bar {
+    height: 3px;
+    margin-top: var(--sp-2);
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
     overflow: hidden;
 }
 
-.gallery-modal-overlay.active .gallery-modal {
-    transform: translateY(0) scale(1);
+.upload-item.is-done .upload-item-bar,
+.upload-item.is-error .upload-item-bar {
+    display: none;
 }
 
-.gallery-modal-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid #f1f5f9;
+.upload-item-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    transition: width var(--dur-fast) linear;
 }
 
-.gallery-modal-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+.upload-item-state {
+    display: grid;
+    place-items: center;
+    font-size: 0.9rem;
+    color: var(--text-faint);
+}
+
+.upload-item.is-done .upload-item-state {
+    color: var(--success);
+}
+
+.upload-item.is-error .upload-item-state {
+    color: var(--danger);
+}
+
+.upload-item-retry {
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--danger);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 2px;
+}
+
+/* ==================== PREVIEW MODAL ====================
+
+   Image on the left, the facts and the copy formats on the right — the
+   arrangement every asset manager uses, because "is this the right picture"
+   and "what do I paste" are answered together.
+   ==================================================================== */
+
+.preview-modal {
+    max-height: 92vh;
+}
+
+.preview-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preview-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: var(--sp-6);
+    padding: var(--sp-6);
+    /* Overrides .app-modal-body's shared cap: this body holds an image, and
+       60vh of it is not enough to judge one by. */
+    max-height: none;
+}
+
+.preview-stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 320px;
+    max-height: 64vh;
+    padding: var(--sp-4);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-2);
+    background-image:
+        linear-gradient(45deg, var(--surface-3) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--surface-3) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--surface-3) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--surface-3) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+
+.preview-stage img {
+    max-width: 100%;
+    max-height: calc(64vh - var(--sp-8));
+    object-fit: contain;
+    border-radius: var(--radius-xs);
+}
+
+.preview-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--surface-1);
+    color: var(--text-2);
+    box-shadow: var(--elev-2);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.preview-nav.is-prev {
+    left: var(--sp-3);
+}
+
+.preview-nav.is-next {
+    right: var(--sp-3);
+}
+
+.preview-nav:hover {
+    background: var(--surface-3);
+    color: var(--text-strong);
+}
+
+.preview-nav:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.preview-nav[hidden] {
+    display: none;
+}
+
+.preview-rail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-6);
+    min-width: 0;
+}
+
+.preview-facts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    margin: 0;
+}
+
+.preview-fact {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding-bottom: var(--sp-3);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.preview-fact:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.preview-fact dt {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+}
+
+.preview-fact dd {
+    margin: 0;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.preview-copy-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin-top: auto;
+}
+
+.preview-copy-label {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.preview-copy-buttons {
+    display: flex;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+}
+
+.preview-copy-buttons .app-btn {
+    height: 34px;
+    padding: 0 var(--sp-4);
+    background: var(--surface-2);
+    font-size: var(--fs-xs);
+}
+
+.preview-copy-buttons .app-btn:hover {
+    background: var(--surface-3);
+}
+
+.app-modal-foot .app-btn[data-preview-open] {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    line-height: 34px;
+    text-decoration: none;
+}
+
+/* --- Delete confirmation ------------------------------------------------ */
+/* .delete-copy moved to dashboard.css §14 when the newsletter's confirm
+   dialogs became the second user of it. */
+.delete-preview {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 1rem;
+    gap: var(--sp-3);
+    margin-top: var(--sp-4);
+    padding: var(--sp-3);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+    min-width: 0;
+}
+
+.delete-preview[hidden] {
+    display: none;
+}
+
+.delete-preview img {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-xs);
+    object-fit: cover;
     flex-shrink: 0;
 }
 
-.gallery-modal-icon.danger-icon {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-}
-
-.gallery-modal-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin: 0;
-    flex: 1;
-}
-
-.gallery-modal-close {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: none;
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: #94a3b8;
-    transition: all 0.15s ease;
-    font-size: 0.9rem;
-}
-
-.gallery-modal-close:hover {
-    background: #f1f5f9;
-    color: #475569;
-}
-
-.gallery-modal-body {
-    padding: 1.5rem;
-}
-
-.gallery-modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.6rem;
-    padding: 1rem 1.5rem;
-    border-top: 1px solid #f1f5f9;
-    background: #fafbfc;
-}
-
-.gallery-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.55rem 1.1rem;
-    border-radius: 9px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.gallery-btn-ghost {
-    background: white;
-    color: #64748b;
-    border: 1px solid #e2e8f0;
-}
-
-.gallery-btn-ghost:hover {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-}
-
-.gallery-btn-danger {
-    background: #ef4444;
-    color: white;
-}
-
-.gallery-btn-danger:hover {
-    background: #dc2626;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-}
-
-.gallery-btn-danger:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-
-.delete-confirm-text {
-    font-size: 0.88rem;
-    color: #475569;
-    line-height: 1.6;
-    margin: 0;
-}
-
-/* ==================== TOAST ==================== */
-.gallery-toast {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    background: #1e293b;
-    color: white;
-    padding: 0.75rem 1.25rem;
-    border-radius: 10px;
-    font-size: 0.82rem;
-    font-weight: 500;
-    z-index: 10000;
-    opacity: 0;
-    transform: translateY(10px);
-    transition: all 0.2s ease;
-    pointer-events: none;
-}
-
-.gallery-toast.show {
-    opacity: 1;
-    transform: translateY(0);
+.delete-preview span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ==================== RESPONSIVE ==================== */
-@media (max-width: 768px) {
-    .gallery-grid {
-        grid-template-columns: repeat(2, 1fr);
+@media (max-width: 1100px) {
+    .preview-body {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .gallery-upload-zone {
-        padding: 1.5rem 1rem;
+    .preview-stage {
+        max-height: 46vh;
+    }
+
+    .preview-stage img {
+        max-height: calc(46vh - var(--sp-8));
+    }
+
+    .preview-copy-group {
+        margin-top: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .media-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: var(--sp-3);
+    }
+
+    .gallery-toolbar-filters,
+    .gallery-selection-bar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .gallery-selection-actions .app-btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .upload-tray {
+        right: var(--sp-4);
+        left: var(--sp-4);
+        bottom: var(--sp-4);
+        width: auto;
     }
 }
