@@ -37,7 +37,7 @@
        rather than flashing a warning on every load while the check is in
        flight. Every send control stays disabled while it is showing. #}
     <div class="setup-banner" data-setup-banner hidden>
-      <span class="setup-banner-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+      <span class="setup-banner-icon"><i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">warning</i></span>
       <div class="setup-banner-body">
         <p class="setup-banner-title">Email service not configured</p>
         <p class="setup-banner-text">
@@ -59,7 +59,7 @@
     #}
     <div class="newsletter-stats reveal">
       <div class="stat-card">
-        <span class="stat-icon stat-audience"><i class="bi bi-people-fill" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-audience"><i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">group</i></span>
         <span class="stat-info">
           <span class="stat-label">{{ 'Subscriber' if subs == 1 else 'Subscribers' }}</span>
           <span class="stat-count" data-stat-subscribers title="{{ subs }}">{{ subs }}</span>
@@ -69,7 +69,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-sent"><i class="bi bi-send-fill" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-sent"><i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">send</i></span>
         <span class="stat-info">
           <span class="stat-label">{{ 'Issue sent' if sent == 1 else 'Issues sent' }}</span>
           <span class="stat-count" data-stat-sent title="{{ sent }}">{{ sent }}</span>
@@ -79,7 +79,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-posts"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-posts"><i class="material-symbols-outlined icon-inline" aria-hidden="true">menu_book</i></span>
         <span class="stat-info">
           <span class="stat-label">{{ 'Published post' if posts == 1 else 'Published posts' }}</span>
           <span class="stat-count" data-stat-posts title="{{ posts }}">{{ posts }}</span>
@@ -148,13 +148,13 @@
                 <button type="button" class="select-field" data-select-trigger aria-haspopup="listbox"
                   aria-expanded="false" aria-labelledby="composeLimitLabel composeLimitValue">
                   <span class="select-field-value" id="composeLimitValue">5 posts</span>
-                  <i class="bi bi-chevron-down select-field-caret" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline select-field-caret" aria-hidden="true">expand_more</i>
                 </button>
 
                 <div class="menu is-block" role="listbox" aria-labelledby="composeLimitLabel" hidden>
                   {% for n in [3, 5, 10] %}
                   <button type="button" class="menu-item" role="option" data-value="{{ n }}">
-                    <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                    <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
                     <span class="menu-label">{{ n }} posts</span>
                   </button>
                   {% endfor %}
@@ -177,14 +177,14 @@
 
           {% if posts == 0 %}
           <p class="compose-blocked">
-            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">info</i>
             Publish at least one post first — a newsletter is built from them.
           </p>
           {% endif %}
 
           <div>
             <button type="button" class="app-btn is-primary" data-generate {{ 'disabled' if posts == 0 else '' }}>
-              <i class="bi bi-stars" aria-hidden="true"></i> Draft newsletter
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_awesome</i> Draft newsletter
             </button>
           </div>
         </div>
@@ -229,19 +229,19 @@
           <aside class="compose-preview">
             <div class="preview-bar">
               <span class="preview-bar-label">
-                <i class="bi bi-eye" aria-hidden="true"></i> Live preview
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">visibility</i> Live preview
               </span>
               {# Most newsletters are read on a phone, so the narrow width is
                  checkable without leaving the composer. #}
               <div class="device-toggle" role="group" aria-label="Preview width">
                 <button type="button" class="device-btn is-active" data-device="desktop" aria-pressed="true"
                   title="Desktop width">
-                  <i class="bi bi-display" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">desktop_windows</i>
                   <span class="visually-hidden">Desktop width</span>
                 </button>
                 <button type="button" class="device-btn" data-device="mobile" aria-pressed="false"
                   title="Phone width">
-                  <i class="bi bi-phone" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">smartphone</i>
                   <span class="visually-hidden">Phone width</span>
                 </button>
               </div>
@@ -249,7 +249,7 @@
 
             <div class="preview-stage" data-preview-stage>
               <div class="preview-placeholder">
-                <i class="bi bi-envelope" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">mail</i>
                 <span>The rendered email will appear here.</span>
               </div>
               {# sandbox: the preview renders template output as a document, so
@@ -263,16 +263,16 @@
 
         <div class="send-bar">
           <p class="send-bar-info">
-            <i class="bi bi-people" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">group</i>
             Goes to <strong>{{ subs }}</strong> {{ 'subscriber' if subs == 1 else 'subscribers' }}
           </p>
           <div class="send-bar-actions">
             <button type="button" class="app-btn is-ghost" data-discard>Discard</button>
             <button type="button" class="app-btn is-ghost" data-open-test data-requires-email>
-              <i class="bi bi-envelope-check" aria-hidden="true"></i> Send test
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">mark_email_read</i> Send test
             </button>
             <button type="button" class="app-btn is-primary" data-open-send data-requires-email>
-              <i class="bi bi-send" aria-hidden="true"></i> Send newsletter
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">send</i> Send newsletter
             </button>
           </div>
         </div>
@@ -284,13 +284,13 @@
       <header class="card-head">
         <h2 class="card-title" id="audienceHeading">Subscribers</h2>
         <button type="button" class="app-btn is-ghost" data-export-subscribers>
-          <i class="bi bi-download" aria-hidden="true"></i> Export CSV
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">download</i> Export CSV
         </button>
       </header>
 
       <div class="audience-toolbar">
         <div class="audience-search">
-          <i class="bi bi-search" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i>
           <label class="visually-hidden" for="subscriberSearch">Search subscribers</label>
           <input type="search" id="subscriberSearch" data-subscriber-search placeholder="Search by email"
             autocomplete="off">
@@ -299,7 +299,7 @@
 
       <div class="subscriber-rows" data-subscriber-rows>
         <div class="list-empty">
-          <span class="list-empty-icon"><i class="bi bi-people"></i></span>
+          <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">group</i></span>
           <p>Loading subscribers…</p>
         </div>
       </div>
@@ -314,7 +314,7 @@
 
       <div class="history-rows" data-history-rows>
         <div class="list-empty">
-          <span class="list-empty-icon"><i class="bi bi-clock-history"></i></span>
+          <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">history</i></span>
           <p>Loading archive…</p>
         </div>
       </div>
@@ -331,7 +331,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="testSendTitle">Send a test</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">
@@ -361,7 +361,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="sendConfirmTitle">Send this newsletter?</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">
@@ -392,7 +392,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="archiveTitle" data-archive-title>Newsletter</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">
@@ -414,7 +414,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="deleteNewsletterTitle">Remove from archive</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">

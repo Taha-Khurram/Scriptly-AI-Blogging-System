@@ -127,7 +127,7 @@
     function menuItem(action, icon, text, danger) {
         return '<li><button type="button" class="dropdown-item' + (danger ? ' text-danger' : '') + '" ' +
             'data-action="' + action + '">' +
-            '<i class="bi bi-' + icon + '" aria-hidden="true"></i> ' + text +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">' + icon + '</i> ' + text +
             '</button></li>';
     }
 
@@ -165,25 +165,25 @@
         // pill columns are fixed tracks, and a missing child would slide the
         // status pill left on that row alone.
         const verdict = aiLabel
-            ? '<span class="ai-pill is-' + ai + '"><i class="bi bi-robot" aria-hidden="true"></i> ' + aiLabel + '</span>'
+            ? '<span class="ai-pill is-' + ai + '"><i class="material-symbols-outlined icon-inline" aria-hidden="true">smart_toy</i> ' + aiLabel + '</span>'
             : '<span class="ai-pill-blank"></span>';
 
         const trailAction = removed
             ? '<button type="button" class="row-action" data-action="restore" title="Put back on the site" ' +
               'aria-label="Put the comment from ' + label + ' back on the site">' +
-              '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>'
+              '<i class="material-symbols-outlined icon-inline" aria-hidden="true">undo</i></button>'
             : '<button type="button" class="row-action" data-action="remove" title="Take off the site" ' +
               'aria-label="Take the comment from ' + label + ' off the site">' +
-              '<i class="bi bi-eye-slash" aria-hidden="true"></i></button>';
+              '<i class="material-symbols-outlined icon-inline" aria-hidden="true">visibility_off</i></button>';
 
         const menu = [
-            menuItem('view', 'eye', 'Open comment'),
+            menuItem('view', 'visibility', 'Open comment'),
             removed
-                ? menuItem('restore', 'arrow-counterclockwise', 'Put back on the site')
-                : menuItem('remove', 'eye-slash', 'Take off the site'),
-            menuItem('copy-email', 'envelope', 'Copy email address'),
+                ? menuItem('restore', 'undo', 'Put back on the site')
+                : menuItem('remove', 'visibility_off', 'Take off the site'),
+            menuItem('copy-email', 'mail', 'Copy email address'),
             '<li><hr class="dropdown-divider"></li>',
-            menuItem('delete', 'trash3', 'Delete permanently', true)
+            menuItem('delete', 'delete', 'Delete permanently', true)
         ];
 
         return '<div class="data-row' + (removed ? ' is-removed' : '') + '" id="comment-row-' + esc(c.id) + '" ' +
@@ -206,7 +206,7 @@
             '<div class="dropdown">' +
             '<button type="button" class="btn-dropdown-trigger" data-bs-toggle="dropdown" aria-expanded="false" ' +
             'aria-label="More actions for the comment from ' + label + '">' +
-            '<i class="bi bi-three-dots-vertical" aria-hidden="true"></i>' +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>' +
             '</button>' +
             '<ul class="dropdown-menu dropdown-menu-end">' + menu.join('') + '</ul>' +
             '</div>' +
@@ -235,14 +235,14 @@
 
     function emptyState() {
         return '<div class="list-empty">' +
-            '<span class="list-empty-icon"><i class="bi bi-chat-square-text" aria-hidden="true"></i></span>' +
+            '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">forum</i></span>' +
             '<p>' + esc(EMPTY_COPY[state.filter] || EMPTY_COPY.all) + '</p>' +
             '</div>';
     }
 
     function errorState(message) {
         return '<div class="list-empty">' +
-            '<span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>' +
+            '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>' +
             '<p>' + esc(message || 'The comments could not be loaded.') + '</p>' +
             '<button type="button" class="app-btn is-ghost" data-action="retry">Try again</button>' +
             '</div>';
@@ -575,7 +575,7 @@
 
     function logEntry(mark, markClass, title, when, reason, diff) {
         return '<div class="mod-entry">' +
-            '<span class="mod-mark ' + markClass + '"><i class="bi bi-' + mark + '" aria-hidden="true"></i></span>' +
+            '<span class="mod-mark ' + markClass + '"><i class="material-symbols-outlined icon-inline" aria-hidden="true">' + mark + '</i></span>' +
             '<div class="mod-body">' +
             '<p class="mod-title">' + title + '</p>' +
             (when ? '<p class="mod-when">' + esc(when) + '</p>' : '') +
@@ -604,7 +604,7 @@
 
         const ai = aiOf(c);
         const entries = [logEntry(
-            'robot', 'is-ai',
+            'smart_toy', 'is-ai',
             esc(AI_TITLE[ai] || AI_TITLE.approved),
             c.ai_moderated_at ? absolute(c.ai_moderated_at) : 'When the comment was submitted',
             c.ai_reason,
@@ -618,7 +618,7 @@
 
         (c.admin_edits || []).forEach((edit) => {
             entries.push(logEntry(
-                'person-gear', 'is-admin',
+                'manage_accounts', 'is-admin',
                 'Edited by <strong>' + esc(edit.admin_name || 'an admin') + '</strong>',
                 edit.edited_at ? absolute(edit.edited_at) : '',
                 edit.reason,

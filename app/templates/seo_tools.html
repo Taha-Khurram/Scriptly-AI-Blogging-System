@@ -53,9 +53,9 @@
           <div class="select-pill" data-select-pill>
             <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
               aria-expanded="false" aria-labelledby="seoDraftLabel">
-              <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i>
               <span class="filter-pill-label" data-pill-text>Loading drafts…</span>
-              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
             </button>
             <select id="seoDraftSelect" data-draft-select aria-labelledby="seoDraftLabel">
               <option value="">Select a draft</option>
@@ -69,9 +69,9 @@
           <div class="select-pill" data-select-pill>
             <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
               aria-expanded="false" aria-labelledby="seoRegionLabel">
-              <i class="bi bi-globe2" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">public</i>
               <span class="filter-pill-label" data-pill-text>{{ regions[0][1] }}</span>
-              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
             </button>
             <select id="seoRegionSelect" data-region-select aria-labelledby="seoRegionLabel">
               {% for code, name in regions %}
@@ -82,7 +82,7 @@
               {% for code, name in regions %}
               <button type="button" class="menu-item{{ ' is-selected' if loop.first }}" role="option"
                 aria-selected="{{ 'true' if loop.first else 'false' }}" data-value="{{ code }}">
-                <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
                 <span class="menu-label">{{ name }}</span>
               </button>
               {% endfor %}
@@ -94,17 +94,17 @@
            saves over the draft. #}
         <div class="seo-verbs">
           <button type="button" class="app-btn is-ghost" data-action="keywords">
-            <i class="bi bi-lightbulb" aria-hidden="true"></i> Research keywords
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">lightbulb</i> Research keywords
           </button>
           <button type="button" class="app-btn is-primary" data-action="analyze">
-            <i class="bi bi-speedometer2" aria-hidden="true"></i> Analyze SEO
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">speed</i> Analyze SEO
           </button>
           <button type="button" class="app-btn is-ghost" data-action="apply">
-            <i class="bi bi-magic" aria-hidden="true"></i> Apply optimization
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_fix_high</i> Apply optimization
           </button>
           <button type="button" class="app-btn is-ghost seo-refresh" data-action="reload-drafts"
             aria-label="Reload the draft list" title="Reload the draft list">
-            <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">refresh</i>
           </button>
         </div>
       </div>
@@ -129,7 +129,7 @@
 
         <div class="seo-state" data-for="empty">
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i></span>
             <p>Pick a draft and a region above. <strong>Analyze SEO</strong> scores it as it stands,
               <strong>Research keywords</strong> looks up the terms it could rank for, and
               <strong>Apply optimization</strong> rewrites it.</p>
@@ -153,7 +153,7 @@
 
         <div class="seo-state" data-for="error">
           <div class="list-empty seo-error">
-            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>
             <p data-error-text>Something went wrong.</p>
             <button type="button" class="app-btn is-ghost" data-action="retry">Try again</button>
           </div>
@@ -163,7 +163,7 @@
         <div class="seo-state" data-for="analysis">
 
           <p class="seo-source">
-            <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i>
             <span data-analysis-source></span>
           </p>
 
@@ -178,7 +178,7 @@
               <span class="seo-grade-caption">grade</span>
             </span>
             <button type="button" class="app-btn is-primary seo-head-action" data-action="apply">
-              <i class="bi bi-magic" aria-hidden="true"></i> Apply optimization
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_fix_high</i> Apply optimization
             </button>
           </div>
 
@@ -219,14 +219,14 @@
           <div class="seo-lists">
             <div class="seo-list-card" data-issues-card hidden>
               <h3 class="seo-subhead">
-                <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Issues found
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i> Issues found
                 <span class="card-count" data-issues-count>0</span>
               </h3>
               <ul class="seo-list" data-issues-list></ul>
             </div>
             <div class="seo-list-card" data-recs-card hidden>
               <h3 class="seo-subhead">
-                <i class="bi bi-lightbulb" aria-hidden="true"></i> Recommendations
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">lightbulb</i> Recommendations
               </h3>
               <ul class="seo-list seo-list-todo" data-recs-list></ul>
             </div>
@@ -237,7 +237,7 @@
         <div class="seo-state" data-for="keywords">
 
           <p class="seo-source">
-            <i class="bi bi-globe2" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">public</i>
             <span data-keywords-source></span>
           </p>
 
@@ -298,7 +298,7 @@
         <div class="seo-state" data-for="comparison">
 
           <div class="seo-outcome">
-            <span class="seo-outcome-icon"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
+            <span class="seo-outcome-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">check_circle</i></span>
             <div class="seo-outcome-copy">
               <h3 class="seo-outcome-title">Optimization applied</h3>
               <p data-outcome-note>The draft has been rewritten and saved.</p>
@@ -319,7 +319,7 @@
               <span class="seo-grade-caption">grade</span>
             </span>
             <a class="app-btn is-primary seo-head-action" href="{{ url_for('blog.drafts_page') }}">
-              <i class="bi bi-file-earmark-text" aria-hidden="true"></i> View my drafts
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i> View my drafts
             </a>
             <button type="button" class="app-btn is-ghost" data-action="reset">Analyze another</button>
           </div>
@@ -363,7 +363,7 @@
                 <input type="text" id="seoTitleAfter" data-title-after readonly>
                 <button type="button" class="app-btn is-ghost" data-action="copy-title"
                   aria-label="Copy the optimized title" title="Copy the optimized title">
-                  <i class="bi bi-clipboard" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i>
                 </button>
               </div>
             </div>
@@ -372,14 +372,14 @@
           <div class="seo-lists">
             <div class="seo-list-card" data-changes-card hidden>
               <h3 class="seo-subhead">
-                <i class="bi bi-list-check" aria-hidden="true"></i> Changes made
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">checklist</i> Changes made
                 <span class="card-count" data-changes-count>0</span>
               </h3>
               <ul class="seo-list seo-list-done" data-changes-list></ul>
             </div>
             <div class="seo-list-card" data-next-card hidden>
               <h3 class="seo-subhead">
-                <i class="bi bi-lightbulb" aria-hidden="true"></i> Go further
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">lightbulb</i> Go further
               </h3>
               <ul class="seo-list seo-list-todo" data-next-list></ul>
             </div>
@@ -400,7 +400,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="seoApplyTitle">Optimize this draft?</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">

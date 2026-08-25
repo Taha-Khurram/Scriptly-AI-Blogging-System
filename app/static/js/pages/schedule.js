@@ -303,7 +303,7 @@
         if (queuedDelta) {
             if (overdue.length) {
                 queuedDelta.className = 'stat-delta is-late';
-                queuedDelta.innerHTML = '<i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> ' +
+                queuedDelta.innerHTML = '<i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">warning</i> ' +
                     esc(overdue.length + ' past due');
             } else if (!queued.length) {
                 queuedDelta.className = 'stat-delta';
@@ -473,12 +473,12 @@
         return '<ul class="dropdown-menu dropdown-menu-end sched-menu">' +
             '<li><p class="sched-menu-head">' + esc(entry.title) + '</p></li>' +
             '<li><button type="button" class="dropdown-item" data-act="reschedule" data-id="' + id + '">' +
-            '<i class="bi bi-calendar-event" aria-hidden="true"></i> Move to another time</button></li>' +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">event</i> Move to another time</button></li>' +
             '<li><button type="button" class="dropdown-item" data-act="publish" data-id="' + id + '">' +
-            '<i class="bi bi-send" aria-hidden="true"></i> Publish now</button></li>' +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">send</i> Publish now</button></li>' +
             '<li><hr class="dropdown-divider"></li>' +
             '<li><button type="button" class="dropdown-item is-danger" data-act="cancel" data-id="' + id + '">' +
-            '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Move back to drafts</button></li>' +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">undo</i> Move back to drafts</button></li>' +
             '</ul>';
     }
 
@@ -488,8 +488,8 @@
     function eventCard(entry) {
         const st = stateOf(entry);
         const time = fmtTime(entry.date);
-        const glyph = st === 'published' ? '<i class="bi bi-check2" aria-hidden="true"></i> '
-            : st === 'overdue' ? '<i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> '
+        const glyph = st === 'published' ? '<i class="material-symbols-outlined icon-inline" aria-hidden="true">check</i> '
+            : st === 'overdue' ? '<i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">warning</i> '
                 : '';
         const inner = '<span class="sched-event-time">' + glyph + esc(time) + '</span>' +
             '<span class="sched-event-title">' + esc(entry.title) + '</span>';
@@ -616,11 +616,11 @@
 
         if (!queued.length) {
             return '<div class="list-empty">' +
-                '<span class="list-empty-icon"><i class="bi bi-inbox" aria-hidden="true"></i></span>' +
+                '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">inbox</i></span>' +
                 '<p>Nothing is waiting to publish. Everything you have scheduled has already gone out — ' +
                 'the week and month views still hold the record.</p>' +
                 '<button type="button" class="app-btn is-primary" data-action="open-add">' +
-                '<i class="bi bi-calendar-plus" aria-hidden="true"></i> Schedule a blog</button>' +
+                '<i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_add_on</i> Schedule a blog</button>' +
                 '</div>';
         }
 
@@ -648,7 +648,7 @@
 
         if (!matches.length) {
             return '<div class="list-empty">' +
-                '<span class="list-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>' +
+                '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i></span>' +
                 '<p>No scheduled or published post matches that. Search covers the title, the category ' +
                 'and the author.</p></div>';
         }
@@ -712,7 +712,7 @@
             '<div class="dropdown sched-menu-wrap">' +
             '<button type="button" class="row-action" data-bs-toggle="dropdown" data-bs-offset="0,4" ' +
             'aria-expanded="false" aria-label="' + esc('Actions for ' + entry.title) + '">' +
-            '<i class="bi bi-three-dots" aria-hidden="true"></i></button>' + menuFor(entry) + '</div>';
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">more_horiz</i></button>' + menuFor(entry) + '</div>';
 
         return '<div class="data-row sched-row is-' + st + '">' +
             '<span class="row-mark sched-time-mark" aria-hidden="true">' +
@@ -993,13 +993,13 @@
 
         let head;
         if (source === 'analytics') {
-            head = '<p class="sched-besttime-source"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ' +
+            head = '<p class="sched-besttime-source"><i class="material-symbols-outlined icon-inline icon-fill besttime-mark is-verified" aria-hidden="true">check_circle</i> ' +
                 'From your Google Analytics data, last 28 days</p>';
         } else if (message) {
             head = '<p class="sched-besttime-source is-warning">' +
-                '<i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> ' + esc(message) + '</p>';
+                '<i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">warning</i> ' + esc(message) + '</p>';
         } else {
-            head = '<p class="sched-besttime-source"><i class="bi bi-lightbulb-fill" aria-hidden="true"></i> ' +
+            head = '<p class="sched-besttime-source"><i class="material-symbols-outlined icon-inline icon-fill besttime-mark is-hint" aria-hidden="true">lightbulb</i> ' +
                 'General best practice — connect Analytics for times based on your own readers</p>';
         }
 
@@ -1009,7 +1009,7 @@
             const when = nextOccurrence(s.day_index, s.hour);
             return '<button type="button" class="sched-slot" data-action="apply-slot" ' +
                 'data-when="' + esc(isoLocal(when)) + '">' +
-                '<span class="sched-slot-when"><i class="bi bi-clock" aria-hidden="true"></i> ' +
+                '<span class="sched-slot-when"><i class="material-symbols-outlined icon-inline" aria-hidden="true">schedule</i> ' +
                 esc(s.display_time) + '</span>' +
                 '<span class="sched-slot-date">' + esc(fmtDate(when)) + '</span>' +
                 (s.reasoning ? '<span class="sched-slot-why">' + esc(s.reasoning) + '</span>' : '') +
@@ -1097,7 +1097,7 @@
                 if (err.name === 'AbortError') return;
                 if (!list) return;
                 list.innerHTML = '<div class="list-empty">' +
-                    '<span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>' +
+                    '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i>' +
                     '</span><p>' + esc(err.message || 'Could not reach the server.') + '</p>' +
                     '<button type="button" class="app-btn is-ghost" data-action="reload-available">Try again' +
                     '</button></div>';
@@ -1116,7 +1116,7 @@
 
         if (!rows.length) {
             list.innerHTML = '<div class="list-empty">' +
-                '<span class="list-empty-icon"><i class="bi bi-file-earmark-x" aria-hidden="true"></i></span>' +
+                '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">search_off</i></span>' +
                 '<p>' + (q
                     ? 'Nothing matches that.'
                     : 'No drafts and nothing awaiting approval. Write a post first and it will show up here.') +
@@ -1151,7 +1151,7 @@
 
         const chosen = $('[data-chosen-blog]');
         if (chosen) {
-            chosen.innerHTML = '<i class="bi bi-file-earmark-text" aria-hidden="true"></i><span>' +
+            chosen.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i><span>' +
                 esc(title) + '</span>';
         }
 
@@ -1241,13 +1241,13 @@
 
         const title = $('[data-reschedule-blog]');
         if (title) {
-            title.innerHTML = '<i class="bi bi-file-earmark-text" aria-hidden="true"></i><span>' +
+            title.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i><span>' +
                 esc(entry.title) + '</span>';
         }
 
         const current = $('[data-reschedule-current]');
         if (current) {
-            current.innerHTML = '<i class="bi bi-clock-history" aria-hidden="true"></i> ' +
+            current.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">history</i> ' +
                 (stateOf(entry) === 'overdue' ? 'Was due ' : 'Currently set for ') +
                 esc(fmtDateTime(entry.date));
         }

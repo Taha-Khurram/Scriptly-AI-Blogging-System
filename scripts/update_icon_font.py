@@ -29,20 +29,32 @@ MANIFEST_PATH = FONT_PATH.with_suffix('.txt')
 SCAN_DIRS = [ROOT / 'app' / 'templates', ROOT / 'app' / 'static' / 'js', ROOT / 'app' / 'static' / 'css']
 SCAN_SUFFIXES = {'.html', '.js', '.css'}
 
-# <span class="material-symbols-outlined …">icon_name</span>
-RE_MARKUP = re.compile(r'material-symbols-outlined[^"\']*["\']\s*>\s*([a-z0-9_]+)')
+# <i class="material-symbols-outlined icon-inline" aria-hidden="true">name</i>
+# Anything up to the tag's '>' can sit between the class and the ligature --
+# more classes, aria-hidden, a style attribute -- so match to the ">" rather
+# than to the closing quote of the class attribute.
+RE_MARKUP = re.compile(r'material-symbols-outlined[^>]*>\s*([a-z0-9_]+)')
 # icon.textContent = <expr>;  — take every string literal in the expression, so
 # both arms of `cond ? 'light_mode' : 'dark_mode'` are picked up. Non-icons in
 # the expression (a comparison against 'dark', say) are dropped by the
 # codepoints check below rather than by guessing here.
 RE_JS_ASSIGN = re.compile(r'textContent\s*=\s*([^;\n]+)')
 RE_JS_STRING = re.compile(r'[\'"]([a-z0-9_]+)[\'"]')
+# el('i', 'material-symbols-outlined icon-inline', 'chevron_right'), and the
+# icon(...) helper that sits next to el() in analytics.js. Both end at the
+# call's closing paren, so there is no need to reason about quoting.
+RE_JS_EL = re.compile(r'material-symbols-outlined[^,]*,\s*([^)]+)\)')
+RE_JS_ICON_CALL = re.compile(r'\bicon\(\s*([^)]+)\)')
 # content: 'icon_name'  inside a rule that sets the Material Symbols family
 RE_CSS_CONTENT = re.compile(r"content:\s*'([a-z0-9_]+)'")
 
+# FILL is a range, not a fixed 0: the `-fill` cuts the app used to get from
+# Bootstrap Icons are now the same glyph drawn with 'FILL' 1, which only a
+# variable font can do. The other axes stay pinned -- a fully variable
+# subset costs several times the size for nothing we actually vary.
 CSS_URL = (
     'https://fonts.googleapis.com/css2'
-    '?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0'
+    '?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0..1,0'
     '&icon_names={names}&display=block'
 )
 # The authoritative name list. Google's CSS endpoint answers 200 with an empty
@@ -54,6 +66,31 @@ CODEPOINTS_URL = (
 )
 UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
+
+
+# Ligatures picked at runtime from data the scanner cannot follow: a lookup
+# table keyed by record type, a severity ladder, a delta direction, a name
+# handed to a helper. Listed here because a glyph missing from the subset
+# renders as its own name in the UI, and nothing else would catch it.
+EXTRA_ICONS = {
+    # activity -- TYPE_ICON, keyed on the record type
+    'article', 'person', 'chat_bubble', 'settings', 'mail', 'label', 'monitoring',
+    # analytics -- delta direction, the KPI tuples, the live/offline pill
+    'north_east', 'south_east', 'remove', 'visibility', 'ads_click', 'group',
+    'sensors', 'block', 'chevron_right', 'description', 'alt_route',
+    # seo-tools -- issue severity ladder, and the recommendation bullet
+    'report', 'warning', 'info', 'arrow_right_alt',
+    # menu and empty-state helpers that take a ligature as an argument
+    'visibility_off', 'undo', 'delete', 'drafts', 'done_all', 'manage_accounts',
+    'link', 'send', 'smart_toy', 'error', 'search', 'post_add', 'check_circle',
+    'campaign', 'lightbulb', 'bookmark',
+    # app.js -- toast type
+    'cancel',
+    # site_settings -- panel_head / nav_item icon arguments
+    'palette', 'web', 'title', 'verified_user', 'share', 'public', 'table',
+    'star', 'subject', 'aspect_ratio', 'translate', 'calendar_month',
+    'schedule', 'format_list_numbered', 'business',
+}
 
 
 def scan_icon_names():
@@ -70,8 +107,9 @@ def scan_icon_names():
             names.update(RE_MARKUP.findall(text))
 
             if path.suffix == '.js':
-                for expr in RE_JS_ASSIGN.findall(text):
-                    names.update(RE_JS_STRING.findall(expr))
+                for pattern in (RE_JS_ASSIGN, RE_JS_EL, RE_JS_ICON_CALL):
+                    for expr in pattern.findall(text):
+                        names.update(RE_JS_STRING.findall(expr))
 
             # Only trust `content:` where the same file names the icon family.
             if path.suffix == '.css' and 'Material Symbols Outlined' in text:
@@ -99,7 +137,7 @@ def main():
                         help='report drift without writing the font')
     args = parser.parse_args()
 
-    candidates = scan_icon_names()
+    candidates = scan_icon_names() | EXTRA_ICONS
     if not candidates:
         print('No Material Symbols icons found — refusing to build an empty font.')
         return 1

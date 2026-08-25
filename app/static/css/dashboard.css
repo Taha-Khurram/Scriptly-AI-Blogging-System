@@ -14,27 +14,9 @@
    --------------------------------------------------------------------------
 */
 
-/* ==========================================================================
-   0. ICON FONT — Material Symbols (self-hosted)
-
-   Served from our own /static rather than fonts.gstatic.com. This font is
-   navigation chrome, not decoration: when it fails to arrive, every icon
-   renders as its raw ligature name ("edit_square", "left_panel_close") right
-   across the rail. Because sidebar navigation is PJAX, nothing reloads, so a
-   single failed CDN request stayed broken until a hard refresh.
-
-   Subset to the glyphs the app actually uses — 5KB instead of the 4MB full
-   variable font. Adding an icon to a template means regenerating it:
-   see docs/DESIGN_SYSTEM.md §3.
-   ========================================================================== */
-
-@font-face {
-    font-family: 'Material Symbols Outlined';
-    font-style: normal;
-    font-weight: 300;
-    font-display: block;
-    src: url('../fonts/material-symbols-outlined.woff2') format('woff2');
-}
+/* The Material Symbols @font-face and the .material-symbols-outlined /
+   .icon-inline / .icon-fill classes live in icons.css, which the public
+   site loads too. Section 0 used to hold them; it is deliberately gone. */
 
 /* ==========================================================================
    1. DESIGN TOKENS — LIGHT (default)
@@ -1095,27 +1077,6 @@ pre {
     background-clip: content-box;
 }
 
-/* Material Symbols — the nav icon set. Light optical weight, 24px grade.
-   font-family lives here rather than in a vendor stylesheet, since the face is
-   declared locally at the top of this file. 'liga' is what turns the ligature
-   name ("edit_square") into the glyph, so it is not optional. */
-.material-symbols-outlined {
-    font-family: 'Material Symbols Outlined';
-    font-weight: normal;
-    font-style: normal;
-    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
-    font-size: 22px;
-    line-height: 1;
-    letter-spacing: normal;
-    text-transform: none;
-    display: inline-block;
-    white-space: nowrap;
-    word-wrap: normal;
-    direction: ltr;
-    font-feature-settings: 'liga';
-    -webkit-font-smoothing: antialiased;
-    user-select: none;
-}
 
 /* Resting state: a centred 44px circle, icon only.
 

@@ -30,7 +30,7 @@
                     {% if blog.cover_image %}
                     <img src="{{ blog.cover_image }}" alt="{{ blog.title }}" loading="lazy">
                     {% else %}
-                    <i class="bi bi-journal-richtext"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">article</i>
                     {% endif %}
                     {% if blog.category %}
                     <span class="blog-card-category">{{ blog.category }}</span>
@@ -51,11 +51,11 @@
                     </p>
                     <div class="blog-card-footer">
                         <div class="blog-card-meta">
-                            <i class="bi bi-calendar3"></i>
+                            <i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_month</i>
                             {{ blog.updated_at.strftime('%b %d, %Y') if blog.updated_at else 'Recently' }}
                         </div>
                         <a href="{{ url_for('site_bp.site_post', site_identifier=settings.site_slug|default(user_id, true), slug_or_id=blog.slug or blog.id) }}" class="blog-card-link">
-                            Read <i class="bi bi-arrow-right"></i>
+                            Read <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i>
                         </a>
                     </div>
                 </div>
@@ -68,10 +68,10 @@
         <nav class="pagination">
             {% if current_page > 1 %}
             <a href="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true), page=current_page-1, category=current_category) }}" class="pagination-btn">
-                <i class="bi bi-chevron-left"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i>
             </a>
             {% else %}
-            <span class="pagination-btn disabled"><i class="bi bi-chevron-left"></i></span>
+            <span class="pagination-btn disabled"><i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i></span>
             {% endif %}
 
             {% for page_num in range(1, total_pages + 1) %}
@@ -86,22 +86,22 @@
 
             {% if current_page < total_pages %}
             <a href="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true), page=current_page+1, category=current_category) }}" class="pagination-btn">
-                <i class="bi bi-chevron-right"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i>
             </a>
             {% else %}
-            <span class="pagination-btn disabled"><i class="bi bi-chevron-right"></i></span>
+            <span class="pagination-btn disabled"><i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i></span>
             {% endif %}
         </nav>
         {% endif %}
 
         {% else %}
         <div class="empty-state">
-            <i class="bi bi-journal-x"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">folder_off</i>
             <h3>No articles found</h3>
             <p>{% if current_category %}No articles in this category yet.{% else %}Check back soon for new content!{% endif %}</p>
             {% if current_category %}
             <a href="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true)) }}" class="btn-primary">
-                <i class="bi bi-arrow-left"></i> View All Articles
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_back</i> View All Articles
             </a>
             {% endif %}
         </div>
@@ -112,7 +112,7 @@
     <aside class="blog-sidebar">
         <!-- Categories -->
         <div class="sidebar-card">
-            <h3><i class="bi bi-folder"></i> Categories</h3>
+            <h3><i class="material-symbols-outlined icon-inline" aria-hidden="true">folder</i> Categories</h3>
             <ul class="category-list">
                 <li>
                     <a href="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true)) }}" class="{% if not current_category %}active{% endif %}">
@@ -136,7 +136,7 @@
 
         <!-- Newsletter -->
         <div class="sidebar-card sidebar-newsletter">
-            <h3><i class="bi bi-envelope"></i> {{ settings.footer.newsletter_title if settings.footer else 'Newsletter' }}</h3>
+            <h3><i class="material-symbols-outlined icon-inline" aria-hidden="true">mail</i> {{ settings.footer.newsletter_title if settings.footer else 'Newsletter' }}</h3>
             <p>{{ settings.footer.newsletter_description if settings.footer else 'Get the latest articles delivered to your inbox.' }}</p>
             <form id="sidebar-newsletter-form">
                 <input type="email" name="email" placeholder="Your email" required>

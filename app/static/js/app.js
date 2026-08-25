@@ -23,24 +23,24 @@ function showToast(options) {
     const { type = 'success', title, message, duration = 4000 } = options || {};
 
     const icons = {
-        success: 'bi-check-circle-fill',
-        error: 'bi-x-circle-fill',
-        warning: 'bi-exclamation-triangle-fill',
-        info: 'bi-info-circle-fill'
+        success: 'check_circle',
+        error: 'cancel',
+        warning: 'warning',
+        info: 'info'
     };
 
     const toast = document.createElement('div');
     toast.className = 'custom-toast';
     toast.innerHTML = `
         <div class="toast-icon ${type}">
-            <i class="bi ${icons[type]}"></i>
+            <i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">${icons[type]}</i>
         </div>
         <div class="toast-content">
             <div class="toast-title">${title}</div>
             <div class="toast-message">${message}</div>
         </div>
         <button class="toast-close" onclick="this.closest('.custom-toast').remove()">
-            <i class="bi bi-x"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
         </button>
         <div class="toast-progress" style="animation-duration: ${duration}ms;"></div>
     `;
@@ -1876,8 +1876,18 @@ document.addEventListener("click", (e) => {
     }
 });
 
-// Show loader on form submit (except AJAX forms)
+// Show loader on form submit (except AJAX forms).
+//
+// `defaultPrevented` is the general guard, and the important one: this overlay
+// covers the whole viewport to bridge a page navigation, so a form whose own
+// handler has already cancelled that navigation must not get it. A form
+// listener runs before this one (it is the event target; this is on document),
+// so by the time we are called the decision has been made. Without the check,
+// any page that submits by fetch and forgets the marker class hides its own
+// result behind a full-screen spinner that nothing ever clears -- which is
+// exactly what the create screen did to the run it had just started.
 document.addEventListener("submit", (e) => {
+    if (e.defaultPrevented) return;
     if (!e.target.classList.contains('no-loader') &&
         !e.target.classList.contains('ajax-form')) {
         showLoader();

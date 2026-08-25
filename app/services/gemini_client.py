@@ -267,6 +267,139 @@ class GeminiClient:
 
         raise last_error or GeminiError()
 
+    def stream_text(self, prompt, *, model=None, generation_config=None,
+                    system_instruction=None, timeout=None, max_retries=None,
+                    label='stream'):
+        """Yield the response text in chunks as the model produces it.
+
+        The non-streaming :meth:`generate_text` is still the right call for
+        anything whose result is only used once it is whole (SEO scores, a
+        category name). This exists for the one place where the wait itself is
+        the product: a reader watching a blog post being written.
+
+        Retries work differently here, and have to. Once a chunk has been
+        yielded the caller has already shown it, so a retry would restart the
+        text from the beginning and duplicate what is on screen. A failure is
+        therefore only retried while nothing has been emitted; after that it
+        propagates and the caller keeps the partial text it already has.
+        """
+        self._require_configured()
+        handle = self.get_model(
+            model, generation_config=generation_config,
+            system_instruction=system_instruction,
+        )
+        deadline = timeout or self._timeout
+        attempts = (max_retries if max_retries is not None else self._max_retries) + 1
+
+        last_error = None
+        for attempt in range(attempts):
+            started = time.perf_counter()
+            emitted = 0
+            try:
+                kwargs = {}
+                if _SUPPORTS_REQUEST_OPTIONS:
+                    kwargs['request_options'] = {'timeout': deadline}
+                stream = handle.generate_content(prompt, stream=True, **kwargs)
+
+                for chunk in stream:
+                    piece = self._chunk_text(chunk)
+                    if piece:
+                        emitted += len(piece)
+                        yield piece
+
+                # The terminal reasons only become readable once the iterator
+                # is drained, so an empty stream is diagnosed here rather than
+                # reported as a successful generation of nothing.
+                if not emitted:
+                    self._raise_for_empty_stream(stream)
+
+                logger.info(
+                    'Gemini %s ok', label,
+                    extra={'label': label, 'model': model or self._default_model,
+                           'attempt': attempt + 1, 'streamed': True,
+                           'duration_ms': round((time.perf_counter() - started) * 1000, 1),
+                           'chars': emitted},
+                )
+                return
+
+            except (GeminiSafetyError, GeminiResponseError):
+                raise
+
+            except Exception as exc:
+                retryable, error_class = _classify(exc)
+                last_error = error_class(str(exc)[:300])
+                logger.warning(
+                    'Gemini %s failed (attempt %s/%s, %s chars in): %s',
+                    label, attempt + 1, attempts, emitted, exc,
+                    extra={'label': label, 'retryable': retryable,
+                           'duration_ms': round((time.perf_counter() - started) * 1000, 1)},
+                )
+                # Mid-stream: the caller is holding text we cannot take back.
+                if emitted:
+                    raise last_error from exc
+                if not retryable or attempt == attempts - 1:
+                    break
+                time.sleep(min(2 ** attempt, 8) * (0.5 + random.random()))
+
+        raise last_error or GeminiError()
+
+    @staticmethod
+    def _chunk_text(chunk):
+        """Text out of one stream chunk, or ``''``.
+
+        A chunk carrying only a finish reason or a safety rating has no parts,
+        and ``chunk.text`` raises on it. That is normal in a stream -- it is not
+        a failure and must not end the iteration -- so it is swallowed here and
+        the terminal state is inspected once at the end instead.
+        """
+        try:
+            return chunk.text or ''
+        except Exception:
+            return ''
+
+    @classmethod
+    def _raise_for_empty_stream(cls, stream):
+        """Explain a stream that produced no text at all.
+
+        The terminal-state accessors on a streaming response are properties that
+        can raise in their own right, and a diagnosis routine that throws its own
+        exception would replace a real answer with a confusing one. So the
+        inspection is guarded and falls back to the plainest true statement.
+        """
+        try:
+            cls._diagnose_empty_stream(stream)
+        except GeminiError:
+            raise
+        except Exception as exc:
+            raise GeminiResponseError(
+                'The AI returned no usable content.'
+            ) from exc
+        raise GeminiResponseError('The AI returned an empty response.')
+
+    @staticmethod
+    def _diagnose_empty_stream(stream):
+        """Raise the precise error for an empty stream, or return."""
+        feedback = getattr(stream, 'prompt_feedback', None)
+        block_reason = getattr(feedback, 'block_reason', None) if feedback else None
+        if block_reason:
+            raise GeminiSafetyError(
+                f'The prompt was blocked by a safety filter ({block_reason}).'
+            )
+
+        candidates = getattr(stream, 'candidates', None) or []
+        finish_reason = str(
+            getattr(candidates[0], 'finish_reason', '') or ''
+        ).upper() if candidates else ''
+
+        if 'SAFETY' in finish_reason:
+            raise GeminiSafetyError()
+        if 'RECITATION' in finish_reason:
+            raise GeminiSafetyError(
+                'The AI stopped because the output reproduced source material '
+                'too closely. Try a different angle on the topic.'
+            )
+        # Nothing specific to say; the caller raises the general case.
+
     def generate_json(self, prompt, *, model=None, generation_config=None,
                       system_instruction=None, timeout=None, max_retries=None,
                       label='generate_json', default=None):

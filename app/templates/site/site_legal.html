@@ -11,9 +11,9 @@
 <section class="legal-hero" data-animate="fade-up">
     <div class="legal-hero-icon">
         {% if 'privacy' in page_title|lower %}
-        <i class="bi bi-shield-lock"></i>
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">admin_panel_settings</i>
         {% else %}
-        <i class="bi bi-file-earmark-text"></i>
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i>
         {% endif %}
     </div>
     <h1><span>{{ page_title }}</span></h1>
@@ -32,7 +32,7 @@
 
     <div class="legal-back">
         <a href="{{ url_for('site_bp.site_home', site_identifier=settings.site_slug|default(user_id, true)) }}">
-            <i class="bi bi-arrow-left"></i> Back to Home
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_back</i> Back to Home
         </a>
     </div>
 </div>

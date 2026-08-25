@@ -43,19 +43,21 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
-    <!-- Material Symbols is self-hosted (see the @font-face at the top of
-         dashboard.css) so the nav icons can never fall back to raw ligature
-         text because a CDN request failed. Preload it: it is above-the-fold
-         chrome on every screen. -->
+    <!-- Material Symbols is self-hosted (see the @font-face in icons.css) so
+         an icon can never fall back to raw ligature text because a CDN request
+         failed. Preload it: it is above-the-fold chrome on every screen. -->
     <link rel="preload" as="font" type="font/woff2" crossorigin
         href="{{ url_for('static', filename='fonts/material-symbols-outlined.woff2') }}">
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <!-- Icons. Every icon in the app is a Material Symbols ligature served
+         from our own /static, so nothing icon-shaped depends on a CDN. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/icons.css') }}?v=1">
 
     <!-- Custom Dashboard CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}?v=16">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}?v=17">
 
     {% block extra_css %}{% endblock %}
 </head>

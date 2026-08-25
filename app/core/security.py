@@ -377,6 +377,9 @@ _CSP_DIRECTIVES = {
         'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net',
         'https://cdn.tiny.cloud',
     ],
+    # No CDN entry: every icon is a self-hosted Material Symbols glyph, and
+    # gstatic serves only the text faces. An icon webfont behind a CDN was
+    # what made a missing font-src entry blank out every icon in the app.
     'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
     'img-src': ["'self'", 'data:', 'blob:', 'https:'],
     'connect-src': [

@@ -160,6 +160,62 @@ class TestApiContract:
         assert response.status_code < 500
 
 
+class TestGenerationStatusStream:
+    """The create screen's live view is a contract on this one endpoint: the
+    reasoning lines, the draft so far, and cursors so the next poll asks only
+    for what it has not seen."""
+
+    @pytest.fixture
+    def seeded(self, signed_in, mock_db):
+        from app.utils.task_manager import task_manager
+
+        client = signed_in(role='ADMIN', user_id='admin-1')
+        task_id = task_manager.create_task('admin-1', kind='generation')
+        task_manager.update_task(task_id, 'content', 20)
+        task_manager.add_thought(task_id, 'Angle: cost per lead', kind='plan')
+        task_manager.append_content(task_id, 'The opening line.')
+        yield client, task_id
+        task_manager.cleanup_expired(max_age=-1)
+
+    def test_a_first_poll_gets_everything_so_far(self, seeded):
+        client, task_id = seeded
+        body = client.get(f'/api/generate/status/{task_id}').get_json()
+
+        assert body['stage'] == 'content'
+        assert [t['text'] for t in body['thoughts']] == ['Angle: cost per lead']
+        assert body['thoughts'][0]['kind'] == 'plan'
+        assert body['content'] == 'The opening line.'
+        assert body['thought_cursor'] == 1
+        assert body['char_cursor'] == len('The opening line.')
+
+    def test_the_next_poll_gets_only_the_new_text(self, seeded):
+        """Without this the response re-sends the whole draft every second."""
+        from app.utils.task_manager import task_manager
+
+        client, task_id = seeded
+        first = client.get(f'/api/generate/status/{task_id}').get_json()
+        task_manager.append_content(task_id, ' And the next one.')
+
+        second = client.get(
+            f'/api/generate/status/{task_id}'
+            f'?tc={first["thought_cursor"]}&cc={first["char_cursor"]}'
+        ).get_json()
+
+        assert second['thoughts'] == []
+        assert second['content'] == ' And the next one.'
+        assert second['total_chars'] == len('The opening line. And the next one.')
+
+    def test_another_users_run_is_not_readable(self, seeded, signed_in):
+        """The live output must not widen the hole the ownership check closed:
+        a draft being written is exactly what must not leak."""
+        _, task_id = seeded
+        other = signed_in(role='USER', user_id='someone-else')
+
+        response = other.get(f'/api/generate/status/{task_id}')
+        assert response.status_code == 404
+        assert 'The opening line' not in response.get_data(as_text=True)
+
+
 class TestPublicSite:
     def test_site_routes_do_not_require_a_session(self, app, client, mock_db):
         """The visitor-facing site must never redirect a reader to a login."""

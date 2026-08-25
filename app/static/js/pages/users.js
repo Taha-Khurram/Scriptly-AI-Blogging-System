@@ -123,7 +123,7 @@
         return '<div class="dropdown">' +
             '<button type="button" class="btn-dropdown-trigger" data-bs-toggle="dropdown" aria-expanded="false" ' +
             'aria-label="More actions for ' + label + '">' +
-            '<i class="bi bi-three-dots-vertical" aria-hidden="true"></i>' +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>' +
             '</button>' +
             '<ul class="dropdown-menu dropdown-menu-end">' + items.join('') + '</ul>' +
             '</div>';
@@ -132,7 +132,7 @@
     function menuItem(action, icon, text, danger) {
         return '<li><button type="button" class="dropdown-item' + (danger ? ' text-danger' : '') + '" ' +
             'data-action="' + action + '">' +
-            '<i class="bi bi-' + icon + '" aria-hidden="true"></i> ' + text +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">' + icon + '</i> ' + text +
             '</button></li>';
     }
 
@@ -172,13 +172,13 @@
             '<div class="row-trail">' +
             '<button type="button" class="row-action" data-action="edit-role" ' +
             'aria-label="Change role for ' + label + '" title="Change role">' +
-            '<i class="bi bi-person-gear" aria-hidden="true"></i>' +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">manage_accounts</i>' +
             '</button>' +
             rowMenu(label, [
-                menuItem('edit-role', 'person-gear', 'Change role'),
-                menuItem('copy-email', 'envelope', 'Copy email address'),
+                menuItem('edit-role', 'manage_accounts', 'Change role'),
+                menuItem('copy-email', 'mail', 'Copy email address'),
                 '<li><hr class="dropdown-divider"></li>',
-                menuItem('delete', 'trash3', 'Remove user', true)
+                menuItem('delete', 'delete', 'Remove user', true)
             ]) +
             '</div>' +
             '</div>';
@@ -199,7 +199,7 @@
         return '<div class="data-row is-invite" data-email="' + esc(email) + '" data-name="' + label + '" ' +
             'data-role="' + role + '" data-search="' + esc(email.toLowerCase()) + '">' +
 
-            '<span class="row-mark" aria-hidden="true"><i class="bi bi-envelope"></i></span>' +
+            '<span class="row-mark" aria-hidden="true"><i class="material-symbols-outlined icon-inline" aria-hidden="true">mail</i></span>' +
 
             '<span class="row-main">' +
             '<span class="row-title">' + label + '</span>' +
@@ -212,14 +212,14 @@
             '<div class="row-trail">' +
             '<button type="button" class="row-action" data-action="resend" ' +
             'aria-label="Resend the invitation to ' + label + '" title="Resend invitation">' +
-            '<i class="bi bi-arrow-clockwise" aria-hidden="true"></i>' +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">refresh</i>' +
             '</button>' +
             rowMenu(label, [
                 menuItem('resend', 'send', 'Resend invitation'),
                 // /users/invite answers with a signup_url and a message telling
                 // the admin to "share the link below" — a link the page never
                 // showed them. It is derivable, so the row offers it.
-                menuItem('copy-link', 'link-45deg', 'Copy signup link')
+                menuItem('copy-link', 'link', 'Copy signup link')
             ]) +
             '</div>' +
             '</div>';
@@ -238,7 +238,7 @@
 
     function emptyState() {
         return '<div class="list-empty">' +
-            '<span class="list-empty-icon"><i class="bi bi-people" aria-hidden="true"></i></span>' +
+            '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">group</i></span>' +
             '<p>No one else has been added yet. Invite an editor to write alongside you, or another ' +
             'admin to share the running of the site.</p>' +
             '<button type="button" class="app-btn is-primary" data-bs-toggle="modal" ' +
@@ -248,7 +248,7 @@
 
     function errorState(message) {
         return '<div class="list-empty">' +
-            '<span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>' +
+            '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>' +
             '<p>' + esc(message || 'The list of people could not be loaded.') + '</p>' +
             '<button type="button" class="app-btn is-ghost" data-action="retry">Try again</button>' +
             '</div>';

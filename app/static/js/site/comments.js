@@ -109,7 +109,7 @@ async function submitComment() {
         showFormMessage(msgEl, 'Something went wrong. Please try again.', 'error');
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-send"></i> Post Comment';
+        btn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">send</i> Post Comment';
     }
 }
 
@@ -157,7 +157,7 @@ function renderComment(comment) {
 function renderEmptyState() {
     return `
     <div class="comments-empty">
-        <i class="bi bi-chat-text"></i>
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">chat</i>
         <p>No comments yet. Be the first to share your thoughts!</p>
     </div>`;
 }

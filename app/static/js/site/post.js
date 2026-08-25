@@ -97,6 +97,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ==================== BOOKMARK BUTTON ====================
+    // The glyph is the same ligature either way -- only the FILL axis moves,
+    // which .icon-fill drives. Setting className alone would drop the icon
+    // font classes and leave the ligature name showing as text.
+    function setBookmarkGlyph(btn, filled) {
+        const mark = btn.querySelector('i');
+        if (!mark) return;
+        mark.className = 'material-symbols-outlined icon-inline'
+            + (filled ? ' icon-fill' : '');
+        mark.textContent = 'bookmark';
+        mark.setAttribute('aria-hidden', 'true');
+    }
+
     const bookmarkBtn = document.getElementById('post-bookmark-btn');
     if (bookmarkBtn) {
         const postId = bookmarkBtn.dataset.postId;
@@ -104,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (bookmarkedPosts.includes(postId)) {
             bookmarkBtn.classList.add('active');
-            bookmarkBtn.querySelector('i').className = 'bi bi-bookmark-fill';
+            setBookmarkGlyph(bookmarkBtn, true);
         }
 
         bookmarkBtn.addEventListener('click', function() {
@@ -114,11 +126,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const index = bookmarkedPosts.indexOf(postId);
                 bookmarkedPosts.splice(index, 1);
                 this.classList.remove('active');
-                this.querySelector('i').className = 'bi bi-bookmark';
+                setBookmarkGlyph(this, false);
             } else {
                 bookmarkedPosts.push(postId);
                 this.classList.add('active');
-                this.querySelector('i').className = 'bi bi-bookmark-fill';
+                setBookmarkGlyph(this, true);
             }
 
             localStorage.setItem('bookmarkedPosts', JSON.stringify(bookmarkedPosts));
@@ -154,16 +166,16 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.post-body pre').forEach(pre => {
         const copyBtn = document.createElement('button');
         copyBtn.className = 'code-copy-btn';
-        copyBtn.innerHTML = '<i class="bi bi-clipboard"></i>';
+        copyBtn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i>';
         copyBtn.title = 'Copy code';
 
         copyBtn.addEventListener('click', async function() {
             const code = pre.querySelector('code') || pre;
             try {
                 await navigator.clipboard.writeText(code.textContent);
-                this.innerHTML = '<i class="bi bi-check"></i>';
+                this.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">check</i>';
                 setTimeout(() => {
-                    this.innerHTML = '<i class="bi bi-clipboard"></i>';
+                    this.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i>';
                 }, 2000);
             } catch (err) {
                 console.error('Failed to copy');

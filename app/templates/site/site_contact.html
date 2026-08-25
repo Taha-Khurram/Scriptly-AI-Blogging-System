@@ -1,4 +1,5 @@
 {% extends "site/site_base.html" %}
+{% from 'partials/brand_icon.html' import brand_icon %}
 
 {% block title %}Contact | {{ settings.site_name }}{% endblock %}
 
@@ -26,14 +27,14 @@
 
         {% if request.args.get('success') %}
         <div class="alert alert-success">
-            <i class="bi bi-check-circle-fill"></i>
+            <i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">check_circle</i>
             <span>Thank you for your message! We'll get back to you soon.</span>
         </div>
         {% endif %}
 
         {% if request.args.get('error') %}
         <div class="alert alert-error">
-            <i class="bi bi-exclamation-circle-fill"></i>
+            <i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">error</i>
             <span>Something went wrong. Please try again.</span>
         </div>
         {% endif %}
@@ -61,7 +62,7 @@
             </div>
 
             <button type="submit" class="btn-primary btn-submit" id="submit-btn">
-                <i class="bi bi-send"></i> Send Message
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">send</i> Send Message
             </button>
         </form>
     </div>
@@ -70,12 +71,12 @@
     <aside class="contact-sidebar">
         <!-- Contact Info -->
         <div class="sidebar-card">
-            <h3><i class="bi bi-info-circle"></i> Contact Info</h3>
+            <h3><i class="material-symbols-outlined icon-inline" aria-hidden="true">info</i> Contact Info</h3>
 
             {% if settings.contact_email %}
             <div class="contact-info-item">
                 <div class="contact-info-icon">
-                    <i class="bi bi-envelope"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">mail</i>
                 </div>
                 <div class="contact-info-content">
                     <h4>Email</h4>
@@ -86,7 +87,7 @@
 
             <div class="contact-info-item">
                 <div class="contact-info-icon">
-                    <i class="bi bi-clock"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">schedule</i>
                 </div>
                 <div class="contact-info-content">
                     <h4>Response Time</h4>
@@ -96,7 +97,7 @@
 
             <div class="contact-info-item">
                 <div class="contact-info-icon">
-                    <i class="bi bi-globe"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">language</i>
                 </div>
                 <div class="contact-info-content">
                     <h4>Website</h4>
@@ -108,22 +109,22 @@
         <!-- Social Links -->
         {% if settings.social_links and (settings.social_links.twitter or settings.social_links.linkedin or settings.social_links.github) %}
         <div class="sidebar-card social-card">
-            <h3><i class="bi bi-share"></i> Follow Us</h3>
+            <h3><i class="material-symbols-outlined icon-inline" aria-hidden="true">share</i> Follow Us</h3>
             <p>Stay connected on social media for updates and more.</p>
             <div class="social-links">
                 {% if settings.social_links.twitter %}
                 <a href="{{ settings.social_links.twitter }}" target="_blank" class="social-link" title="Twitter">
-                    <i class="bi bi-twitter-x"></i>
+                    {{ brand_icon('x') }}
                 </a>
                 {% endif %}
                 {% if settings.social_links.linkedin %}
                 <a href="{{ settings.social_links.linkedin }}" target="_blank" class="social-link" title="LinkedIn">
-                    <i class="bi bi-linkedin"></i>
+                    {{ brand_icon('linkedin') }}
                 </a>
                 {% endif %}
                 {% if settings.social_links.github %}
                 <a href="{{ settings.social_links.github }}" target="_blank" class="social-link" title="GitHub">
-                    <i class="bi bi-github"></i>
+                    {{ brand_icon('github') }}
                 </a>
                 {% endif %}
             </div>
@@ -139,19 +140,19 @@
     </div>
     <div class="faq-list" data-animate-stagger>
         <details class="faq-item">
-            <summary>{{ settings.hero_contact.faq_1_q if settings.hero_contact else 'How quickly will I get a response?' }}<i class="bi bi-plus"></i></summary>
+            <summary>{{ settings.hero_contact.faq_1_q if settings.hero_contact else 'How quickly will I get a response?' }}<i class="material-symbols-outlined icon-inline" aria-hidden="true">add</i></summary>
             <p>{{ settings.hero_contact.faq_1_a if settings.hero_contact else 'We aim to respond to all inquiries within 24-48 hours during business days.' }}</p>
         </details>
         <details class="faq-item">
-            <summary>{{ settings.hero_contact.faq_2_q if settings.hero_contact else 'Can I contribute to the blog?' }}<i class="bi bi-plus"></i></summary>
+            <summary>{{ settings.hero_contact.faq_2_q if settings.hero_contact else 'Can I contribute to the blog?' }}<i class="material-symbols-outlined icon-inline" aria-hidden="true">add</i></summary>
             <p>{{ settings.hero_contact.faq_2_a if settings.hero_contact else "We welcome guest contributions! Reach out with your ideas and we'll discuss collaboration opportunities." }}</p>
         </details>
         <details class="faq-item">
-            <summary>{{ settings.hero_contact.faq_3_q if settings.hero_contact else 'How can I stay updated?' }}<i class="bi bi-plus"></i></summary>
+            <summary>{{ settings.hero_contact.faq_3_q if settings.hero_contact else 'How can I stay updated?' }}<i class="material-symbols-outlined icon-inline" aria-hidden="true">add</i></summary>
             <p>{{ settings.hero_contact.faq_3_a if settings.hero_contact else 'Subscribe to our newsletter or follow us on social media to never miss new content.' }}</p>
         </details>
         <details class="faq-item">
-            <summary>{{ settings.hero_contact.faq_4_q if settings.hero_contact else 'Do you offer partnerships?' }}<i class="bi bi-plus"></i></summary>
+            <summary>{{ settings.hero_contact.faq_4_q if settings.hero_contact else 'Do you offer partnerships?' }}<i class="material-symbols-outlined icon-inline" aria-hidden="true">add</i></summary>
             <p>{{ settings.hero_contact.faq_4_a if settings.hero_contact else "Yes! We're open to collaborations and partnerships. Let us know what you have in mind." }}</p>
         </details>
     </div>

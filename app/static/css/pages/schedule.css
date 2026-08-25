@@ -1050,11 +1050,13 @@
     color: var(--text-muted);
 }
 
-.sched-besttime-source .bi-check-circle-fill {
+/* Keyed on what the mark means, not on which glyph it is: the ligature is
+   the element's text now, so there is no glyph class left to select. */
+.sched-besttime-source .besttime-mark.is-verified {
     color: var(--success);
 }
 
-.sched-besttime-source .bi-lightbulb-fill {
+.sched-besttime-source .besttime-mark.is-hint {
     color: var(--info);
 }
 

@@ -73,37 +73,37 @@
     {% if lead.email %}
     <button type="button" class="row-action" data-action="reply" title="Reply by email"
       aria-label="Reply to {{ name }} by email">
-      <i class="bi bi-reply" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">reply</i>
     </button>
     {% endif %}
 
     <div class="dropdown">
       <button type="button" class="btn-dropdown-trigger" data-bs-toggle="dropdown" aria-expanded="false"
         aria-label="More actions for the message from {{ name }}">
-        <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>
       </button>
       <ul class="dropdown-menu dropdown-menu-end">
         <li><button type="button" class="dropdown-item" data-action="view">
-            <i class="bi bi-envelope-open" aria-hidden="true"></i> Open message
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">drafts</i> Open message
           </button></li>
         {% if lead.email %}
         <li><button type="button" class="dropdown-item" data-action="reply">
-            <i class="bi bi-reply" aria-hidden="true"></i> Reply by email
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">reply</i> Reply by email
           </button></li>
         <li><button type="button" class="dropdown-item" data-action="copy-email">
-            <i class="bi bi-envelope" aria-hidden="true"></i> Copy email address
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">mail</i> Copy email address
           </button></li>
         {% endif %}
         {% if unread %}
         <li><button type="button" class="dropdown-item" data-action="mark-read">
-            <i class="bi bi-check2-all" aria-hidden="true"></i> Mark as read
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">done_all</i> Mark as read
           </button></li>
         {% endif %}
         <li>
           <hr class="dropdown-divider">
         </li>
         <li><button type="button" class="dropdown-item text-danger" data-action="delete">
-            <i class="bi bi-trash3" aria-hidden="true"></i> Delete lead
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i> Delete lead
           </button></li>
       </ul>
     </div>
@@ -148,7 +148,7 @@
 
     <div class="leads-stats reveal">
       <div class="stat-card">
-        <span class="stat-icon stat-all"><i class="bi bi-inbox" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-all"><i class="material-symbols-outlined icon-inline" aria-hidden="true">inbox</i></span>
         <span class="stat-info">
           <span class="stat-label">{{ 'Lead' if total == 1 else 'Leads' }}</span>
           <span class="stat-count" data-stat-total>{{ total }}</span>
@@ -156,7 +156,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-new"><i class="bi bi-envelope-fill" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-new"><i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">mail</i></span>
         <span class="stat-info">
           <span class="stat-label">Unread</span>
           <span class="stat-count" data-stat-unread>{{ unread }}</span>
@@ -176,7 +176,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-seen"><i class="bi bi-envelope-open" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-seen"><i class="material-symbols-outlined icon-inline" aria-hidden="true">drafts</i></span>
         <span class="stat-info">
           <span class="stat-label">Read</span>
           <span class="stat-count" data-stat-read>{{ read }}</span>
@@ -218,7 +218,7 @@
           {% for lead in initial_leads %}{{ lead_row(lead) }}{% endfor %}
           {% else %}
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-inbox" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">inbox</i></span>
             <p>Nothing yet. When a visitor fills in the contact form on your site, their message
               arrives here.</p>
           </div>
@@ -241,7 +241,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="leadModalTitle" data-modal-subject>Message</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 
@@ -271,7 +271,7 @@
             <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Close</button>
             <button type="button" class="app-btn is-danger" data-modal-delete>Delete</button>
             <a class="app-btn is-primary" data-modal-reply href="#">
-              <i class="bi bi-reply" aria-hidden="true"></i> Reply
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">reply</i> Reply
             </a>
           </footer>
         </div>
@@ -285,7 +285,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="deleteLeadTitle">Delete lead</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 

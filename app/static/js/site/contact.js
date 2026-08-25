@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (contactForm && submitBtn) {
         contactForm.addEventListener('submit', function() {
-            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending...';
+            submitBtn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">hourglass_top</i> Sending...';
             submitBtn.disabled = true;
         });
     }
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+            btn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">hourglass_top</i>';
             btn.disabled = true;
 
             // Get the subscribe URL from data attribute
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        btn.innerHTML = '<i class="bi bi-check-lg"></i> Subscribed!';
+                        btn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">check</i> Subscribed!';
                         this.querySelector('input[type="email"]').value = '';
                         setTimeout(() => {
                             btn.innerHTML = originalText;

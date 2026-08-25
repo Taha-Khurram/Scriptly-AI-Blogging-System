@@ -31,7 +31,7 @@ function checkEmptyState() {
     // the card looking exactly as it would on a fresh load.
     container.innerHTML = `
       <div class="list-empty">
-        <span class="list-empty-icon"><i class="bi bi-file-earmark-text"></i></span>
+        <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i></span>
         <p>No drafts yet. Anything you generate lands here until you send it for approval.</p>
         <a href="/create" class="page-header-action is-ghost">Create one</a>
       </div>
@@ -476,7 +476,7 @@ async function submitForReview(id) {
       hideActionLoader();
       if (dropdownBtn) {
         dropdownBtn.disabled = false;
-        dropdownBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+        dropdownBtn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>';
       }
       showToast({
         type: 'error',
@@ -489,7 +489,7 @@ async function submitForReview(id) {
     hideActionLoader();
     if (dropdownBtn) {
       dropdownBtn.disabled = false;
-      dropdownBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+      dropdownBtn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>';
     }
     showToast({
       type: 'error',
@@ -656,7 +656,7 @@ async function deleteDraft(id) {
       hideActionLoader();
       if (dropdownBtn) {
         dropdownBtn.disabled = false;
-        dropdownBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+        dropdownBtn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>';
       }
       showToast({
         type: 'error',
@@ -669,7 +669,7 @@ async function deleteDraft(id) {
     hideActionLoader();
     if (dropdownBtn) {
       dropdownBtn.disabled = false;
-      dropdownBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+      dropdownBtn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>';
     }
     showToast({
       type: 'error',
@@ -744,7 +744,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast({ type: 'error', title: 'Error', message: 'Connection error.', duration: 4000 });
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-calendar-check"></i> Schedule & Submit';
+        btn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">event_available</i> Schedule & Submit';
       }
     });
   }
@@ -777,16 +777,16 @@ async function loadBestTimeSuggestions() {
 function renderSuggestionChips(listEl, suggestions, fromAnalytics, apiMessage) {
   let sourceLabel;
   if (fromAnalytics) {
-    sourceLabel = '<span class="best-time-source best-time-source-analytics"><i class="bi bi-check-circle-fill"></i> Based on your Google Analytics data (last 28 days)</span>';
+    sourceLabel = '<span class="best-time-source best-time-source-analytics"><i class="material-symbols-outlined icon-inline icon-fill besttime-mark is-verified" aria-hidden="true">check_circle</i> Based on your Google Analytics data (last 28 days)</span>';
   } else if (apiMessage) {
-    sourceLabel = `<span class="best-time-source best-time-source-warning"><i class="bi bi-exclamation-triangle-fill"></i> ${apiMessage}</span>`;
+    sourceLabel = `<span class="best-time-source best-time-source-warning"><i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">warning</i> ${apiMessage}</span>`;
   } else {
-    sourceLabel = '<span class="best-time-source"><i class="bi bi-lightbulb-fill"></i> General best practices</span>';
+    sourceLabel = '<span class="best-time-source"><i class="material-symbols-outlined icon-inline icon-fill besttime-mark is-hint" aria-hidden="true">lightbulb</i> General best practices</span>';
   }
 
   listEl.innerHTML = sourceLabel + suggestions.map(s =>
     `<button type="button" class="best-time-chip" onclick="applyBestTime(${s.day_index}, ${s.hour})" title="${s.reasoning}">
-      <i class="bi bi-clock"></i> ${s.display_time}
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">schedule</i> ${s.display_time}
       <span class="best-time-score">${s.reasoning}</span>
     </button>`
   ).join('');
@@ -858,7 +858,7 @@ function openImagePicker() {
           }
           grid.innerHTML = html;
         } else {
-          grid.innerHTML = '<div class="image-picker-empty" style="grid-column:1/-1;"><i class="bi bi-images" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>No images in gallery. Upload images on the Gallery page first.</div>';
+          grid.innerHTML = '<div class="image-picker-empty" style="grid-column:1/-1;"><i class="material-symbols-outlined icon-inline" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;" aria-hidden="true">photo_library</i>No images in gallery. Upload images on the Gallery page first.</div>';
         }
       } else {
         grid.innerHTML = '<div class="image-picker-empty" style="grid-column:1/-1;">Error loading images.</div>';

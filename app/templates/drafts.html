@@ -25,7 +25,7 @@
       <span class="material-symbols-outlined">dark_mode</span>
     </button>
     <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-primary">
-      <i class="bi bi-plus-lg" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">add</i>
       <span class="page-header-label">New draft</span>
     </a>
     {% endcall %}
@@ -75,37 +75,37 @@
                  everything, so nothing here is the only way to reach an action. #}
               <button type="button" class="row-action" onclick="openViewModal('{{ draft.id }}')"
                 aria-label="Preview {{ title }}" title="Preview">
-                <i class="bi bi-eye" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">visibility</i>
               </button>
               <button type="button" class="row-action" onclick="submitForReview('{{ draft.id }}')"
                 aria-label="Submit {{ title }} for approval" title="Submit for approval">
-                <i class="bi bi-send" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">send</i>
               </button>
 
               <div class="dropdown">
                 <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false"
                   aria-label="More actions for {{ title }}">
-                  <i class="bi bi-three-dots-vertical"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                   <li>
                     <button class="dropdown-item" onclick="openViewModal('{{ draft.id }}')">
-                      <i class="bi bi-eye" style="color: var(--info);"></i> View Draft
+                      <i class="material-symbols-outlined icon-inline" style="color: var(--info);" aria-hidden="true">visibility</i> View Draft
                     </button>
                   </li>
                   <li>
                     <button class="dropdown-item" onclick="openEditModal('{{ draft.id }}')">
-                      <i class="bi bi-pencil-square" style="color: var(--primary-color);"></i> Edit Draft
+                      <i class="material-symbols-outlined icon-inline" style="color: var(--primary-color);" aria-hidden="true">edit_square</i> Edit Draft
                     </button>
                   </li>
                   <li>
                     <button class="dropdown-item" onclick="humanizeDraft('{{ draft.id }}')">
-                      <i class="bi bi-shield-check" style="color: var(--accent);"></i> Humanize
+                      <i class="material-symbols-outlined icon-inline" style="color: var(--accent);" aria-hidden="true">verified_user</i> Humanize
                     </button>
                   </li>
                   <li>
                     <button class="dropdown-item" onclick="submitForReview('{{ draft.id }}')">
-                      <i class="bi bi-check-circle" style="color: var(--success);"></i> Submit for Approval
+                      <i class="material-symbols-outlined icon-inline" style="color: var(--success);" aria-hidden="true">check_circle</i> Submit for Approval
                     </button>
                   </li>
                   <li>
@@ -113,7 +113,7 @@
                   </li>
                   <li>
                     <button class="dropdown-item text-danger" onclick="deleteDraft('{{ draft.id }}')">
-                      <i class="bi bi-x-circle"></i> Delete
+                      <i class="material-symbols-outlined icon-inline" aria-hidden="true">cancel</i> Delete
                     </button>
                   </li>
                 </ul>
@@ -126,7 +126,7 @@
         <p class="list-noresults" data-noresults hidden>No drafts match that search.</p>
         {% else %}
         <div class="list-empty">
-          <span class="list-empty-icon"><i class="bi bi-file-earmark-text"></i></span>
+          <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i></span>
           <p>No drafts yet. Anything you generate lands here until you send it for approval.</p>
           <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-ghost">Create one</a>
         </div>
@@ -139,7 +139,7 @@
       <nav class="pager" aria-label="Drafts pages">
         <a class="pager-btn {{ 'is-disabled' if not has_prev }}"
           href="?page={{ current_page - 1 }}" aria-label="Previous page">
-          <i class="bi bi-chevron-left" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i>
         </a>
         {% for p in range(1, total_pages + 1) %}
         {% if p == 1 or p == total_pages or (p >= current_page - 1 and p <= current_page + 1) %}
@@ -151,7 +151,7 @@
         {% endfor %}
         <a class="pager-btn {{ 'is-disabled' if not has_next }}"
           href="?page={{ current_page + 1 }}" aria-label="Next page">
-          <i class="bi bi-chevron-right" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i>
         </a>
       </nav>
       {% endif %}
@@ -163,7 +163,7 @@
         <div class="modal-content">
           <div class="custom-modal-header">
             <h5 class="custom-modal-title">
-              <i class="bi bi-pencil-square"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">edit_square</i>
               Edit Draft
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -178,7 +178,7 @@
                 <span class="slug-prefix">/post/</span>
                 <input type="text" class="slug-input" id="modal-slug" placeholder="auto-generated-from-title">
                 <button type="button" class="slug-regenerate-btn" id="regenerate-slug" title="Regenerate from title">
-                  <i class="bi bi-arrow-clockwise"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">refresh</i>
                 </button>
               </div>
               <small class="slug-hint">Leave blank to auto-generate from title. Changing slug will create a 301
@@ -192,16 +192,16 @@
                 <img id="coverImageImg" src="" alt="Cover">
                 <div class="cover-image-actions">
                   <button type="button" class="cover-img-action-btn" onclick="openImagePicker()" title="Change image">
-                    <i class="bi bi-arrow-repeat"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">autorenew</i>
                   </button>
                   <button type="button" class="cover-img-action-btn danger" onclick="removeCoverImage()"
                     title="Remove image">
-                    <i class="bi bi-trash"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i>
                   </button>
                 </div>
               </div>
               <div class="cover-image-placeholder" id="coverImagePlaceholder" onclick="openImagePicker()">
-                <div class="cover-placeholder-icon"><i class="bi bi-image"></i></div>
+                <div class="cover-placeholder-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">image</i></div>
                 <div class="cover-placeholder-text">Click to select a feature image</div>
                 <div class="cover-placeholder-hint">Choose from your gallery</div>
               </div>
@@ -210,8 +210,8 @@
             <!-- SEO Settings -->
             <div class="seo-settings-section">
               <button type="button" class="seo-toggle-btn" id="seo-toggle-btn">
-                <i class="bi bi-search"></i> SEO Settings
-                <i class="bi bi-chevron-down seo-chevron"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i> SEO Settings
+                <i class="material-symbols-outlined icon-inline seo-chevron" aria-hidden="true">expand_more</i>
               </button>
               <div class="seo-fields" id="seo-fields" style="display: none;">
                 <div class="seo-field">
@@ -234,11 +234,11 @@
           </div>
           <div class="custom-modal-footer">
             <button type="button" class="btn-modal btn-secondary" onclick="copyDraftContent()">
-              <i class="bi bi-clipboard"></i> Copy
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i> Copy
             </button>
             <button type="button" class="btn-modal btn-primary-custom" id="save-changes-btn"
               onclick="saveModalChanges()">
-              <i class="bi bi-check-lg"></i> Save Changes
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">check</i> Save Changes
             </button>
           </div>
         </div>
@@ -251,7 +251,7 @@
         <div class="modal-content">
           <div class="custom-modal-header">
             <h5 class="custom-modal-title">
-              <i class="bi bi-file-earmark-text"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i>
               Draft Preview
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -261,25 +261,25 @@
             <!-- Title Section -->
             <h2 class="blog-title-display" id="view-modal-title">Blog Title</h2>
             <span class="status-badge status-draft mb-3" id="view-modal-status">
-              <i class="bi bi-circle-fill"></i> DRAFT
+              <i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">circle</i> DRAFT
             </span>
 
             <!-- Meta Info Bar -->
             <div class="meta-info-bar">
               <div class="meta-item">
-                <i class="bi bi-folder2"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">folder</i>
                 <span id="view-modal-category">General</span>
               </div>
               <div class="meta-item">
-                <i class="bi bi-stopwatch"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">timer</i>
                 <span id="view-modal-reading-time">-- min read</span>
               </div>
               <div class="meta-item">
-                <i class="bi bi-body-text"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">notes</i>
                 <span id="view-modal-word-count">-- words</span>
               </div>
               <div class="meta-item">
-                <i class="bi bi-calendar3"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_month</i>
                 <span id="view-modal-date">--</span>
               </div>
             </div>
@@ -287,7 +287,7 @@
             <!-- Table of Contents -->
             <div class="toc-container d-none" id="view-modal-toc">
               <div class="toc-header">
-                <i class="bi bi-list-ul"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">toc</i>
                 <span>Table of Contents</span>
               </div>
               <div id="view-modal-toc-content"></div>
@@ -295,7 +295,7 @@
 
             <!-- Content Preview -->
             <div class="content-label">
-              <i class="bi bi-text-paragraph"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">subject</i>
               <span>Content Preview</span>
             </div>
             <div class="blog-content-preview" id="view-modal-content">
@@ -317,7 +317,7 @@
         <div class="modal-content">
           <div class="custom-modal-header">
             <h5 class="custom-modal-title">
-              <i class="bi bi-calendar-event"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">event</i>
               Schedule & Submit for Approval
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -329,7 +329,7 @@
               style="padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
             <div id="bestTimeSuggestions" class="best-time-container mt-3">
               <div class="best-time-header">
-                <i class="bi bi-robot"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">smart_toy</i>
                 <span>AI Publish Time Agent — Recommended Times</span>
               </div>
               <div id="bestTimeSuggestionsList" class="best-time-list">
@@ -342,10 +342,10 @@
           </div>
           <div class="custom-modal-footer">
             <button type="button" class="btn-modal btn-modal-secondary" data-bs-dismiss="modal">
-              <i class="bi bi-x-lg"></i> Cancel
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i> Cancel
             </button>
             <button type="button" class="btn-modal btn-modal-success" id="confirmScheduleBtn">
-              <i class="bi bi-calendar-check"></i> Schedule & Submit
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">event_available</i> Schedule & Submit
             </button>
           </div>
         </div>
@@ -356,8 +356,8 @@
     <div class="image-picker-overlay" id="imagePickerOverlay" onclick="closeImagePicker(event)">
       <div class="image-picker-modal" onclick="event.stopPropagation()">
         <div class="image-picker-header">
-          <h4 class="image-picker-title"><i class="bi bi-images"></i> Choose from Gallery</h4>
-          <button class="image-picker-close" onclick="closeImagePicker()"><i class="bi bi-x-lg"></i></button>
+          <h4 class="image-picker-title"><i class="material-symbols-outlined icon-inline" aria-hidden="true">photo_library</i> Choose from Gallery</h4>
+          <button class="image-picker-close" onclick="closeImagePicker()"><i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i></button>
         </div>
         <div class="image-picker-body">
           <div class="image-picker-grid" id="imagePickerGrid">
@@ -368,7 +368,7 @@
           </div>
         </div>
         <div class="image-picker-footer">
-          <a href="/gallery" class="image-picker-upload-link"><i class="bi bi-cloud-arrow-up"></i> Upload new images in
+          <a href="/gallery" class="image-picker-upload-link"><i class="material-symbols-outlined icon-inline" aria-hidden="true">cloud_upload</i> Upload new images in
             Gallery</a>
         </div>
       </div>

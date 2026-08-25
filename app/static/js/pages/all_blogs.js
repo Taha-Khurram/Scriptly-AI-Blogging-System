@@ -196,7 +196,7 @@ async function loadBlogs() {
             updateResultSummary(0, 1, perPage);
             listEl.innerHTML = `
                 <div class="list-empty">
-                    <span class="list-empty-icon"><i class="bi bi-journals"></i></span>
+                    <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">library_books</i></span>
                     <p>No blogs found. Try a different status, category or date range.</p>
                 </div>`;
             document.getElementById('blogsPagination').innerHTML = '';
@@ -205,7 +205,7 @@ async function loadBlogs() {
         console.error('Error loading blogs:', err);
         listEl.innerHTML = `
             <div class="blogs-state is-error">
-                <i class="bi bi-exclamation-circle"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">error</i>
                 <p class="mb-0">Failed to load blogs.</p>
             </div>`;
     }
@@ -252,18 +252,18 @@ function renderBlogRow(blog) {
             <div class="dropdown">
                 <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false"
                     aria-label="More actions for ${title}">
-                    <i class="bi bi-three-dots-vertical"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li>
                         <button class="dropdown-item" onclick="openEditModal('${id}')">
-                            <i class="bi bi-pencil-square" style="color: var(--primary-color);"></i> Edit Blog
+                            <i class="material-symbols-outlined icon-inline" style="color: var(--primary-color);" aria-hidden="true">edit_square</i> Edit Blog
                         </button>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
                         <button class="dropdown-item text-danger" onclick="deleteBlog('${id}')">
-                            <i class="bi bi-x-circle"></i> Delete
+                            <i class="material-symbols-outlined icon-inline" aria-hidden="true">cancel</i> Delete
                         </button>
                     </li>
                 </ul>
@@ -307,7 +307,7 @@ function renderPagination(total, page, perPage) {
 
     let html = '';
     html += `<button class="pager-btn ${page <= 1 ? 'is-disabled' : ''}" onclick="goToPage(${page - 1})" ${page <= 1 ? 'disabled' : ''} aria-label="Previous page">
-        <i class="bi bi-chevron-left"></i>
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i>
     </button>`;
 
     for (let i = 1; i <= totalPages; i++) {
@@ -319,7 +319,7 @@ function renderPagination(total, page, perPage) {
     }
 
     html += `<button class="pager-btn ${page >= totalPages ? 'is-disabled' : ''}" onclick="goToPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''} aria-label="Next page">
-        <i class="bi bi-chevron-right"></i>
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i>
     </button>`;
 
     container.innerHTML = html;
@@ -914,7 +914,7 @@ async function deleteBlog(id) {
             hideActionLoader();
             if (dropdownBtn) {
                 dropdownBtn.disabled = false;
-                dropdownBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+                dropdownBtn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>';
             }
             showToast({ type: 'error', title: 'Delete Failed', message: data.error || 'Could not delete blog.', duration: 5000 });
         }
@@ -922,7 +922,7 @@ async function deleteBlog(id) {
         hideActionLoader();
         if (dropdownBtn) {
             dropdownBtn.disabled = false;
-            dropdownBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+            dropdownBtn.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>';
         }
         showToast({ type: 'error', title: 'Error', message: 'Failed to delete blog.', duration: 5000 });
     }
@@ -972,7 +972,7 @@ function openImagePicker() {
                     }
                     grid.innerHTML = html;
                 } else {
-                    grid.innerHTML = '<div class="image-picker-empty" style="grid-column:1/-1;"><i class="bi bi-images" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>No images in gallery. Upload images on the Gallery page first.</div>';
+                    grid.innerHTML = '<div class="image-picker-empty" style="grid-column:1/-1;"><i class="material-symbols-outlined icon-inline" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;" aria-hidden="true">photo_library</i>No images in gallery. Upload images on the Gallery page first.</div>';
                 }
             } else {
                 grid.innerHTML = '<div class="image-picker-empty" style="grid-column:1/-1;">Error loading images.</div>';

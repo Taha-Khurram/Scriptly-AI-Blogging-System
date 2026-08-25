@@ -450,20 +450,59 @@ def generate_and_submit():
 
 
 def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, auto_submit):
-    """Background task that runs the full blog generation pipeline."""
+    """Background task that runs the full blog generation pipeline.
+
+    The pipeline reports three things back into the task record as it works --
+    its plan, the draft text, and the stage it is actually on -- so the create
+    screen can show the run instead of a bar that sat at 30% for a minute.
+    """
     with app.app_context():
+        # Progress across the writing stage comes from characters actually
+        # received, so the bar moves because text arrived and not because time
+        # passed. WRITE_FLOOR/CEILING are the slice of the bar the writing owns;
+        # EXPECTED_CHARS is a ~1000-word post, and a longer one simply parks at
+        # the ceiling rather than overrunning it.
+        WRITE_FLOOR, WRITE_CEILING, EXPECTED_CHARS = 15, 65, 6500
+        PROGRESS_STEP_CHARS = 400   # how often a chunk is worth a status write
+
+        state = {'chars': 0, 'marked': 0}
+
+        def on_content(chunk):
+            total = task_manager.append_content(task_id, chunk)
+            state['chars'] = total
+            if total - state['marked'] < PROGRESS_STEP_CHARS:
+                return
+            state['marked'] = total
+            share = min(1.0, total / EXPECTED_CHARS)
+            task_manager.update_task(
+                task_id, 'content',
+                WRITE_FLOOR + int((WRITE_CEILING - WRITE_FLOOR) * share),
+            )
+
+        def on_thought(text, kind='note'):
+            task_manager.add_thought(task_id, text, kind=kind)
+
+        def on_stage(stage, progress):
+            task_manager.update_task(task_id, stage, progress)
+
         try:
-            task_manager.update_task(task_id, 'content', 30)
+            task_manager.update_task(task_id, 'content', WRITE_FLOOR)
 
             blog_ai = BlogAgent()
-            generated_data = blog_ai.run_pipeline(prompt, enable_seo=False)
+            generated_data = blog_ai.run_pipeline(
+                prompt, enable_seo=False,
+                on_thought=on_thought,
+                on_content=on_content,
+                on_stage=on_stage,
+            )
 
             if generated_data.get('status') == 'failed' or 'error' in generated_data:
                 error_msg = generated_data.get('error', 'Blog generation failed')
-                task_manager.fail_task(task_id, error_msg)
+                task_manager.fail_task(
+                    task_id, error_msg,
+                    code=generated_data.get('error_code'),
+                )
                 return
-
-            task_manager.update_task(task_id, 'formatting', 80)
 
             content_text = ""
             content_obj = generated_data.get('content', {})
@@ -501,15 +540,29 @@ def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, au
                     'toc_html': ''
                 }
 
-            task_manager.update_task(task_id, 'categorizing', 90)
+            task_manager.update_task(task_id, 'categorizing', 85)
 
             cat_agent = CategoryAgent()
             db = FirestoreService()
             categories = db.get_all_categories(user_id, limit=50, use_cache=True)
-            generated_data['category'] = cat_agent.categorize_blog(
+            category = cat_agent.categorize_blog(
                 generated_data.get('title'),
                 content_text,
                 categories=categories
+            )
+            generated_data['category'] = category
+
+            # Whether the category was matched or invented is the interesting
+            # half: "filed under Fintech" reads the same either way, and only
+            # one of them adds a category to the site's taxonomy.
+            known = {(c.get('name') or '').strip().lower() for c in (categories or [])}
+            on_thought(
+                'Filed under {} ({}).'.format(
+                    category,
+                    'one of your existing categories'
+                    if (category or '').strip().lower() in known
+                    else 'a new category for this post'
+                )
             )
 
             task_manager.update_task(task_id, 'saving', 95)
@@ -569,6 +622,26 @@ def generation_status(task_id):
         'error': task.get('error'),
         'error_code': task.get('error_code'),
     }
+
+    # Live output, as a delta against what the caller says it already has.
+    # Cursors rather than the whole buffer: a poll every second through a
+    # 7 KB draft would otherwise re-send the entire text each time, and the
+    # client would have to diff it to find out what is new.
+    #
+    # Absent cursors mean "send me everything from the start", which is what a
+    # reattaching client wants -- a browser that navigated away and came back
+    # replays the run rather than joining it blind.
+    stream = task_manager.stream_since(
+        task_id,
+        since_thought=request.args.get('tc', type=int) or 0,
+        since_char=request.args.get('cc', type=int) or 0,
+    )
+    payload['thoughts'] = stream['thoughts']
+    payload['content'] = stream['content']
+    payload['thought_cursor'] = stream['thought_cursor']
+    payload['char_cursor'] = stream['char_cursor']
+    payload['total_chars'] = stream['total_chars']
+    payload['truncated'] = stream['truncated']
 
     # Tell a waiting user where they are instead of leaving them watching a
     # progress bar that has not moved.

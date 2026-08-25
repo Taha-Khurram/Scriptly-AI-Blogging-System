@@ -282,7 +282,7 @@
     white-space: nowrap;
 }
 
-.an-property>.bi-chevron-right {
+.an-property>i {
     flex-shrink: 0;
     color: var(--text-faint);
     font-size: 0.85rem;

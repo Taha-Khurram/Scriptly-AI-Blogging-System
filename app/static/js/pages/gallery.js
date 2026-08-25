@@ -179,7 +179,7 @@
             '<span class="media-check-box" aria-hidden="true"></span>' +
             '</span>' +
             '<button type="button" class="media-quick" data-media-copy title="Copy image URL"' +
-            ' aria-label="Copy URL for ' + name + '"><i class="bi bi-link-45deg" aria-hidden="true"></i></button>' +
+            ' aria-label="Copy URL for ' + name + '"><i class="material-symbols-outlined icon-inline" aria-hidden="true">link</i></button>' +
             '</div>' +
             '<figcaption class="media-caption">' +
             '<span class="media-name" title="' + name + '">' + name + '</span>' +
@@ -212,9 +212,9 @@
             '<span class="media-row-size">' + formatBytes(img.size) + '</span>' +
             '<div class="row-trail">' +
             '<button type="button" class="row-action" data-media-copy title="Copy image URL"' +
-            ' aria-label="Copy URL for ' + name + '"><i class="bi bi-link-45deg" aria-hidden="true"></i></button>' +
+            ' aria-label="Copy URL for ' + name + '"><i class="material-symbols-outlined icon-inline" aria-hidden="true">link</i></button>' +
             '<button type="button" class="row-action" data-media-delete title="Delete image"' +
-            ' aria-label="Delete ' + name + '"><i class="bi bi-trash3" aria-hidden="true"></i></button>' +
+            ' aria-label="Delete ' + name + '"><i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i></button>' +
             '</div></div>';
     }
 
@@ -225,15 +225,15 @@
         if (!state.items.length) {
             body.innerHTML = isFiltered()
                 ? '<div class="list-empty">' +
-                '<span class="list-empty-icon"><i class="bi bi-search"></i></span>' +
+                '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i></span>' +
                 '<p>No images match those filters.</p>' +
                 '<button type="button" class="app-btn is-ghost" data-clear-filters>Clear filters</button>' +
                 '</div>'
                 : '<div class="list-empty gallery-empty">' +
-                '<span class="list-empty-icon"><i class="bi bi-images"></i></span>' +
+                '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">photo_library</i></span>' +
                 '<p>No images yet. Upload artwork here once and reuse it as a feature image on any post.</p>' +
                 '<button type="button" class="app-btn is-primary" data-upload-trigger>' +
-                '<i class="bi bi-cloud-arrow-up" aria-hidden="true"></i> Upload images</button>' +
+                '<i class="material-symbols-outlined icon-inline" aria-hidden="true">cloud_upload</i> Upload images</button>' +
                 '<span class="gallery-empty-hint">or drop files anywhere on this page — PNG, JPG, GIF, WebP up to 5MB</span>' +
                 '</div>';
             syncSelectionChrome();
@@ -268,7 +268,7 @@
 
         let html = '<button type="button" class="pager-btn' + (page <= 1 ? ' is-disabled' : '') +
             '" data-page="' + (page - 1) + '" aria-label="Previous page">' +
-            '<i class="bi bi-chevron-left" aria-hidden="true"></i></button>';
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i></button>';
 
         let prev = 0;
         pages.forEach((p) => {
@@ -280,7 +280,7 @@
 
         html += '<button type="button" class="pager-btn' + (page >= last ? ' is-disabled' : '') +
             '" data-page="' + (page + 1) + '" aria-label="Next page">' +
-            '<i class="bi bi-chevron-right" aria-hidden="true"></i></button>';
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i></button>';
 
         pager.innerHTML = html;
     }
@@ -723,7 +723,7 @@
             '<span class="upload-item-note">' + formatBytes(file.size) + '</span>' +
             '<div class="upload-item-bar"><div class="upload-item-fill"></div></div>' +
             '</div>' +
-            '<span class="upload-item-state"><i class="bi bi-arrow-up-circle"></i></span>';
+            '<span class="upload-item-state"><i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_circle_up</i></span>';
 
         list.appendChild(li);
         return li;
@@ -740,8 +740,8 @@
         const state_el = $('.upload-item-state', li);
         if (state_el) {
             state_el.innerHTML = ok
-                ? '<i class="bi bi-check-circle-fill"></i>'
-                : '<i class="bi bi-exclamation-circle-fill"></i>';
+                ? '<i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">check_circle</i>'
+                : '<i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">error</i>';
         }
         const noteEl = $('.upload-item-note', li);
         if (noteEl && note) noteEl.textContent = note;

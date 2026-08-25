@@ -1,4 +1,5 @@
 {% extends "site/site_base.html" %}
+{% from 'partials/brand_icon.html' import brand_icon %}
 
 {% block title %}{{ blog.title }} | {{ settings.site_name }}{% endblock %}
 
@@ -37,10 +38,10 @@
         {% endif %}
         {% if blog.content and blog.content.reading_time %}
         <span class="post-reading-time">
-            <i class="bi bi-clock"></i> {{ blog.content.reading_time }}
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">schedule</i> {{ blog.content.reading_time }}
         {% else %}
         <span class="post-reading-time">
-            <i class="bi bi-clock"></i> 5 min read
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">schedule</i> 5 min read
         {% endif %}
         </span>
     </div>
@@ -53,7 +54,7 @@
                 {% if blog.author_avatar %}
                 <img src="{{ blog.author_avatar }}" alt="{{ blog.author or 'Author' }}">
                 {% else %}
-                <i class="bi bi-person"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">person</i>
                 {% endif %}
             </div>
             <div class="post-author-details">
@@ -66,10 +67,10 @@
         </div>
         <div class="post-header-actions">
             <button class="post-action-btn" id="post-share-btn" title="Share">
-                <i class="bi bi-share"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">share</i>
             </button>
             <button class="post-action-btn" id="post-bookmark-btn" data-post-id="{{ blog.id }}" title="Bookmark">
-                <i class="bi bi-bookmark"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">bookmark</i>
             </button>
         </div>
     </div>
@@ -83,7 +84,7 @@
         {% if blog.toc and blog.toc|length > 0 %}
         <div class="toc-card">
             <div class="toc-header">
-                <i class="bi bi-list-ul"></i> Table of Contents
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">toc</i> Table of Contents
             </div>
             <ul class="toc-list">
                 {% for item in blog.toc %}
@@ -124,15 +125,15 @@
                 <div class="post-share-buttons">
                     <a href="https://twitter.com/intent/tweet?text={{ blog.title|urlencode }}&url={{ request.url|urlencode }}"
                        target="_blank" class="share-btn twitter" title="Share on X">
-                        <i class="bi bi-twitter-x"></i>
+                        {{ brand_icon('x') }}
                     </a>
                     <a href="https://www.linkedin.com/shareArticle?mini=true&url={{ request.url|urlencode }}&title={{ blog.title|urlencode }}"
                        target="_blank" class="share-btn linkedin" title="Share on LinkedIn">
-                        <i class="bi bi-linkedin"></i>
+                        {{ brand_icon('linkedin') }}
                     </a>
                     <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url|urlencode }}"
                        target="_blank" class="share-btn facebook" title="Share on Facebook">
-                        <i class="bi bi-facebook"></i>
+                        {{ brand_icon('facebook') }}
                     </a>
                 </div>
             </div>
@@ -183,7 +184,7 @@
             </div>
             <div class="comment-form-actions">
                 <button type="submit" class="comment-submit-btn" id="comment-submit-btn">
-                    <i class="bi bi-send"></i> Post Comment
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">send</i> Post Comment
                 </button>
             </div>
             <div class="comment-form-message d-none" id="comment-form-message"></div>
@@ -219,7 +220,7 @@
     <div class="related-header">
         <h2 class="related-title">Related Posts</h2>
         <a href="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true)) }}" class="related-view-all">
-            View all <i class="bi bi-arrow-right"></i>
+            View all <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i>
         </a>
     </div>
 
@@ -231,7 +232,7 @@
                 <img src="{{ related.cover_image }}" alt="{{ related.title }}">
                 {% else %}
                 <div class="related-card-placeholder">
-                    <i class="bi bi-image"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">image</i>
                 </div>
                 {% endif %}
             </div>
@@ -256,7 +257,7 @@
                         {% if related.author_avatar %}
                         <img src="{{ related.author_avatar }}" alt="{{ related.author }}">
                         {% else %}
-                        <i class="bi bi-person"></i>
+                        <i class="material-symbols-outlined icon-inline" aria-hidden="true">person</i>
                         {% endif %}
                     </div>
                     <span class="related-author-name">{{ related.author or settings.site_name }}</span>

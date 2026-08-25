@@ -26,7 +26,7 @@
             <!-- Search -->
             {% if not settings.header or settings.header.show_search %}
             <div class="header-search">
-                <i class="bi bi-search"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i>
                 <input type="text" placeholder="Search posts..." id="header-search-input" data-search-url="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true)) }}" value="{{ search_query or '' }}">
             </div>
             {% endif %}
@@ -51,7 +51,7 @@
         <a href="{{ url_for('site_bp.site_contact', site_identifier=settings.site_slug|default(user_id, true)) }}" class="{% if request.endpoint == 'site_bp.site_contact' %}active{% endif %}">{{ settings.header.nav_contact if settings.header else 'Contact' }}</a>
         {% if not settings.header or settings.header.show_search %}
         <div class="mobile-search">
-            <i class="bi bi-search"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i>
             <input type="text" placeholder="Search posts..." data-search-url="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true)) }}" value="{{ search_query or '' }}">
         </div>
         {% endif %}
@@ -63,10 +63,10 @@
 <div class="subscribe-modal-overlay" id="subscribe-modal">
     <div class="subscribe-modal">
         <button class="subscribe-modal-close" id="subscribe-modal-close">
-            <i class="bi bi-x-lg"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
         </button>
         <div class="subscribe-modal-icon">
-            <i class="bi bi-envelope-paper"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">mail</i>
         </div>
         <h3 class="subscribe-modal-title">Subscribe to Newsletter</h3>
         <p class="subscribe-modal-message">
@@ -83,10 +83,10 @@
 <div class="result-modal-overlay" id="success-modal">
     <div class="result-modal">
         <button class="result-modal-close" onclick="closeResultModal('success-modal')">
-            <i class="bi bi-x-lg"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
         </button>
         <div class="result-modal-icon success">
-            <i class="bi bi-check-lg"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">check</i>
         </div>
         <h3 class="result-modal-title">Thanks for subscribing!</h3>
         <p class="result-modal-message">
@@ -100,10 +100,10 @@
 <div class="result-modal-overlay" id="already-subscribed-modal">
     <div class="result-modal">
         <button class="result-modal-close" onclick="closeResultModal('already-subscribed-modal')">
-            <i class="bi bi-x-lg"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
         </button>
         <div class="result-modal-icon info">
-            <i class="bi bi-info-lg"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">info</i>
         </div>
         <h3 class="result-modal-title">Already Subscribed</h3>
         <p class="result-modal-message">

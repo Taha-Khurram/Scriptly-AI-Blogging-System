@@ -128,15 +128,15 @@
     const BLOG_TYPES = ['blog', 'generated', 'edited', 'published', 'deleted', 'status_change', 'seo_optimized'];
 
     const TYPES = {
-        blog: { label: 'Content', icon: 'file-post' },
+        blog: { label: 'Content', icon: 'article' },
         user: { label: 'People', icon: 'person' },
-        comment: { label: 'Comment', icon: 'chat-dots' },
-        settings: { label: 'Settings', icon: 'gear' },
-        newsletter: { label: 'Newsletter', icon: 'envelope' },
-        category: { label: 'Category', icon: 'tags' }
+        comment: { label: 'Comment', icon: 'chat_bubble' },
+        settings: { label: 'Settings', icon: 'settings' },
+        newsletter: { label: 'Newsletter', icon: 'mail' },
+        category: { label: 'Category', icon: 'label' }
     };
 
-    const OTHER = { label: 'Other', icon: 'activity' };
+    const OTHER = { label: 'Other', icon: 'monitoring' };
 
     function kindOf(entry) {
         const raw = entry.target_type || entry.type || '';
@@ -177,7 +177,7 @@
             '</span>' +
 
             '<span class="type-pill type-' + kind + '">' +
-            '<i class="bi bi-' + type.icon + '" aria-hidden="true"></i> ' + type.label +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">' + type.icon + '</i> ' + type.label +
             '</span>' +
 
             '<time class="row-time" datetime="' + esc(when) + '" data-relative>' +
@@ -263,7 +263,7 @@
     function emptyHtml() {
         const filtered = state.type !== 'all' || state.user !== 'all' || state.query || state.from || state.to;
         return '<div class="list-empty">' +
-            '<span class="list-empty-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span>' +
+            '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">history</i></span>' +
             '<p>' + (filtered
                 ? 'Nothing matches those filters. Widen the date range, or clear them and start again.'
                 : 'Nothing recorded yet. Every publish, invitation and settings change your team ' +
@@ -295,7 +295,7 @@
         } catch (error) {
             if (error.name === 'AbortError') return;
             list.innerHTML = '<div class="list-empty">' +
-                '<span class="list-empty-icon"><i class="bi bi-exclamation-circle" aria-hidden="true"></i></span>' +
+                '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">error</i></span>' +
                 '<p>' + esc(error.message) + ' Try again in a moment.</p></div>';
             const nav = $('[data-pager]', root);
             if (nav) nav.innerHTML = '';

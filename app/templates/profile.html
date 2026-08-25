@@ -467,26 +467,26 @@
                     {% endif %}
                 </div>
                 <div class="profile-avatar-overlay">
-                    <i class="bi bi-camera"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">photo_camera</i>
                 </div>
             </div>
             <p class="profile-avatar-hint">Click to change photo</p>
             {% if user.get('profile_image') %}
             <div class="profile-avatar-actions" id="profileAvatarActions">
                 <button type="button" class="btn-change-avatar" onclick="openProfileImagePicker()">
-                    <i class="bi bi-arrow-repeat"></i> Change
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">autorenew</i> Change
                 </button>
                 <button type="button" class="btn-remove-avatar" onclick="removeProfileImage()">
-                    <i class="bi bi-trash3"></i> Remove
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i> Remove
                 </button>
             </div>
             {% else %}
             <div class="profile-avatar-actions" id="profileAvatarActions" style="display:none;">
                 <button type="button" class="btn-change-avatar" onclick="openProfileImagePicker()">
-                    <i class="bi bi-arrow-repeat"></i> Change
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">autorenew</i> Change
                 </button>
                 <button type="button" class="btn-remove-avatar" onclick="removeProfileImage()">
-                    <i class="bi bi-trash3"></i> Remove
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i> Remove
                 </button>
             </div>
             {% endif %}
@@ -532,8 +532,8 @@
 <div class="image-picker-overlay" id="imagePickerOverlay" onclick="closeProfileImagePicker(event)">
     <div class="image-picker-modal" onclick="event.stopPropagation()">
         <div class="image-picker-header">
-            <h4 class="image-picker-title"><i class="bi bi-images"></i> Choose Profile Photo</h4>
-            <button class="image-picker-close" onclick="closeProfileImagePicker()"><i class="bi bi-x-lg"></i></button>
+            <h4 class="image-picker-title"><i class="material-symbols-outlined icon-inline" aria-hidden="true">photo_library</i> Choose Profile Photo</h4>
+            <button class="image-picker-close" onclick="closeProfileImagePicker()"><i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i></button>
         </div>
         <div class="image-picker-body">
             <div class="image-picker-grid" id="imagePickerGrid">
@@ -544,7 +544,7 @@
             </div>
         </div>
         <div class="image-picker-footer">
-            <a href="/gallery" class="image-picker-upload-link"><i class="bi bi-cloud-arrow-up"></i> Upload new images in Gallery</a>
+            <a href="/gallery" class="image-picker-upload-link"><i class="material-symbols-outlined icon-inline" aria-hidden="true">cloud_upload</i> Upload new images in Gallery</a>
         </div>
     </div>
 </div>
@@ -583,7 +583,7 @@
                         }
                         grid.innerHTML = html;
                     } else {
-                        grid.innerHTML = '<div class="image-picker-empty" style="grid-column:1/-1;"><i class="bi bi-images" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>No images in gallery. Upload images on the Gallery page first.</div>';
+                        grid.innerHTML = '<div class="image-picker-empty" style="grid-column:1/-1;"><i class="material-symbols-outlined icon-inline" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;" aria-hidden="true">photo_library</i>No images in gallery. Upload images on the Gallery page first.</div>';
                     }
                 } else {
                     grid.innerHTML = '<div class="image-picker-empty" style="grid-column:1/-1;">Error loading images.</div>';

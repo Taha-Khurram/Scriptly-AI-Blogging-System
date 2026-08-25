@@ -638,11 +638,13 @@
     font-size: 0.7rem;
 }
 
-.best-time-source .bi-check-circle-fill {
+/* Keyed on what the mark means, not on which glyph it is: the ligature is
+   the element's text now, so there is no glyph class left to select. */
+.best-time-source .besttime-mark.is-verified {
     color: var(--success);
 }
 
-.best-time-source .bi-lightbulb-fill {
+.best-time-source .besttime-mark.is-hint {
     color: var(--warning);
 }
 

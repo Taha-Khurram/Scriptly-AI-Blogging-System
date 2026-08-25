@@ -105,6 +105,15 @@
         return node;
     }
 
+    /* An icon is an <i> carrying a ligature name as its text. That name is
+       real text in the DOM, so it has to be hidden from assistive tech --
+       el() takes no attributes, hence a helper of its own. */
+    function icon(ligature) {
+        const node = el('i', 'material-symbols-outlined icon-inline', ligature);
+        node.setAttribute('aria-hidden', 'true');
+        return node;
+    }
+
     const SVGNS = 'http://www.w3.org/2000/svg';
     function svg(tag, attrs) {
         const node = document.createElementNS(SVGNS, tag);
@@ -139,7 +148,7 @@
         propertyList.textContent = '';
         propertyList.setAttribute('aria-busy', 'false');
         const note = el('div', 'an-note');
-        note.appendChild(el('i', 'bi bi-' + (kind === 'error' ? 'exclamation-triangle' : 'info-circle')));
+        note.appendChild(icon(kind === 'error' ? 'warning' : 'info'));
         note.appendChild(el('span', null, text));
         propertyList.appendChild(note);
     }
@@ -193,7 +202,7 @@
             body.appendChild(el('span', 'an-property-name', prop.display_name));
             body.appendChild(el('span', 'an-property-account', prop.account_name));
             row.appendChild(body);
-            row.appendChild(el('i', 'bi bi-chevron-right'));
+            row.appendChild(icon('chevron_right'));
             propertyList.appendChild(row);
         });
     }
@@ -404,7 +413,7 @@
         // A percentage against zero is not a number. Say what happened instead
         // of printing an infinity or silently hiding the comparison.
         if (prev === 0) {
-            node.appendChild(el('i', 'bi bi-dash'));
+            node.appendChild(icon('remove'));
             node.appendChild(document.createTextNode(
                 cur === 0 ? ' no visits either period' : ' first visits vs ' + against));
             return;
@@ -416,9 +425,9 @@
 
         // Direction is carried by an arrow glyph and words as well as by
         // colour, so the hue never means anything on its own.
-        const icon = dir === 'up' ? 'arrow-up-right' : dir === 'down' ? 'arrow-down-right' : 'dash';
+        const glyph = dir === 'up' ? 'north_east' : dir === 'down' ? 'south_east' : 'remove';
         if (dir !== 'flat') node.classList.add('is-' + dir);
-        node.appendChild(el('i', 'bi bi-' + icon));
+        node.appendChild(icon(glyph));
         node.appendChild(document.createTextNode(
             dir === 'flat'
                 ? ' level vs ' + against
@@ -540,7 +549,7 @@
         if (ui.chartLoading) ui.chartLoading.hidden = true;
         clearChart();
         const note = el('div', 'an-note');
-        note.appendChild(el('i', 'bi bi-info-circle'));
+        note.appendChild(icon('info'));
         note.appendChild(el('span', null, text));
         chartBox.appendChild(note);
         chartBox.setAttribute('aria-label', text);
@@ -778,7 +787,7 @@
         if (halted(res, data)) return;
 
         if (!data.success || !data.pages || !data.pages.length) {
-            cardEmpty(ui.topPages, 'file-earmark-text', 'No page views in this period yet.');
+            cardEmpty(ui.topPages, 'description', 'No page views in this period yet.');
             topPages = [];
             return;
         }
@@ -851,7 +860,7 @@
         if (halted(res, data)) return;
 
         if (!data.success || !data.sources || !data.sources.length) {
-            cardEmpty(ui.sources, 'signpost-split', 'No sessions in this period yet.');
+            cardEmpty(ui.sources, 'alt_route', 'No sessions in this period yet.');
             return;
         }
         paintSources(data.sources, Number(data.total_sessions) || 0);
@@ -908,18 +917,18 @@
         host.textContent = '';
         host.setAttribute('aria-busy', 'false');
         const note = el('div', 'an-note');
-        note.appendChild(el('i', 'bi bi-exclamation-triangle'));
+        note.appendChild(icon('warning'));
         note.appendChild(el('span', null, text));
         host.appendChild(note);
     }
 
-    function cardEmpty(host, icon, text) {
+    function cardEmpty(host, glyph, text) {
         if (!host) return;
         host.textContent = '';
         host.setAttribute('aria-busy', 'false');
         const empty = el('div', 'list-empty');
         const medallion = el('span', 'list-empty-icon');
-        medallion.appendChild(el('i', 'bi bi-' + icon));
+        medallion.appendChild(icon(glyph));
         empty.appendChild(medallion);
         empty.appendChild(el('p', null, text));
         host.appendChild(empty);

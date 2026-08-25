@@ -4,7 +4,7 @@
 {% block title %}Create | {{ app_config.app_name if app_config else 'ScriptlyAI' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/create-blog.css') }}?v=3">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/create-blog.css') }}?v=5">
 {% endblock %}
 
 {#
@@ -36,7 +36,7 @@
       <span class="material-symbols-outlined">dark_mode</span>
     </button>
     <a href="{{ url_for('blog.drafts_page') }}" class="page-header-action is-ghost">
-      <i class="bi bi-pencil-square" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">edit_square</i>
       <span class="page-header-label">Drafts</span>
     </a>
     {% endcall %}
@@ -71,7 +71,7 @@
           </p>
         </div>
 
-        <form class="create-composer" data-create-form novalidate>
+        <form class="create-composer ajax-form" data-create-form novalidate>
           {#
             The prompt entry is a column now, not a row: the field on top, a
             footer of controls beneath it. The old single-line box with one
@@ -99,19 +99,19 @@
               <div class="select-pill prompt-dest" data-select-pill>
                 <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
                   aria-expanded="false" aria-labelledby="destLabel destValue">
-                  <i class="bi bi-inbox" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">inbox</i>
                   <span class="visually-hidden" id="destLabel">Where it lands</span>
                   <span class="filter-pill-value" id="destValue">Save to drafts</span>
-                  <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
                 </button>
 
                 <div class="menu" role="listbox" aria-labelledby="destLabel" hidden>
                   <button type="button" class="menu-item" role="option" data-value="draft">
-                    <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                    <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
                     <span class="menu-label">Save to drafts</span>
                   </button>
                   <button type="button" class="menu-item" role="option" data-value="submit">
-                    <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                    <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
                     <span class="menu-label">{{ 'Publish when done' if is_admin else 'Send for review' }}</span>
                   </button>
                 </div>
@@ -144,7 +144,7 @@
                 <span class="prompt-count" data-prompt-count aria-hidden="true" hidden></span>
 
                 <button type="submit" class="prompt-submit" data-submit disabled aria-label="Generate blog">
-                  <i class="bi bi-arrow-up" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_upward</i>
                 </button>
               </div>
             </div>
@@ -166,22 +166,22 @@
           <div class="starters-row">
             <button type="button" class="starter" data-starter
               data-prompt-text="A step-by-step how-to guide on [your topic], written for a beginner: a short intro, numbered steps with the reasoning behind each, and the common mistakes to avoid.">
-              <i class="bi bi-signpost-2" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">signpost</i>
               <span>How-to guide</span>
             </button>
             <button type="button" class="starter" data-starter
               data-prompt-text="A comparison of [option A] and [option B]: what each is genuinely good at, where each falls short, what they cost in money and effort, and a clear recommendation for who should pick which.">
-              <i class="bi bi-columns-gap" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">view_column</i>
               <span>Comparison</span>
             </button>
             <button type="button" class="starter" data-starter
               data-prompt-text="Ten practical ideas for [your topic], each with a paragraph of explanation and one concrete example a reader could copy today.">
-              <i class="bi bi-list-ol" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">format_list_numbered</i>
               <span>Listicle</span>
             </button>
             <button type="button" class="starter" data-starter
               data-prompt-text="An explainer on [your topic] for a non-technical reader: what it actually is, why it matters right now, the two or three things people get wrong about it, and what to do next.">
-              <i class="bi bi-lightbulb" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">lightbulb</i>
               <span>Explainer</span>
             </button>
           </div>
@@ -191,88 +191,128 @@
 
       <!-- ===================== RUN ===================== -->
       {#
-        The working session. The old wait was one line of text and a 6px bar for
-        a pipeline that reports five named stages — so "Writing blog content"
-        sat there for a minute with nothing to say how far in it was, or that
-        three more steps were still to come.
+        The working session, as a conversation rather than a card.
 
-        The bar shows the server's real percentage and nothing else. It does not
-        creep between stages: a bar that invents progress can strand a wrong
-        value, and the shimmer, the pulsing step dot and the elapsed clock
-        already carry "still working" without lying about how much is left.
+        The card this replaces read as a modal: an elevated panel floating in
+        the middle of the screen with a percentage in the corner and a checklist
+        of five steps. That framing fought what is actually happening — an agent
+        answering a request, at length, while you watch. So the run is a thread
+        now: what you asked on one side, the agent's turn on the other, and
+        inside that turn the same three things in the order they happen.
+
+          1. What it is thinking, while it is thinking (the reasoning
+             disclosure, open by default, collapsible).
+          2. The post, streaming into the body of the message as prose — no
+             inner scroll box, because a message does not scroll independently
+             of the conversation it is in.
+          3. What it did, as ticked lines after the fact (the trail): the
+             section count, the word count, the category it filed under.
+
+        The live status and the progress bar sit at the foot of the turn, next
+        to the newest text, and carry the server's real numbers. Nothing here
+        invents progress; the pulsing dot and the caret say "still working"
+        without lying about how much is left.
+
+        Everything lives inside .dashboard-main, and the page — not a box — is
+        what scrolls as the draft grows.
       #}
-      {# No `hidden` attribute: the [data-state] switch above is the single
-         source of truth for which panel exists. A `hidden` here would be
-         overridden by .create-run's own `display: flex` anyway — author rules
-         beat the UA sheet — leaving two mechanisms where one of them lies. #}
-      <section class="create-run" data-create-panel="run" aria-label="Generation progress">
-        <div class="run-card">
+      {# No `hidden` attribute: the [data-state] switch on the wrapper is the
+         single source of truth for which panel exists. #}
+      <section class="create-run" data-create-panel="run" aria-label="Generation">
+        <div class="thread">
 
-          <div class="run-head">
-            <span class="run-spark" aria-hidden="true">
+          {# The ask. A bubble, so the thread reads as an exchange and the
+             prompt is never orphaned from the answer being written for it. #}
+          <article class="turn is-you">
+            <p class="turn-who">You</p>
+            <div class="turn-bubble" data-run-prompt></div>
+          </article>
+
+          <article class="turn is-agent" data-agent-turn>
+            <span class="turn-mark" aria-hidden="true">
               <span class="material-symbols-outlined">auto_awesome</span>
             </span>
-            <div class="run-head-body">
-              <p class="run-title" data-run-title>Warming up</p>
-              <p class="run-sub" data-run-sub>
+
+            <div class="turn-main">
+              <p class="turn-who">Scriptly</p>
+
+              {# aria-live on a dedicated status line rather than on the turn:
+                 a screen reader hears the stage change, not every token of a
+                 draft it will be handed in full a second later. #}
+              <p class="visually-hidden" role="status" aria-live="polite" data-run-live></p>
+
+              {#
+                Reasoning. The agent is asked to plan the piece before writing
+                it, in the same model call, so these lines are the reasoning the
+                draft was written against — not a caption invented to fill the
+                wait. Open by default: the plan is the part a writer wants to
+                read. Hidden until the first line lands, because an empty
+                reasoning block promises something and shows nothing.
+              #}
+              <div class="reason" data-reason hidden>
+                <button type="button" class="reason-head" data-reason-toggle aria-expanded="true"
+                  aria-controls="runReasonBody">
+                  <span class="reason-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span class="reason-title" data-reason-title>Thinking</span>
+                  <i class="material-symbols-outlined icon-inline reason-caret" aria-hidden="true">expand_more</i>
+                </button>
+                <div class="reason-body" id="runReasonBody" data-reason-body>
+                  <ol class="reason-list" data-reason-list></ol>
+                </div>
+              </div>
+
+              {# The draft. Prose in the message body, styled as a preview of
+                 the piece rather than the finished article — the formatted
+                 version is one screen away and must not be mistaken for this. #}
+              <div class="draft" data-stream hidden>
+                <div class="draft-body" data-stream-text></div>
+              </div>
+
+              {# The trail: the pipeline's own observations, ticked in as they
+                 become true. This is what the five-step checklist was for, in
+                 the form a conversation can carry — facts about work done,
+                 rather than a list of work to come. #}
+              <ol class="trail" data-trail></ol>
+
+              <div class="turn-foot">
+                <p class="turn-status">
+                  <span class="status-dot" aria-hidden="true"></span>
+                  <span class="status-stage" data-run-title>Warming up</span>
+                  <span class="status-meta" data-stream-count></span>
+                </p>
+                <p class="turn-metrics">
+                  <span data-run-pct>5%</span>
+                  <span class="turn-metrics-sep" aria-hidden="true">·</span>
+                  <span class="turn-elapsed" data-run-elapsed>0:00</span>
+                </p>
+              </div>
+
+              <div class="turn-bar">
+                <span class="turn-bar-fill" data-run-bar style="width: 5%"></span>
+              </div>
+
+              <p class="turn-note" data-run-sub>
                 This runs on the server — you can move around the app and come back.
               </p>
+
+              {# Failure lands in the thread rather than only in a toast that
+                 has faded by the time the reader looks back. #}
+              <div class="turn-fail" data-run-fail hidden>
+                <span class="turn-fail-icon" aria-hidden="true">
+                  <i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">warning</i>
+                </span>
+                <div class="turn-fail-body">
+                  <p class="turn-fail-title">Generation stopped</p>
+                  <p class="turn-fail-text" data-run-fail-text></p>
+                </div>
+                <div class="turn-fail-actions">
+                  <button type="button" class="app-btn is-ghost" data-action="edit-prompt">Edit prompt</button>
+                  <button type="button" class="app-btn is-primary" data-action="retry">Try again</button>
+                </div>
+              </div>
+
             </div>
-            <div class="run-metrics">
-              <span class="run-pct" data-run-pct>5%</span>
-              <span class="run-elapsed" data-run-elapsed>0:00</span>
-            </div>
-          </div>
-
-          {# aria-live sits on a dedicated status line rather than on the whole
-             card, so a screen reader hears the stage change and not the clock. #}
-          <p class="visually-hidden" role="status" aria-live="polite" data-run-live></p>
-
-          <div class="run-bar">
-            <span class="run-bar-fill" data-run-bar style="width: 5%"></span>
-          </div>
-
-          <ol class="run-steps" data-run-steps>
-            {% for key, label, note in [
-              ('starting',     'Warming up',             'Handing your prompt to the writing agent.'),
-              ('content',      'Writing the draft',      'The long one — usually 30 to 60 seconds.'),
-              ('formatting',   'Formatting and styling', 'Headings, table of contents, internal links.'),
-              ('categorizing', 'Assigning a category',   'Matched against the categories you already use.'),
-              ('saving',       'Saving to your library', '')
-            ] %}
-            <li class="run-step" data-step="{{ key }}">
-              <span class="run-step-mark" aria-hidden="true">
-                <i class="bi bi-check2 run-step-tick"></i>
-                <span class="run-step-dot"></span>
-              </span>
-              <span class="run-step-body">
-                <span class="run-step-label">{{ label }}</span>
-                {% if note %}<span class="run-step-note">{{ note }}</span>{% endif %}
-              </span>
-            </li>
-            {% endfor %}
-          </ol>
-
-          <div class="run-prompt">
-            <p class="run-prompt-label">Working from</p>
-            <p class="run-prompt-text" data-run-prompt></p>
-          </div>
-
-          {# Failure lands here rather than only in a toast that has already
-             faded by the time the reader looks back at the screen. #}
-          <div class="run-fail" data-run-fail hidden>
-            <span class="run-fail-icon" aria-hidden="true">
-              <i class="bi bi-exclamation-triangle-fill"></i>
-            </span>
-            <div class="run-fail-body">
-              <p class="run-fail-title">Generation stopped</p>
-              <p class="run-fail-text" data-run-fail-text></p>
-            </div>
-            <div class="run-fail-actions">
-              <button type="button" class="app-btn is-ghost" data-action="edit-prompt">Edit prompt</button>
-              <button type="button" class="app-btn is-primary" data-action="retry">Try again</button>
-            </div>
-          </div>
+          </article>
 
         </div>
       </section>
@@ -283,5 +323,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/create-blog.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/pages/create-blog.js') }}?v=5"></script>
 {% endblock %}

@@ -222,11 +222,11 @@
 
         if (menu) {
             menu.innerHTML = '<button type="button" class="menu-item" role="option" data-value="">' +
-                '<i class="bi bi-check2 menu-check" aria-hidden="true"></i>' +
+                '<i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>' +
                 '<span class="menu-label">' + esc(placeholder) + '</span></button>' +
                 drafts.map((d) => '<button type="button" class="menu-item" role="option" ' +
                     'data-value="' + esc(d.id) + '">' +
-                    '<i class="bi bi-check2 menu-check" aria-hidden="true"></i>' +
+                    '<i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>' +
                     '<span class="menu-label">' +
                     esc(String(d.title || 'Untitled').replace(/\*\*/g, '')) +
                     '</span></button>').join('');

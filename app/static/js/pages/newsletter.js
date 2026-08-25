@@ -213,11 +213,11 @@
         if (!el) return;
         el.classList.remove('is-up', 'is-down');
         if (!text) { el.textContent = ''; return; }
-        const icon = direction === 'up' ? 'arrow-up-right'
-            : direction === 'down' ? 'arrow-down-right' : 'dash';
+        const icon = direction === 'up' ? 'north_east'
+            : direction === 'down' ? 'south_east' : 'remove';
         if (direction === 'up') el.classList.add('is-up');
         if (direction === 'down') el.classList.add('is-down');
-        el.innerHTML = '<i class="bi bi-' + icon + '" aria-hidden="true"></i> ' + esc(text);
+        el.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">' + icon + '</i> ' + esc(text);
     }
 
     function paintSubscriberTile() {
@@ -351,13 +351,13 @@
             paintSubscriberTile();
         } catch (err) {
             console.error('Subscribers failed:', err);
-            box.innerHTML = emptyState('exclamation-circle', 'Could not load subscribers.');
+            box.innerHTML = emptyState('error', 'Could not load subscribers.');
         }
     }
 
     function emptyState(icon, text, extra) {
         return '<div class="list-empty">' +
-            '<span class="list-empty-icon"><i class="bi bi-' + icon + '"></i></span>' +
+            '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">' + icon + '</i></span>' +
             '<p>' + esc(text) + '</p>' + (extra || '') + '</div>';
     }
 
@@ -377,7 +377,7 @@
         if (exportBtn) exportBtn.disabled = rows.length === 0;
 
         if (!state.subscribers.length) {
-            box.innerHTML = emptyState('people',
+            box.innerHTML = emptyState('group',
                 'No subscribers yet. The signup form on your public site feeds this list.');
             return;
         }
@@ -449,7 +449,7 @@
             paintSentTile();
         } catch (err) {
             console.error('History failed:', err);
-            box.innerHTML = emptyState('exclamation-circle', 'Could not load the archive.');
+            box.innerHTML = emptyState('error', 'Could not load the archive.');
         }
     }
 
@@ -471,23 +471,23 @@
             const subject = esc(item.subject || 'No subject');
             const n = parseInt(item.recipient_count, 10) || 0;
             return '<div class="data-row" data-history-row="' + id + '">' +
-                '<span class="row-mark" aria-hidden="true"><i class="bi bi-envelope"></i></span>' +
+                '<span class="row-mark" aria-hidden="true"><i class="material-symbols-outlined icon-inline" aria-hidden="true">mail</i></span>' +
                 '<button type="button" class="row-open" data-view="' + id + '" title="Open ' + subject + '">' +
                 '<span class="row-title">' + subject + '</span>' +
                 '<span class="row-meta"><span>Sent ' + esc(formatDate(item.sent_at)) + '</span></span>' +
                 '</button>' +
-                '<span class="row-recipients"><i class="bi bi-people" aria-hidden="true"></i> ' + n + '</span>' +
+                '<span class="row-recipients"><i class="material-symbols-outlined icon-inline" aria-hidden="true">group</i> ' + n + '</span>' +
                 '<time class="row-time">' + esc(formatDate(item.sent_at)) + '</time>' +
                 '<div class="row-trail">' +
                 '<div class="dropdown">' +
                 '<button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false"' +
-                ' aria-label="More actions for ' + subject + '"><i class="bi bi-three-dots-vertical"></i></button>' +
+                ' aria-label="More actions for ' + subject + '"><i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i></button>' +
                 '<ul class="dropdown-menu dropdown-menu-end">' +
                 '<li><button class="dropdown-item" data-view="' + id + '">' +
-                '<i class="bi bi-eye" style="color: var(--info);"></i> View</button></li>' +
+                '<i class="material-symbols-outlined icon-inline" style="color: var(--info);" aria-hidden="true">visibility</i> View</button></li>' +
                 '<li><hr class="dropdown-divider"></li>' +
                 '<li><button class="dropdown-item text-danger" data-delete="' + id + '">' +
-                '<i class="bi bi-trash3"></i> Delete</button></li>' +
+                '<i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i> Delete</button></li>' +
                 '</ul></div></div></div>';
         }).join('') + '</div>';
     }

@@ -290,6 +290,198 @@ class TestTaskManager:
 
 
 # =========================================================================
+# Live task output (the create screen's reasoning panel and streamed draft)
+# =========================================================================
+
+class TestTaskStream:
+    @pytest.fixture
+    def pool(self):
+        from app.utils.task_manager import TaskManager
+
+        manager = TaskManager(max_workers=2, max_queue_depth=5, retention_seconds=1)
+        yield manager
+        manager.shutdown(wait=False)
+
+    def test_a_poll_receives_only_what_it_has_not_seen(self, pool):
+        """The point of the cursors: a poll every second through a 7 KB draft
+        must not re-send the whole draft each time."""
+        task_id = pool.create_task('u1')
+        pool.add_thought(task_id, 'Angle: cost per lead')
+        pool.append_content(task_id, 'First half. ')
+
+        first = pool.stream_since(task_id)
+        assert [t['text'] for t in first['thoughts']] == ['Angle: cost per lead']
+        assert first['content'] == 'First half. '
+
+        pool.add_thought(task_id, 'Reader: a founder')
+        pool.append_content(task_id, 'Second half.')
+
+        second = pool.stream_since(
+            task_id,
+            since_thought=first['thought_cursor'],
+            since_char=first['char_cursor'],
+        )
+        assert [t['text'] for t in second['thoughts']] == ['Reader: a founder']
+        assert second['content'] == 'Second half.'
+        assert second['total_chars'] == len('First half. Second half.')
+
+    def test_a_late_client_replays_from_the_start(self, pool):
+        """Navigating away and back re-attaches to the run, so cursor 0 has to
+        mean 'everything' rather than 'nothing new'."""
+        task_id = pool.create_task('u1')
+        pool.append_content(task_id, 'abc')
+        pool.append_content(task_id, 'def')
+
+        assert pool.stream_since(task_id)['content'] == 'abcdef'
+
+    def test_a_slice_is_capped_and_resumable(self, pool):
+        task_id = pool.create_task('u1')
+        pool.append_content(task_id, 'x' * 100)
+
+        first = pool.stream_since(task_id, max_chars=40)
+        assert len(first['content']) == 40
+        assert first['char_cursor'] == 40
+
+        rest = pool.stream_since(task_id, since_char=first['char_cursor'], max_chars=1000)
+        assert len(rest['content']) == 60
+        assert rest['char_cursor'] == 100
+
+    def test_a_cursor_past_the_end_does_not_raise(self, pool):
+        """A stale cursor from a previous run is worth one repeated slice, not a
+        500 in the middle of a generation that is otherwise fine."""
+        task_id = pool.create_task('u1')
+        pool.append_content(task_id, 'short')
+
+        out = pool.stream_since(task_id, since_thought=99, since_char=9999)
+        assert out['content'] == ''
+        assert out['thoughts'] == []
+
+    def test_the_buffer_is_bounded(self, pool):
+        """A model that will not stop cannot grow the process without limit."""
+        from app.utils.task_manager import _MAX_STREAM_CHARS
+
+        task_id = pool.create_task('u1')
+        for _ in range(12):
+            pool.append_content(task_id, 'y' * 10_000)
+
+        out = pool.stream_since(task_id, max_chars=_MAX_STREAM_CHARS * 2)
+        assert out['total_chars'] == _MAX_STREAM_CHARS
+        assert out['truncated'] is True
+
+    def test_output_is_dropped_with_the_task(self, pool):
+        """The live output is the larger of the two records; leaving it behind
+        is how a bounded table leaks megabytes."""
+        task_id = pool.create_task('u1')
+        pool.append_content(task_id, 'z' * 500)
+        pool.complete_task(task_id, {})
+
+        time.sleep(1.05)
+        pool.cleanup_expired()
+
+        assert pool.stats()['stream_chars'] == 0
+        assert pool.stream_since(task_id)['total_chars'] == 0
+
+    def test_thoughts_carry_their_kind_and_elapsed_time(self, pool):
+        """The panel separates what the model said about its own approach from
+        what the pipeline observed afterwards."""
+        task_id = pool.create_task('u1')
+        pool.add_thought(task_id, 'Angle: cost per lead', kind='plan')
+        pool.add_thought(task_id, '1043 words, 5 min read')
+
+        kinds = [t['kind'] for t in pool.stream_since(task_id)['thoughts']]
+        assert kinds == ['plan', 'note']
+        assert all(t['at'] >= 0 for t in pool.stream_since(task_id)['thoughts'])
+
+    def test_writes_to_an_unknown_task_are_ignored(self, pool):
+        """A worker whose task was evicted mid-run must not resurrect it."""
+        pool.add_thought('made-up-id', 'hello')
+        assert pool.append_content('made-up-id', 'text') == 0
+        assert pool.stream_since('made-up-id')['total_chars'] == 0
+
+
+# =========================================================================
+# Blog stream splitting (plan vs post)
+# =========================================================================
+
+class TestStreamSplitter:
+    """The plan and the post arrive in one stream, split on a marker the model
+    is asked to emit. Every test here is a shape a model has actually returned,
+    and in all of them the post itself must survive intact -- a tidy reasoning
+    panel is never worth a lost draft."""
+
+    @staticmethod
+    def _run(text, chunk=7):
+        from app.agents.content_agent import StreamSplitter
+
+        thoughts, content = [], []
+        splitter = StreamSplitter(on_thought=thoughts.append,
+                                  on_content=content.append)
+        for i in range(0, len(text), chunk):
+            splitter.feed(text[i:i + chunk])
+        return thoughts, ''.join(content), splitter.close()
+
+    def test_splits_the_plan_from_the_post(self):
+        thoughts, streamed, markdown = self._run(
+            '=== PLAN ===\n'
+            '- Angle: cost per lead, not vanity metrics\n'
+            '- Reader: a founder who already runs ads\n'
+            '=== BLOG ===\n'
+            'The opening line.\n\n## Setup\n\nBody.\n',
+            chunk=5,
+        )
+        assert thoughts == ['Angle: cost per lead, not vanity metrics',
+                            'Reader: a founder who already runs ads']
+        assert markdown.startswith('The opening line.')
+        assert '=== BLOG ===' not in markdown
+        assert 'Angle:' not in markdown
+        # What was streamed to the screen is what was saved.
+        assert streamed.strip() == markdown
+
+    def test_strips_the_code_fence_the_prompt_forbids(self):
+        _, _, markdown = self._run(
+            '=== PLAN ===\n- One note\n=== BLOG ===\n'
+            '```markdown\n## Real heading\n\ntext\n```\n',
+            chunk=3,
+        )
+        assert markdown.startswith('## Real heading')
+        assert '```' not in markdown
+
+    def test_tolerates_a_decorated_marker(self):
+        thoughts, _, markdown = self._run(
+            '**=== PLAN ===**\n1. First note\n2) Second note\n'
+            '**==== BLOG ====**\nBody starts.\n',
+            chunk=4,
+        )
+        assert thoughts == ['First note', 'Second note']
+        assert markdown == 'Body starts.'
+
+    def test_a_response_with_no_markers_is_still_a_whole_post(self):
+        """The failure that matters: if the model ignores the format, the post
+        must arrive complete and nothing may be shown as reasoning."""
+        body = '## A heading\n\n' + ('Sentence about the topic. ' * 40)
+        thoughts, _, markdown = self._run(body, chunk=11)
+
+        assert thoughts == []
+        assert markdown.startswith('## A heading')
+        assert len(markdown) >= len(body) - 2
+
+    def test_a_plan_with_no_header_is_flushed_at_the_blog_marker(self):
+        thoughts, _, markdown = self._run(
+            '- Angle: the boring one works\n- Reader: impatient\n'
+            '=== BLOG ===\nBody.\n',
+            chunk=6,
+        )
+        assert thoughts == ['Angle: the boring one works', 'Reader: impatient']
+        assert markdown == 'Body.'
+
+    def test_the_marker_and_the_first_words_can_share_a_chunk(self):
+        _, _, markdown = self._run(
+            '=== PLAN ===\n- n\n=== BLOG ===\nX', chunk=4096
+        )
+        assert markdown == 'X'
+
+
+# =========================================================================
 # Upload validation
 # =========================================================================
 

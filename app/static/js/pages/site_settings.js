@@ -266,7 +266,7 @@
             } else if (logo && current) {
                 current.src = logo;
             } else if (!logo && current) {
-                mark.innerHTML = '<i class="bi bi-globe2" aria-hidden="true"></i>';
+                mark.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">public</i>';
             }
         }
     }
@@ -536,7 +536,7 @@
                 if (err.name === 'AbortError') return;
                 if (!body) return;
                 body.innerHTML = '<div class="list-empty">' +
-                    '<span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>' +
+                    '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>' +
                     '<p>' + esc(err.message || 'Could not reach the gallery.') + '</p>' +
                     '<button type="button" class="app-btn is-ghost" data-picker-retry>Try again</button></div>';
             });
@@ -548,7 +548,7 @@
 
         if (!state.gallery.length) {
             body.innerHTML = '<div class="list-empty">' +
-                '<span class="list-empty-icon"><i class="bi bi-images" aria-hidden="true"></i></span>' +
+                '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">photo_library</i></span>' +
                 '<p>Your gallery is empty. Upload something on the Gallery page and it will show up here.</p></div>';
             return;
         }
@@ -651,7 +651,7 @@
             .then((data) => {
                 if (!data.success || !data.activities || !data.activities.length) {
                     box.innerHTML = '<div class="list-empty">' +
-                        '<span class="list-empty-icon"><i class="bi bi-inbox" aria-hidden="true"></i></span>' +
+                        '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">inbox</i></span>' +
                         '<p>' + esc(data.error || 'No rows yet. Use the dashboard and entries will appear here.') +
                         '</p></div>';
                     return;
@@ -679,7 +679,7 @@
             .catch((err) => {
                 if (err.name === 'AbortError') return;
                 box.innerHTML = '<div class="list-empty">' +
-                    '<span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>' +
+                    '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>' +
                     '<p>Could not read the sheet. Check the ID above, and that the service account has Editor ' +
                     'access.</p><button type="button" class="app-btn is-ghost" data-sheets-refresh>Try again</button>' +
                     '</div>';

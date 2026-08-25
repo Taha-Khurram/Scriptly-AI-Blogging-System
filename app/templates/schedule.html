@@ -34,11 +34,11 @@
       <div class="cal" data-cal>
         <div class="cal-head">
           <button type="button" class="cal-nav" data-cal-prev aria-label="Previous month">
-            <i class="bi bi-chevron-left" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i>
           </button>
           <span class="cal-title" data-cal-title aria-live="polite"></span>
           <button type="button" class="cal-nav" data-cal-next aria-label="Next month">
-            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i>
           </button>
         </div>
         <div class="cal-dow" aria-hidden="true">
@@ -62,7 +62,7 @@
     {# The summary is the label for what the confirm button is about to do, the
        same job it does in the date-range modal's footer. #}
     <p class="sched-when-summary" data-when-summary>
-      <i class="bi bi-calendar-event" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">event</i>
       <span data-when-text>Pick a day, then a time.</span>
     </p>
 
@@ -93,7 +93,7 @@
       <span class="material-symbols-outlined">dark_mode</span>
     </button>
     <button type="button" class="page-header-action is-primary" data-action="open-add">
-      <i class="bi bi-calendar-plus" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_add_on</i>
       <span class="page-header-label">Schedule a blog</span>
     </button>
     {% endcall %}
@@ -105,7 +105,7 @@
       it identically to a future entry, so a stalled queue was invisible.
     #}
     <div class="sched-alert reveal" data-overdue-alert hidden>
-      <span class="sched-alert-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+      <span class="sched-alert-icon"><i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">warning</i></span>
       <div class="sched-alert-body">
         <p class="sched-alert-title" data-overdue-title>A post is past its publish time</p>
         <p class="sched-alert-text">
@@ -130,7 +130,7 @@
          the next seven days, which is what says whether the pipeline is
          front-loaded or running thin. #}
       <div class="stat-card">
-        <span class="stat-icon stat-queued"><i class="bi bi-calendar-check" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-queued"><i class="material-symbols-outlined icon-inline" aria-hidden="true">event_available</i></span>
         <span class="stat-info">
           <span class="stat-label">Queued</span>
           <span class="stat-count" data-stat-queued>—</span>
@@ -145,7 +145,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-published"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-published"><i class="material-symbols-outlined icon-inline" aria-hidden="true">check_circle</i></span>
         <span class="stat-info">
           <span class="stat-label">Published</span>
           <span class="stat-count" data-stat-published>—</span>
@@ -158,7 +158,7 @@
          instant. The third column collapses to zero rather than carrying a
          contrived picture. #}
       <div class="stat-card sched-next-card">
-        <span class="stat-icon stat-next"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-next"><i class="material-symbols-outlined icon-inline" aria-hidden="true">hourglass_top</i></span>
         <span class="stat-info">
           <span class="stat-label">Next publish</span>
           <span class="stat-count sched-next-value" data-stat-next>—</span>
@@ -188,11 +188,11 @@
       {# Hidden in the Upcoming view, which is not bounded by a range. #}
       <div class="sched-range" data-range-nav>
         <button type="button" class="sched-nav" data-action="prev" aria-label="Previous">
-          <i class="bi bi-chevron-left" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i>
         </button>
         <p class="sched-range-title" data-range-title aria-live="polite">&nbsp;</p>
         <button type="button" class="sched-nav" data-action="next" aria-label="Next">
-          <i class="bi bi-chevron-right" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i>
         </button>
         <button type="button" class="app-btn is-ghost sched-today" data-action="today">Today</button>
       </div>
@@ -221,7 +221,7 @@
 
         <div class="sched-state" data-for="error">
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>
             <p data-error-text>Could not load your schedule.</p>
             <button type="button" class="app-btn is-ghost" data-action="reload">Try again</button>
           </div>
@@ -229,11 +229,11 @@
 
         <div class="sched-state" data-for="empty">
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-calendar3" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_month</i></span>
             <p>Nothing is scheduled yet. Pick a draft and a time, and Scriptly will publish it for you —
               the queue and everything it has already sent show up here.</p>
             <button type="button" class="app-btn is-primary" data-action="open-add">
-              <i class="bi bi-calendar-plus" aria-hidden="true"></i> Schedule a blog
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_add_on</i> Schedule a blog
             </button>
           </div>
         </div>
@@ -245,7 +245,7 @@
           <div class="sched-searchnote" data-search-note hidden>
             <span data-search-text></span>
             <button type="button" class="filter-clear" data-action="clear-search">
-              <i class="bi bi-x-lg" aria-hidden="true"></i> Clear
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i> Clear
             </button>
           </div>
           <div data-view-panel></div>
@@ -261,7 +261,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="addScheduleTitle">Schedule a blog</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 
@@ -296,7 +296,7 @@
 
                 <div class="sched-besttime" data-besttime="add">
                   <p class="sched-besttime-head">
-                    <i class="bi bi-robot" aria-hidden="true"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">smart_toy</i>
                     Publish Time Agent — recommended slots
                   </p>
                   <div class="sched-besttime-list" data-besttime-list>
@@ -327,7 +327,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="rescheduleTitle">Move this post</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 
@@ -345,7 +345,7 @@
 
               <div class="sched-besttime" data-besttime="reschedule">
                 <p class="sched-besttime-head">
-                  <i class="bi bi-robot" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">smart_toy</i>
                   Publish Time Agent — recommended slots
                 </p>
                 <div class="sched-besttime-list" data-besttime-list>
@@ -380,7 +380,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="publishNowTitle">Publish this now?</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">
@@ -408,7 +408,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="cancelScheduleTitle">Take this off the schedule?</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">

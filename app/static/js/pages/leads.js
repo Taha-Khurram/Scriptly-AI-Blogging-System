@@ -148,7 +148,7 @@
     function menuItem(action, icon, text, danger) {
         return '<li><button type="button" class="dropdown-item' + (danger ? ' text-danger' : '') + '" ' +
             'data-action="' + action + '">' +
-            '<i class="bi bi-' + icon + '" aria-hidden="true"></i> ' + text +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">' + icon + '</i> ' + text +
             '</button></li>';
     }
 
@@ -188,14 +188,14 @@
               esc(String(when).slice(0, 10)) + '</time>'
             : '<span class="row-time-blank"></span>';
 
-        const menu = [menuItem('view', 'envelope-open', 'Open message')];
+        const menu = [menuItem('view', 'drafts', 'Open message')];
         if (email) {
             menu.push(menuItem('reply', 'reply', 'Reply by email'));
-            menu.push(menuItem('copy-email', 'envelope', 'Copy email address'));
+            menu.push(menuItem('copy-email', 'mail', 'Copy email address'));
         }
-        if (unread) menu.push(menuItem('mark-read', 'check2-all', 'Mark as read'));
+        if (unread) menu.push(menuItem('mark-read', 'done_all', 'Mark as read'));
         menu.push('<li><hr class="dropdown-divider"></li>');
-        menu.push(menuItem('delete', 'trash3', 'Delete lead', true));
+        menu.push(menuItem('delete', 'delete', 'Delete lead', true));
 
         return '<div class="data-row' + (unread ? ' is-unread' : '') + '" id="lead-row-' + esc(lead.id) + '" ' +
             'data-id="' + esc(lead.id) + '" data-name="' + label + '" data-email="' + esc(email) + '" ' +
@@ -218,12 +218,12 @@
             (email
                 ? '<button type="button" class="row-action" data-action="reply" title="Reply by email" ' +
                   'aria-label="Reply to ' + label + ' by email">' +
-                  '<i class="bi bi-reply" aria-hidden="true"></i></button>'
+                  '<i class="material-symbols-outlined icon-inline" aria-hidden="true">reply</i></button>'
                 : '') +
             '<div class="dropdown">' +
             '<button type="button" class="btn-dropdown-trigger" data-bs-toggle="dropdown" aria-expanded="false" ' +
             'aria-label="More actions for the message from ' + label + '">' +
-            '<i class="bi bi-three-dots-vertical" aria-hidden="true"></i>' +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>' +
             '</button>' +
             '<ul class="dropdown-menu dropdown-menu-end">' + menu.join('') + '</ul>' +
             '</div>' +
@@ -256,14 +256,14 @@
             : esc(EMPTY_COPY[state.filter] || EMPTY_COPY.all);
 
         return '<div class="list-empty">' +
-            '<span class="list-empty-icon"><i class="bi bi-inbox" aria-hidden="true"></i></span>' +
+            '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">inbox</i></span>' +
             '<p>' + copy + '</p>' +
             '</div>';
     }
 
     function errorState(message) {
         return '<div class="list-empty">' +
-            '<span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>' +
+            '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>' +
             '<p>' + esc(message || 'The inbox could not be loaded.') + '</p>' +
             '<button type="button" class="app-btn is-ghost" data-action="retry">Try again</button>' +
             '</div>';

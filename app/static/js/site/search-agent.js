@@ -94,21 +94,21 @@ document.addEventListener('DOMContentLoaded', function() {
         return `
             <div class="search-insights">
                 <button class="insights-toggle" onclick="this.parentElement.classList.toggle('expanded')">
-                    <i class="bi bi-cpu"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">memory</i>
                     <span>Agent Insights</span>
-                    <i class="bi bi-chevron-down toggle-icon"></i>
+                    <i class="material-symbols-outlined icon-inline toggle-icon" aria-hidden="true">expand_more</i>
                 </button>
                 <div class="insights-content">
                     <div class="insights-grid">
                         <div class="insight-card">
-                            <div class="insight-icon"><i class="bi bi-bullseye"></i></div>
+                            <div class="insight-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">target</i></div>
                             <div class="insight-body">
                                 <span class="insight-label">Intent</span>
                                 <span class="insight-value">${escapeHtml(intent.label || 'Unknown')}</span>
                             </div>
                         </div>
                         <div class="insight-card">
-                            <div class="insight-icon"><i class="bi bi-graph-up"></i></div>
+                            <div class="insight-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">trending_up</i></div>
                             <div class="insight-body">
                                 <span class="insight-label">Quality</span>
                                 <span class="insight-value">${escapeHtml(quality.label || 'Unknown')}</span>

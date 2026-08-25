@@ -177,7 +177,7 @@
 
         <!-- Site Identity Card -->
         <div class="app-settings-card animate-fade-up">
-            <h3><i class="bi bi-building"></i> Site Identity</h3>
+            <h3><i class="material-symbols-outlined icon-inline" aria-hidden="true">business</i> Site Identity</h3>
             <p class="text-muted">Configure your application name and branding that appears throughout the platform.</p>
 
             <form id="app-settings-form">
@@ -211,7 +211,7 @@
                                     {% if settings.app_logo %}
                                     <img src="{{ settings.app_logo }}" alt="Logo">
                                     {% else %}
-                                    <i class="bi bi-image"></i>
+                                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">image</i>
                                     {% endif %}
                                 </div>
                                 <div class="flex-grow-1">
@@ -231,7 +231,7 @@
                                     {% if settings.app_favicon %}
                                     <img src="{{ settings.app_favicon }}" alt="Favicon">
                                     {% else %}
-                                    <i class="bi bi-image"></i>
+                                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">image</i>
                                     {% endif %}
                                 </div>
                                 <div class="flex-grow-1">
@@ -251,7 +251,7 @@
                         {% if settings.app_logo %}
                         <img src="{{ settings.app_logo }}" alt="Logo" id="preview-logo-img">
                         {% else %}
-                        <i class="bi bi-robot" id="preview-logo-icon"></i>
+                        <i class="material-symbols-outlined icon-inline" id="preview-logo-icon" aria-hidden="true">smart_toy</i>
                         {% endif %}
                     </div>
                     <div class="preview-name" id="preview-name">{{ settings.app_name }}</div>
@@ -260,7 +260,7 @@
 
                 <div class="d-flex justify-content-end mt-4">
                     <button type="submit" class="btn-save" id="save-btn">
-                        <i class="bi bi-check-lg"></i> Save Changes
+                        <i class="material-symbols-outlined icon-inline" aria-hidden="true">check</i> Save Changes
                     </button>
                 </div>
             </form>
@@ -287,11 +287,11 @@ function updateLogoPreview() {
     const mainPreviewBox = document.getElementById('preview-logo-box');
 
     if (logoUrl) {
-        previewBox.innerHTML = `<img src="${logoUrl}" alt="Logo" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'bi bi-image\\'></i>';">`;
-        mainPreviewBox.innerHTML = `<img src="${logoUrl}" alt="Logo" id="preview-logo-img" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'bi bi-robot\\'></i>';">`;
+        previewBox.innerHTML = `<img src="${logoUrl}" alt="Logo" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'material-symbols-outlined icon-inline\\' aria-hidden=\\'true\\'>image</i>';">`;
+        mainPreviewBox.innerHTML = `<img src="${logoUrl}" alt="Logo" id="preview-logo-img" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'material-symbols-outlined icon-inline\\' aria-hidden=\\'true\\'>smart_toy</i>';">`;
     } else {
-        previewBox.innerHTML = '<i class="bi bi-image"></i>';
-        mainPreviewBox.innerHTML = '<i class="bi bi-robot"></i>';
+        previewBox.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">image</i>';
+        mainPreviewBox.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">smart_toy</i>';
     }
 }
 
@@ -300,9 +300,9 @@ function updateFaviconPreview() {
     const previewBox = document.getElementById('favicon-preview');
 
     if (faviconUrl) {
-        previewBox.innerHTML = `<img src="${faviconUrl}" alt="Favicon" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'bi bi-image\\'></i>';">`;
+        previewBox.innerHTML = `<img src="${faviconUrl}" alt="Favicon" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'material-symbols-outlined icon-inline\\' aria-hidden=\\'true\\'>image</i>';">`;
     } else {
-        previewBox.innerHTML = '<i class="bi bi-image"></i>';
+        previewBox.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">image</i>';
     }
 }
 

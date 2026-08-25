@@ -95,9 +95,9 @@
   <div class="select-pill" data-select-pill>
     <button type="button" class="select-field" data-select-trigger aria-haspopup="listbox" aria-expanded="false"
       aria-labelledby="{{ id }}Label">
-      {% if icon %}<i class="bi {{ icon }}" aria-hidden="true"></i>{% endif %}
+      {% if icon %}<i class="material-symbols-outlined icon-inline" aria-hidden="true">{{ icon }}</i>{% endif %}
       <span class="select-field-value" data-pill-text>{{ current_label[0] if current_label else (options[0][1] if options else '—') }}</span>
-      <i class="bi bi-chevron-down select-field-caret" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline select-field-caret" aria-hidden="true">expand_more</i>
     </button>
     <select id="{{ id }}" name="{{ id }}" aria-labelledby="{{ id }}Label" data-setting>
       {% for value, text in options %}
@@ -108,7 +108,7 @@
       {% for value, text in options %}
       <button type="button" class="menu-item" role="option" data-value="{{ value }}"
         aria-selected="{{ 'true' if value|string == current|string else 'false' }}">
-        <i class="bi bi-check menu-check" aria-hidden="true"></i>
+        <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
         <span class="menu-label">{{ text }}</span>
       </button>
       {% endfor %}
@@ -140,16 +140,16 @@
         <img src="{{ value }}" alt="" data-image-preview>
       </span>
       <span class="set-image-empty" data-image-empty {{ 'hidden' if value }}>
-        <i class="bi bi-image" aria-hidden="true"></i>
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">image</i>
         <span>Choose an image</span>
         <small>From your gallery</small>
       </span>
     </button>
     <span class="set-image-actions" data-image-actions {{ 'hidden' if not value }}>
       <button type="button" class="set-image-btn" data-image-open="{{ key }}" title="Replace image"
-        aria-label="Replace {{ label|lower }}"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button>
+        aria-label="Replace {{ label|lower }}"><i class="material-symbols-outlined icon-inline" aria-hidden="true">autorenew</i></button>
       <button type="button" class="set-image-btn is-danger" data-image-clear="{{ key }}" title="Remove image"
-        aria-label="Remove {{ label|lower }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
+        aria-label="Remove {{ label|lower }}"><i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i></button>
     </span>
   </span>
   {{ field_foot(id, hint, None) }}
@@ -172,7 +172,7 @@
 {% macro nav_item(key, icon, text) %}
 <button type="button" class="set-nav-item{{ ' is-active' if key == 'general' }}" role="tab"
   aria-selected="{{ 'true' if key == 'general' else 'false' }}" aria-controls="panel-{{ key }}" data-section="{{ key }}">
-  <i class="bi {{ icon }}" aria-hidden="true"></i>
+  <i class="material-symbols-outlined icon-inline" aria-hidden="true">{{ icon }}</i>
   <span class="set-nav-text">{{ text }}</span>
   <span class="set-nav-dot" data-section-dot="{{ key }}" hidden></span>
 </button>
@@ -186,7 +186,7 @@
 {% macro panel_head(title, lede='', icon='') %}
 <header class="set-panel-head">
   <h2 class="set-panel-title">
-    {% if icon %}<i class="bi {{ icon }}" aria-hidden="true"></i>{% endif %}
+    {% if icon %}<i class="material-symbols-outlined icon-inline" aria-hidden="true">{{ icon }}</i>{% endif %}
     {{ title }}
   </h2>
   {% if lede %}<p class="set-panel-lede">{{ lede }}</p>{% endif %}
@@ -261,7 +261,7 @@
       <span class="material-symbols-outlined">dark_mode</span>
     </button>
     <a href="{{ site_url }}" target="_blank" rel="noopener" class="page-header-action is-primary">
-      <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">open_in_new</i>
       <span class="page-header-label">Visit your site</span>
     </a>
     {% endcall %}
@@ -271,18 +271,18 @@
     <section class="surface-card set-site reveal" aria-label="Your site">
       <span class="set-site-mark" data-site-mark>
         {% if settings.logo_url %}<img src="{{ settings.logo_url }}" alt="">
-        {% else %}<i class="bi bi-globe2" aria-hidden="true"></i>{% endif %}
+        {% else %}<i class="material-symbols-outlined icon-inline" aria-hidden="true">public</i>{% endif %}
       </span>
       <div class="set-site-body">
         <p class="set-site-name" data-site-name>{{ settings.site_name or 'Untitled site' }}</p>
         <p class="set-site-desc" data-site-desc>{{ settings.site_description or 'No description yet' }}</p>
       </div>
       <div class="set-url">
-        <i class="bi bi-link-45deg" aria-hidden="true"></i>
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">link</i>
         <a href="{{ site_url }}" target="_blank" rel="noopener" data-site-link>{{ request.host }}/site/<span
             data-site-slug>{{ site_id }}</span></a>
         <button type="button" class="set-url-copy" data-copy-url title="Copy site URL" aria-label="Copy site URL">
-          <i class="bi bi-clipboard" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i>
         </button>
       </div>
     </section>
@@ -295,26 +295,26 @@
           aria-label="Settings sections" aria-orientation="vertical">
           <div class="set-nav-group">
             <p class="set-nav-label">Site</p>
-            {{ nav_item('general', 'bi-gear', 'General') }}
-            {{ nav_item('appearance', 'bi-palette', 'Appearance') }}
-            {{ nav_item('content', 'bi-file-text', 'Content') }}
+            {{ nav_item('general', 'settings', 'General') }}
+            {{ nav_item('appearance', 'palette', 'Appearance') }}
+            {{ nav_item('content', 'description', 'Content') }}
           </div>
           <div class="set-nav-group">
             <p class="set-nav-label">Pages</p>
-            {{ nav_item('chrome', 'bi-layout-text-window', 'Header & footer') }}
-            {{ nav_item('heroes', 'bi-card-heading', 'Hero sections') }}
-            {{ nav_item('legal', 'bi-shield-check', 'Legal') }}
+            {{ nav_item('chrome', 'web', 'Header & footer') }}
+            {{ nav_item('heroes', 'title', 'Hero sections') }}
+            {{ nav_item('legal', 'verified_user', 'Legal') }}
           </div>
           <div class="set-nav-group">
             <p class="set-nav-label">Discovery</p>
-            {{ nav_item('seo', 'bi-search', 'SEO') }}
-            {{ nav_item('social', 'bi-share', 'Social') }}
-            {{ nav_item('permalinks', 'bi-link-45deg', 'Permalinks') }}
+            {{ nav_item('seo', 'search', 'SEO') }}
+            {{ nav_item('social', 'share', 'Social') }}
+            {{ nav_item('permalinks', 'link', 'Permalinks') }}
           </div>
           <div class="set-nav-group">
             <p class="set-nav-label">System</p>
-            {{ nav_item('locale', 'bi-globe2', 'Locale & time') }}
-            {{ nav_item('sheets', 'bi-table', 'Google Sheets') }}
+            {{ nav_item('locale', 'public', 'Locale & time') }}
+            {{ nav_item('sheets', 'table', 'Google Sheets') }}
           </div>
         </nav>
 
@@ -322,7 +322,7 @@
 
           <!-- ==================== GENERAL ==================== -->
           <section class="set-panel" id="panel-general" role="tabpanel" data-panel="general" tabindex="0">
-            {{ panel_head('General', 'What your site is called, where it lives, and who can reach it.', icon='bi-gear') }}
+            {{ panel_head('General', 'What your site is called, where it lives, and who can reach it.', icon='settings') }}
 
             <div class="set-grid">
               {{ field('site_name', 'Site name', settings.site_name, 'Appears as your site title and in the browser tab.', placeholder='My Awesome Blog') }}
@@ -336,7 +336,7 @@
                 <input type="text" id="site_slug" name="site_slug" value="{{ settings.site_slug }}" placeholder="my-blog"
                   pattern="[a-z0-9-]+" data-setting>
                 <button type="button" class="set-prefixed-btn" data-slug-generate title="Generate from site name"
-                  aria-label="Generate slug from site name"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+                  aria-label="Generate slug from site name"><i class="material-symbols-outlined icon-inline" aria-hidden="true">refresh</i></button>
               </div>
               <span class="app-field-foot"><span class="app-field-hint">Lowercase letters, numbers and hyphens only,
                   at least 3 characters. Leave blank to fall back to your account ID.</span></span>
@@ -350,14 +350,14 @@
               {{ choose('site_visibility', 'Visibility', [
                    ('public', 'Public — anyone can view'),
                    ('unlisted', 'Unlisted — only with a direct link')
-                 ], settings.site_visibility or 'public', 'Controls who can reach your site.', icon='bi-eye') }}
+                 ], settings.site_visibility or 'public', 'Controls who can reach your site.', icon='visibility') }}
             </div>
 
             <div class="set-group">
               <h3 class="set-group-title">Your content at a glance</h3>
               <div class="set-stats">
                 <div class="stat-card">
-                  <span class="stat-icon stat-live"><i class="bi bi-journal-check" aria-hidden="true"></i></span>
+                  <span class="stat-icon stat-live"><i class="material-symbols-outlined icon-inline" aria-hidden="true">library_add_check</i></span>
                   <span class="stat-info">
                     <span class="stat-label">Published</span>
                     <span class="stat-count" data-stat-published>{{ published_count }}</span>
@@ -365,7 +365,7 @@
                   </span>
                 </div>
                 <div class="stat-card">
-                  <span class="stat-icon stat-cats"><i class="bi bi-folder2" aria-hidden="true"></i></span>
+                  <span class="stat-icon stat-cats"><i class="material-symbols-outlined icon-inline" aria-hidden="true">folder</i></span>
                   <span class="stat-info">
                     <span class="stat-label">Categories</span>
                     <span class="stat-count">{{ categories_count }}</span>
@@ -373,7 +373,7 @@
                   </span>
                 </div>
                 <div class="stat-card">
-                  <span class="stat-icon stat-queue"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
+                  <span class="stat-icon stat-queue"><i class="material-symbols-outlined icon-inline" aria-hidden="true">hourglass_top</i></span>
                   <span class="stat-info">
                     <span class="stat-label">Awaiting review</span>
                     <span class="stat-count" data-stat-pending>{{ pending_count }}</span>
@@ -409,14 +409,14 @@
                     <div class="row-trail">
                       <button type="button" class="set-unpublish" data-unpublish="{{ blog.id }}"
                         data-title="{{ (blog.title or 'Untitled')|replace('**','') }}">
-                        <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Unpublish
+                        <i class="material-symbols-outlined icon-inline" aria-hidden="true">undo</i> Unpublish
                       </button>
                     </div>
                   </div>
                   {% endfor %}
                 </div>
                 <div class="list-empty" data-published-empty {{ 'hidden' if published_blogs }}>
-                  <span class="list-empty-icon"><i class="bi bi-journal-x" aria-hidden="true"></i></span>
+                  <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">folder_off</i></span>
                   <p>Nothing is published yet. Approved posts show up here, and you can pull any of them back.</p>
                 </div>
               </div>
@@ -425,7 +425,7 @@
 
           <!-- ==================== APPEARANCE ==================== -->
           <section class="set-panel" id="panel-appearance" role="tabpanel" data-panel="appearance" tabindex="0" hidden>
-            {{ panel_head('Appearance', 'The marks and colours your public site is built from.', icon='bi-palette') }}
+            {{ panel_head('Appearance', 'The marks and colours your public site is built from.', icon='palette') }}
 
             <div class="set-grid">
               {{ image('logo', 'logo_url', 'Logo', settings.logo_url, 'Square works best — around 200×200.', square=true) }}
@@ -448,14 +448,14 @@
 
           <!-- ==================== CONTENT ==================== -->
           <section class="set-panel" id="panel-content" role="tabpanel" data-panel="content" tabindex="0" hidden>
-            {{ panel_head('Content', 'How posts are listed and what each one shows.', icon='bi-file-text') }}
+            {{ panel_head('Content', 'How posts are listed and what each one shows.', icon='description') }}
 
             <div class="set-grid">
               {{ choose('posts_per_page', 'Posts per page',
                         [(5,'5 posts'),(10,'10 posts'),(15,'15 posts'),(20,'20 posts'),(25,'25 posts'),(30,'30 posts'),(50,'50 posts')],
-                        settings.posts_per_page or 10, 'How many posts the homepage lists at a time.', icon='bi-list-ol') }}
+                        settings.posts_per_page or 10, 'How many posts the homepage lists at a time.', icon='format_list_numbered') }}
               {{ choose('featured_post_id', 'Featured post', post_options,
-                        settings.featured_post_id or '', 'Pinned to the top of your homepage.', icon='bi-star') }}
+                        settings.featured_post_id or '', 'Pinned to the top of your homepage.', icon='star') }}
             </div>
 
             <div class="set-group">
@@ -467,7 +467,7 @@
 
           <!-- ==================== HEADER & FOOTER ==================== -->
           <section class="set-panel" id="panel-chrome" role="tabpanel" data-panel="chrome" tabindex="0" hidden>
-            {{ panel_head('Header & footer', 'The navigation and the strip at the bottom of every page.', icon='bi-layout-text-window') }}
+            {{ panel_head('Header & footer', 'The navigation and the strip at the bottom of every page.', icon='web') }}
 
             <div class="set-group">
               <h3 class="set-group-title">Navigation labels</h3>
@@ -513,16 +513,16 @@
           <!-- ==================== HERO SECTIONS ==================== -->
           <section class="set-panel" id="panel-heroes" role="tabpanel" data-panel="heroes" tabindex="0" hidden>
             {{ panel_head('Hero sections', 'The headline copy on each of your four public pages. Placeholders {site_name} and
-                           {site_description} are filled in for you.', icon='bi-card-heading') }}
+                           {site_description} are filled in for you.', icon='title') }}
 
             {# Real <details> elements, so keyboard support and find-in-page work
                without a global toggleAccordion(id). #}
             <details class="set-disclosure" data-disclosure="hero-home" open>
               <summary>
-                <i class="bi bi-house set-disclosure-icon" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline set-disclosure-icon" aria-hidden="true">home</i>
                 Homepage
                 <span class="set-disclosure-count">12 fields</span>
-                <i class="bi bi-chevron-down set-disclosure-caret" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline set-disclosure-caret" aria-hidden="true">expand_more</i>
               </summary>
               <div class="set-disclosure-body">
                 <div class="set-grid">
@@ -554,10 +554,10 @@
 
             <details class="set-disclosure" data-disclosure="hero-about">
               <summary>
-                <i class="bi bi-person-badge set-disclosure-icon" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline set-disclosure-icon" aria-hidden="true">badge</i>
                 About page
                 <span class="set-disclosure-count">21 fields</span>
-                <i class="bi bi-chevron-down set-disclosure-caret" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline set-disclosure-caret" aria-hidden="true">expand_more</i>
               </summary>
               <div class="set-disclosure-body">
                 <div class="set-grid">
@@ -619,10 +619,10 @@
 
             <details class="set-disclosure" data-disclosure="hero-blog">
               <summary>
-                <i class="bi bi-journals set-disclosure-icon" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline set-disclosure-icon" aria-hidden="true">library_books</i>
                 Blog index
                 <span class="set-disclosure-count">2 fields</span>
-                <i class="bi bi-chevron-down set-disclosure-caret" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline set-disclosure-caret" aria-hidden="true">expand_more</i>
               </summary>
               <div class="set-disclosure-body">
                 <div class="set-grid">
@@ -634,10 +634,10 @@
 
             <details class="set-disclosure" data-disclosure="hero-contact">
               <summary>
-                <i class="bi bi-envelope set-disclosure-icon" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline set-disclosure-icon" aria-hidden="true">mail</i>
                 Contact page
                 <span class="set-disclosure-count">12 fields</span>
-                <i class="bi bi-chevron-down set-disclosure-caret" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline set-disclosure-caret" aria-hidden="true">expand_more</i>
               </summary>
               <div class="set-disclosure-body">
                 <div class="set-grid">
@@ -668,13 +668,13 @@
 
           <!-- ==================== LEGAL ==================== -->
           <section class="set-panel" id="panel-legal" role="tabpanel" data-panel="legal" tabindex="0" hidden>
-            {{ panel_head('Legal', 'Your privacy policy, terms, and the cookie banner.', icon='bi-shield-check') }}
+            {{ panel_head('Legal', 'Your privacy policy, terms, and the cookie banner.', icon='verified_user') }}
 
             {# Everything in this panel used to be discarded on save: the handler
                built no `legal` key, so the API's data.get('legal', {}) always saw
                nothing and the toast said "Settings Saved" regardless. #}
             <div class="set-note">
-              <i class="bi bi-info-circle" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">info</i>
               <div class="set-note-body">
                 <strong>Placeholders</strong> — <code>{site_name}</code>, <code>{contact_email}</code> and
                 <code>{date}</code> are replaced when the page is served, so the policies stay current on their own.
@@ -698,7 +698,7 @@
                       'Markdown. Rendered when the page is served.', rows=14, mono=true) }}
               <a class="set-inline-link" href="{{ url_for('site_bp.site_privacy_policy', site_identifier=site_id) }}"
                 target="_blank" rel="noopener">Open the live page
-                <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">open_in_new</i></a>
             </div>
 
             <div class="set-group">
@@ -711,7 +711,7 @@
                       'Markdown. Rendered when the page is served.', rows=14, mono=true) }}
               <a class="set-inline-link" href="{{ url_for('site_bp.site_terms_of_service', site_identifier=site_id) }}"
                 target="_blank" rel="noopener">Open the live page
-                <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">open_in_new</i></a>
             </div>
 
             <div class="set-group">
@@ -731,7 +731,7 @@
 
           <!-- ==================== SEO ==================== -->
           <section class="set-panel" id="panel-seo" role="tabpanel" data-panel="seo" tabindex="0" hidden>
-            {{ panel_head('SEO', 'How search engines and social platforms see your site.', icon='bi-search') }}
+            {{ panel_head('SEO', 'How search engines and social platforms see your site.', icon='search') }}
 
             {{ toggle('seo_indexing_enabled', 'Allow search engine indexing',
                       'Off asks crawlers to stay away. It is a request, not a lock.',
@@ -741,42 +741,39 @@
               <h3 class="set-group-title">Generated files</h3>
               <div class="set-resources">
                 <div class="set-resource">
-                  <span class="set-resource-icon"><i class="bi bi-diagram-3" aria-hidden="true"></i></span>
+                  <span class="set-resource-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">account_tree</i></span>
                   <div class="set-resource-body">
                     <p class="set-resource-name">Sitemap</p>
                     <p class="set-resource-url">/site/{{ site_id }}/sitemap.xml</p>
                     <p class="set-resource-desc">Every published post and page, regenerated automatically.</p>
                     <a class="set-resource-open" target="_blank" rel="noopener"
-                      href="{{ url_for('site_bp.site_sitemap', site_identifier=site_id) }}">Open <i
-                        class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                      href="{{ url_for('site_bp.site_sitemap', site_identifier=site_id) }}">Open <i class="material-symbols-outlined icon-inline" aria-hidden="true">open_in_new</i></a>
                   </div>
                 </div>
                 <div class="set-resource">
-                  <span class="set-resource-icon"><i class="bi bi-file-text" aria-hidden="true"></i></span>
+                  <span class="set-resource-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i></span>
                   <div class="set-resource-body">
                     <p class="set-resource-name">robots.txt</p>
                     <p class="set-resource-url">/site/{{ site_id }}/robots.txt</p>
                     <p class="set-resource-desc">Crawler instructions, derived from the toggle above unless you
                       override it below.</p>
                     <a class="set-resource-open" target="_blank" rel="noopener"
-                      href="{{ url_for('site_bp.site_robots_txt', site_identifier=site_id) }}">Open <i
-                        class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                      href="{{ url_for('site_bp.site_robots_txt', site_identifier=site_id) }}">Open <i class="material-symbols-outlined icon-inline" aria-hidden="true">open_in_new</i></a>
                   </div>
                 </div>
                 <div class="set-resource is-feed">
-                  <span class="set-resource-icon"><i class="bi bi-rss" aria-hidden="true"></i></span>
+                  <span class="set-resource-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">rss_feed</i></span>
                   <div class="set-resource-body">
                     <p class="set-resource-name">RSS feed</p>
                     <p class="set-resource-url">/site/{{ site_id }}/feed.xml</p>
                     <p class="set-resource-desc">RSS 2.0, for readers and aggregators.</p>
                     <a class="set-resource-open" target="_blank" rel="noopener"
-                      href="{{ url_for('site_bp.site_rss_feed', site_identifier=site_id) }}">Open <i
-                        class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                      href="{{ url_for('site_bp.site_rss_feed', site_identifier=site_id) }}">Open <i class="material-symbols-outlined icon-inline" aria-hidden="true">open_in_new</i></a>
                   </div>
                 </div>
               </div>
               <div class="set-note">
-                <i class="bi bi-lightbulb" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">lightbulb</i>
                 <div class="set-note-body">
                   Submit the sitemap to <a href="https://search.google.com/search-console" target="_blank"
                     rel="noopener">Google Search Console</a> and <a href="https://www.bing.com/webmasters"
@@ -792,11 +789,11 @@
               <div class="set-grid">
                 {{ choose('rss_posts_count', 'Posts in the feed',
                           [(10,'10 posts'),(20,'20 posts'),(30,'30 posts'),(50,'50 posts'),(100,'100 posts')],
-                          rss.posts_count or 20, 'The most recent this many.', icon='bi-list-ol') }}
+                          rss.posts_count or 20, 'The most recent this many.', icon='format_list_numbered') }}
                 {{ choose('rss_content_type', 'How much of each post',
                           [('summary','Summary only'),('full','Full content')],
                           rss.content_type or 'summary',
-                          'Full content is friendlier to readers; a summary brings them to your site.', icon='bi-text-paragraph') }}
+                          'Full content is friendlier to readers; a summary brings them to your site.', icon='subject') }}
               </div>
               {{ toggle('rss_include_image', 'Include cover images',
                         'Adds a media:content tag per item.',
@@ -826,7 +823,7 @@
                 {{ choose('seo_twitter_card', 'X / Twitter card',
                           [('summary_large_image','Large image'),('summary','Summary')],
                           (seo.twitter_card if seo else 'summary_large_image') or 'summary_large_image',
-                          'How a link to your site unfurls.', icon='bi-aspect-ratio') }}
+                          'How a link to your site unfurls.', icon='aspect_ratio') }}
                 {{ field('seo_twitter_site', 'X / Twitter handle', seo.twitter_site if seo else '',
                          placeholder='@yoursite') }}
               </div>
@@ -854,7 +851,7 @@
 
           <!-- ==================== SOCIAL ==================== -->
           <section class="set-panel" id="panel-social" role="tabpanel" data-panel="social" tabindex="0" hidden>
-            {{ panel_head('Social', 'Where else people can find you, and what your About page says.', icon='bi-share') }}
+            {{ panel_head('Social', 'Where else people can find you, and what your About page says.', icon='share') }}
 
             <div class="set-grid is-thirds">
               {{ field('social_twitter', 'X / Twitter', social.twitter if social else '',
@@ -880,7 +877,7 @@
 
           <!-- ==================== PERMALINKS ==================== -->
           <section class="set-panel" id="panel-permalinks" role="tabpanel" data-panel="permalinks" tabindex="0" hidden>
-            {{ panel_head('Permalinks', 'The shape of your post and archive URLs.', icon='bi-link-45deg') }}
+            {{ panel_head('Permalinks', 'The shape of your post and archive URLs.', icon='link') }}
 
             <div class="app-field" data-field>
               <span class="field-label">Post URL structure</span>
@@ -930,7 +927,7 @@
             </div>
 
             <div class="set-note">
-              <i class="bi bi-signpost-split" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">alt_route</i>
               <div class="set-note-body">
                 Old URLs keep working — they 301 to the new shape, so existing links and search rankings survive the
                 change.
@@ -940,20 +937,20 @@
 
           <!-- ==================== LOCALE ==================== -->
           <section class="set-panel" id="panel-locale" role="tabpanel" data-panel="locale" tabindex="0" hidden>
-            {{ panel_head('Locale & time', 'The timezone, language and date shapes your public site uses.', icon='bi-globe2') }}
+            {{ panel_head('Locale & time', 'The timezone, language and date shapes your public site uses.', icon='public') }}
 
             <div class="set-grid">
               {{ choose('timezone', 'Timezone', timezones, settings.timezone or 'UTC',
-                        'Every date on your site is rendered in this zone.', icon='bi-globe-americas') }}
+                        'Every date on your site is rendered in this zone.', icon='public') }}
               {{ choose('locale', 'Language', locales, settings.locale or 'en',
-                        'Also steers the language of AI-generated content.', icon='bi-translate') }}
+                        'Also steers the language of AI-generated content.', icon='translate') }}
             </div>
 
             <div class="set-grid">
               {{ choose('date_format', 'Date format', date_options,
-                        settings.date_format or 'MMM DD, YYYY', icon='bi-calendar3') }}
+                        settings.date_format or 'MMM DD, YYYY', icon='calendar_month') }}
               {{ choose('time_format', 'Time format', time_options,
-                        settings.time_format or '12h', icon='bi-clock') }}
+                        settings.time_format or '12h', icon='schedule') }}
             </div>
 
             <div class="set-group">
@@ -977,7 +974,7 @@
 
           <!-- ==================== GOOGLE SHEETS ==================== -->
           <section class="set-panel" id="panel-sheets" role="tabpanel" data-panel="sheets" tabindex="0" hidden>
-            {{ panel_head('Google Sheets', 'Mirror every dashboard action into a spreadsheet as it happens.', icon='bi-table') }}
+            {{ panel_head('Google Sheets', 'Mirror every dashboard action into a spreadsheet as it happens.', icon='table') }}
 
             <div class="app-field is-wide" data-field>
               <label for="google_sheets_id">Spreadsheet</label>
@@ -992,20 +989,19 @@
               <div>
                 <span class="set-standalone-label">Status</span>
                 {% if settings.google_sheets_id %}
-                <span class="status-pill status-published"><i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                <span class="status-pill status-published"><i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">check_circle</i>
                   Connected</span>
                 {% if settings.activity_tracking_enabled %}
-                <span class="status-pill status-scheduled"><i class="bi bi-record-circle" aria-hidden="true"></i>
+                <span class="status-pill status-scheduled"><i class="material-symbols-outlined icon-inline" aria-hidden="true">fiber_manual_record</i>
                   Recording</span>
                 {% else %}
-                <span class="status-pill status-draft"><i class="bi bi-pause-circle" aria-hidden="true"></i>
+                <span class="status-pill status-draft"><i class="material-symbols-outlined icon-inline" aria-hidden="true">pause_circle</i>
                   Paused</span>
                 {% endif %}
                 <a class="set-resource-open" target="_blank" rel="noopener"
-                  href="https://docs.google.com/spreadsheets/d/{{ settings.google_sheets_id }}/edit">Open the sheet <i
-                    class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                  href="https://docs.google.com/spreadsheets/d/{{ settings.google_sheets_id }}/edit">Open the sheet <i class="material-symbols-outlined icon-inline" aria-hidden="true">open_in_new</i></a>
                 {% else %}
-                <span class="status-pill status-draft"><i class="bi bi-dash-circle" aria-hidden="true"></i>
+                <span class="status-pill status-draft"><i class="material-symbols-outlined icon-inline" aria-hidden="true">remove_circle</i>
                   Not configured</span>
                 {% endif %}
               </div>
@@ -1017,7 +1013,7 @@
                       settings.activity_tracking_enabled) }}
 
             <div class="set-note is-warning">
-              <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">warning</i>
               <div class="set-note-body">
                 <strong>Share the sheet first.</strong> Give this address <strong>Editor</strong> access, or every write
                 fails silently on Google's side.
@@ -1025,7 +1021,7 @@
                   <span data-service-account>{{ service_account_email or 'Service account not configured' }}</span>
                   {% if service_account_email %}
                   <button type="button" data-copy-service title="Copy address" aria-label="Copy service account address">
-                    <i class="bi bi-clipboard" aria-hidden="true"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i>
                   </button>
                   {% endif %}
                 </span>
@@ -1035,7 +1031,7 @@
             <div class="set-group">
               <h3 class="set-group-title">What gets recorded</h3>
               <div class="set-note">
-                <i class="bi bi-list-check" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">checklist</i>
                 <div class="set-note-body">
                   <ul>
                     <li>Page visits across the dashboard</li>
@@ -1055,12 +1051,12 @@
                 <p class="set-panel-lede">Read back from the sheet, so it also proves the connection
                   works.</p>
                 <button type="button" class="app-btn is-ghost" data-sheets-refresh>
-                  <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">refresh</i> Refresh
                 </button>
               </div>
               <div data-sheets-activity>
                 <div class="list-empty">
-                  <span class="list-empty-icon"><i class="bi bi-table" aria-hidden="true"></i></span>
+                  <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">table</i></span>
                   <p>Nothing loaded yet. Refresh to read the last rows back out of your sheet.</p>
                 </div>
               </div>
@@ -1092,7 +1088,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="imagePickerTitle">Choose from your gallery</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body" data-picker-body>
@@ -1104,7 +1100,7 @@
           <footer class="app-modal-foot">
             <p class="app-modal-note">Uploads happen in the Gallery.</p>
             <a href="/gallery" class="app-btn is-ghost">
-              <i class="bi bi-cloud-arrow-up" aria-hidden="true"></i> Open Gallery
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">cloud_upload</i> Open Gallery
             </a>
           </footer>
         </div>
@@ -1118,7 +1114,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="unpublishTitle">Take this off your site?</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">
@@ -1146,7 +1142,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="discardTitle">Leave without saving?</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">

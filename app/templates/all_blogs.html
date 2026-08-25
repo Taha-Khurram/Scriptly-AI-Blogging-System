@@ -29,7 +29,7 @@
       <span class="material-symbols-outlined">dark_mode</span>
     </button>
     <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-primary">
-      <i class="bi bi-stars" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_awesome</i>
       <span class="page-header-label">New blog</span>
     </a>
     {% endcall %}
@@ -57,21 +57,21 @@
         <div class="select-pill" data-select-pill>
           <button type="button" class="filter-pill" data-pill="category" data-select-trigger
             aria-haspopup="listbox" aria-expanded="false" aria-labelledby="categoryFilterLabel">
-            <i class="bi bi-tag" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">label</i>
             <span class="visually-hidden" id="categoryFilterLabel">Filter by category</span>
             <span class="filter-pill-label" aria-hidden="true">Category</span>
             <span class="filter-pill-value" id="categoryFilterValue" aria-hidden="true" hidden></span>
-            <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
           </button>
 
           <div class="menu is-end" role="listbox" aria-labelledby="categoryFilterLabel" hidden>
             <button type="button" class="menu-item" role="option" data-value="all">
-              <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
               <span class="menu-label">All categories</span>
             </button>
             {% for cat in categories %}
             <button type="button" class="menu-item" role="option" data-value="{{ cat.name }}">
-              <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
               <span class="menu-label">{{ cat.name }}</span>
             </button>
             {% endfor %}
@@ -86,13 +86,13 @@
         </div>
 
         <button type="button" class="filter-pill" id="dateFilterBtn" onclick="openDateModal()">
-          <i class="bi bi-calendar3" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_month</i>
           <span id="dateFilterLabel">Date range</span>
-          <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
         </button>
 
         <button type="button" class="filter-clear" id="clearFiltersBtn" onclick="clearAllFilters()" hidden>
-          <i class="bi bi-x-lg" aria-hidden="true"></i> Clear all
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i> Clear all
         </button>
       </div>
     </section>
@@ -142,12 +142,12 @@
             <div class="dropdown">
               <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false"
                 aria-label="More actions for {{ title }}">
-                <i class="bi bi-three-dots-vertical"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>
               </button>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li>
                   <button class="dropdown-item" onclick="openEditModal('{{ blog.id }}')">
-                    <i class="bi bi-pencil-square" style="color: var(--primary-color);"></i> Edit Blog
+                    <i class="material-symbols-outlined icon-inline" style="color: var(--primary-color);" aria-hidden="true">edit_square</i> Edit Blog
                   </button>
                 </li>
                 <li>
@@ -155,7 +155,7 @@
                 </li>
                 <li>
                   <button class="dropdown-item text-danger" onclick="deleteBlog('{{ blog.id }}')">
-                    <i class="bi bi-x-circle"></i> Delete
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">cancel</i> Delete
                   </button>
                 </li>
               </ul>
@@ -165,7 +165,7 @@
         {% endfor %}
         {% else %}
         <div class="list-empty">
-          <span class="list-empty-icon"><i class="bi bi-journals"></i></span>
+          <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">library_books</i></span>
           <p>No blogs found. Try a different status, category or date range.</p>
         </div>
         {% endif %}
@@ -198,7 +198,7 @@
       <header class="date-modal-head">
         <h2 class="date-modal-title" id="dateRangeTitle">Date range</h2>
         <button type="button" class="date-modal-close" data-bs-dismiss="modal" aria-label="Close">
-          <i class="bi bi-x-lg" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
         </button>
       </header>
 
@@ -229,11 +229,11 @@
           <div class="cal" data-calendar>
             <div class="cal-head">
               <button type="button" class="cal-nav" data-cal-prev aria-label="Previous month">
-                <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i>
               </button>
               <span class="cal-title" data-cal-title aria-live="polite"></span>
               <button type="button" class="cal-nav" data-cal-next aria-label="Next month">
-                <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i>
               </button>
             </div>
 
@@ -268,7 +268,7 @@
     <div class="modal-content">
       <div class="custom-modal-header">
         <h5 class="custom-modal-title">
-          <i class="bi bi-pencil-square"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">edit_square</i>
           Edit Blog
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -283,7 +283,7 @@
             <span class="slug-prefix">/post/</span>
             <input type="text" class="slug-input" id="modal-slug" placeholder="auto-generated-from-title">
             <button type="button" class="slug-regenerate-btn" id="regenerate-slug" title="Regenerate from title">
-              <i class="bi bi-arrow-clockwise"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">refresh</i>
             </button>
           </div>
           <small class="slug-hint">Leave blank to auto-generate from title. Changing slug will create a 301 redirect.</small>
@@ -296,15 +296,15 @@
             <img id="coverImageImg" src="" alt="Cover">
             <div class="cover-image-actions">
               <button type="button" class="cover-img-action-btn" onclick="openImagePicker()" title="Change image">
-                <i class="bi bi-arrow-repeat"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">autorenew</i>
               </button>
               <button type="button" class="cover-img-action-btn danger" onclick="removeCoverImage()" title="Remove image">
-                <i class="bi bi-trash"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i>
               </button>
             </div>
           </div>
           <div class="cover-image-placeholder" id="coverImagePlaceholder" onclick="openImagePicker()">
-            <div class="cover-placeholder-icon"><i class="bi bi-image"></i></div>
+            <div class="cover-placeholder-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">image</i></div>
             <div class="cover-placeholder-text">Click to select a feature image</div>
             <div class="cover-placeholder-hint">Choose from your gallery</div>
           </div>
@@ -313,8 +313,8 @@
         <!-- SEO Settings -->
         <div class="seo-settings-section">
           <button type="button" class="seo-toggle-btn" id="seo-toggle-btn">
-            <i class="bi bi-search"></i> SEO Settings
-            <i class="bi bi-chevron-down seo-chevron"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i> SEO Settings
+            <i class="material-symbols-outlined icon-inline seo-chevron" aria-hidden="true">expand_more</i>
           </button>
           <div class="seo-fields" id="seo-fields" style="display: none;">
             <div class="seo-field">
@@ -334,10 +334,10 @@
       </div>
       <div class="custom-modal-footer">
         <button type="button" class="btn-modal btn-secondary" onclick="copyBlogContent()">
-          <i class="bi bi-clipboard"></i> Copy
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i> Copy
         </button>
         <button type="button" class="btn-modal btn-primary-custom" id="save-changes-btn" onclick="saveModalChanges()">
-          <i class="bi bi-check-lg"></i> Save Changes
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">check</i> Save Changes
         </button>
       </div>
     </div>
@@ -348,8 +348,8 @@
 <div class="image-picker-overlay" id="imagePickerOverlay" onclick="closeImagePicker(event)">
   <div class="image-picker-modal" onclick="event.stopPropagation()">
     <div class="image-picker-header">
-      <h4 class="image-picker-title"><i class="bi bi-images"></i> Choose from Gallery</h4>
-      <button class="image-picker-close" onclick="closeImagePicker()"><i class="bi bi-x-lg"></i></button>
+      <h4 class="image-picker-title"><i class="material-symbols-outlined icon-inline" aria-hidden="true">photo_library</i> Choose from Gallery</h4>
+      <button class="image-picker-close" onclick="closeImagePicker()"><i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i></button>
     </div>
     <div class="image-picker-body">
       <div class="image-picker-grid" id="imagePickerGrid">
@@ -360,7 +360,7 @@
       </div>
     </div>
     <div class="image-picker-footer">
-      <a href="/gallery" class="image-picker-upload-link"><i class="bi bi-cloud-arrow-up"></i> Upload new images in Gallery</a>
+      <a href="/gallery" class="image-picker-upload-link"><i class="material-symbols-outlined icon-inline" aria-hidden="true">cloud_upload</i> Upload new images in Gallery</a>
     </div>
   </div>
 </div>

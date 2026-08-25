@@ -1,0 +1,100 @@
+/* ==========================================================================
+   ICONS — Material Symbols (self-hosted) + brand marks
+
+   Shared by the dashboard (base.html) and the public site (site_base.html).
+   It used to live at the top of dashboard.css, but the public site never
+   loads that file, so the site had no @font-face at all once its icons
+   stopped coming from a CDN.
+
+   Served from our own /static rather than fonts.gstatic.com. These are
+   ligatures, so a font that fails to arrive does not degrade to blank --
+   every icon renders as its own name ("edit_square") in the UI. And because
+   dashboard navigation is PJAX, nothing reloads, so one failed CDN request
+   stayed broken until a hard refresh. Serving it ourselves removes that
+   failure mode.
+
+   Subset to the glyphs the app actually uses. Adding an icon to a template
+   means regenerating the font:
+       python scripts/update_icon_font.py
+   See docs/DESIGN_SYSTEM.md section 3.
+   ========================================================================== */
+
+@font-face {
+    font-family: 'Material Symbols Outlined';
+    font-style: normal;
+    font-weight: 300;
+    font-display: block;
+    src: url('../fonts/material-symbols-outlined.woff2') format('woff2');
+}
+
+/* The variable axes are driven through custom properties rather than written
+   into each rule. font-variation-settings is a single declaration, so a rule
+   that wanted to change only FILL would otherwise have to restate wght, GRAD
+   and opsz too -- and silently reset them when it forgot. With properties, a
+   modifier sets the one axis it cares about and inherits the rest. */
+.material-symbols-outlined {
+    --icon-fill: 0;
+    --icon-wght: 300;
+    --icon-opsz: 24;
+
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-variation-settings:
+        'FILL' var(--icon-fill),
+        'wght' var(--icon-wght),
+        'GRAD' 0,
+        'opsz' var(--icon-opsz);
+    font-size: 22px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    /* 'liga' is what turns the ligature name ("edit_square") into the glyph,
+       so it is not optional. */
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+}
+
+/* Inline icon: sized by the text it sits in.
+
+   The base class pins 22px because it was written for nav chrome, where the
+   glyph is the whole control. Icons inside buttons, badges, table cells and
+   sentences have to track their own line instead -- which is what the
+   Bootstrap Icons these replaced did, since `.bi` never set a font-size.
+   Kept to one class so an existing element-scoped override (`.foo i
+   { font-size: … }`) still outranks it. */
+.icon-inline {
+    font-size: 1.15em;
+    vertical-align: -0.15em;
+    /* A touch heavier and optically smaller than the rail's 300/24: at text
+       size, 300 reads thin next to the surrounding characters. */
+    --icon-wght: 400;
+    --icon-opsz: 20;
+}
+
+/* The filled cut of the same glyph -- what the `-fill` suffix meant in
+   Bootstrap Icons. One axis, so it composes with any size modifier. */
+.icon-fill {
+    --icon-fill: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Brand marks
+
+   Material Symbols carries no company logos, so the four social marks are
+   inline SVG (see partials/brand_icon.html). Sized and coloured like an
+   inline glyph so they sit in the same rows as one.
+   -------------------------------------------------------------------------- */
+.brand-icon {
+    width: 1.15em;
+    height: 1.15em;
+    vertical-align: -0.15em;
+    display: inline-block;
+    fill: currentColor;
+    flex-shrink: 0;
+}

@@ -35,7 +35,7 @@
     {# The API for this has existed all along; the button was commented out. #}
     <button type="button" class="page-header-action is-primary" data-bs-toggle="modal"
       data-bs-target="#addCategoryModal">
-      <i class="bi bi-plus-lg" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">add</i>
       <span class="page-header-label">New category</span>
     </button>
     {% endcall %}
@@ -71,23 +71,23 @@
             <div class="row-trail">
               <button type="button" class="row-action" onclick="viewCategoryBlogs('{{ cat.id }}', '{{ name }}')"
                 aria-label="View blogs in {{ name }}" title="View blogs">
-                <i class="bi bi-journal-text" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">menu_book</i>
               </button>
 
               <div class="dropdown">
                 <button class="btn-dropdown-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false"
                   aria-label="More actions for {{ name }}">
-                  <i class="bi bi-three-dots-vertical"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                   <li>
                     <button class="dropdown-item" onclick="viewCategoryBlogs('{{ cat.id }}', '{{ name }}')">
-                      <i class="bi bi-journal-text" style="color: var(--info);"></i> View Blogs
+                      <i class="material-symbols-outlined icon-inline" style="color: var(--info);" aria-hidden="true">menu_book</i> View Blogs
                     </button>
                   </li>
                   <li>
                     <button class="dropdown-item" onclick="openEditModal('{{ cat.id }}', '{{ name }}')">
-                      <i class="bi bi-pencil-square" style="color: var(--primary-color);"></i> Rename
+                      <i class="material-symbols-outlined icon-inline" style="color: var(--primary-color);" aria-hidden="true">edit_square</i> Rename
                     </button>
                   </li>
                   <li>
@@ -95,7 +95,7 @@
                   </li>
                   <li>
                     <button class="dropdown-item text-danger" onclick="deleteCategory('{{ cat.id }}')">
-                      <i class="bi bi-trash3"></i> Delete
+                      <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i> Delete
                     </button>
                   </li>
                 </ul>
@@ -108,7 +108,7 @@
         <p class="list-noresults" data-noresults hidden>No categories match that search.</p>
         {% else %}
         <div class="list-empty">
-          <span class="list-empty-icon"><i class="bi bi-tags"></i></span>
+          <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">label</i></span>
           <p>No categories yet. They group your posts on the site and in every listing filter.</p>
           <button type="button" class="app-btn is-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
             Create your first category
@@ -125,7 +125,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="addCategoryTitle">New category</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <form id="addCategoryForm" class="ajax-form">
@@ -153,7 +153,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="editCategoryTitle">Rename category</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <form id="editCategoryForm" class="ajax-form">
@@ -182,7 +182,7 @@
               Blogs in “<span id="viewBlogsCategoryName"></span>”
             </h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 
@@ -193,7 +193,7 @@
             </div>
 
             <div id="blogsListEmpty" class="list-empty d-none">
-              <span class="list-empty-icon"><i class="bi bi-journal-x"></i></span>
+              <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">folder_off</i></span>
               <p>Nothing filed under this category yet.</p>
             </div>
 

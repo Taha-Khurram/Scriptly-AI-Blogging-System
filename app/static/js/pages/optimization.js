@@ -300,11 +300,11 @@
 
         if (menu) {
             menu.innerHTML = '<button type="button" class="menu-item" role="option" data-value="">' +
-                '<i class="bi bi-check2 menu-check" aria-hidden="true"></i>' +
+                '<i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>' +
                 '<span class="menu-label">' + esc(placeholder) + '</span></button>' +
                 drafts.map((d) => '<button type="button" class="menu-item" role="option" ' +
                     'data-value="' + esc(d.id) + '">' +
-                    '<i class="bi bi-check2 menu-check" aria-hidden="true"></i>' +
+                    '<i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>' +
                     '<span class="menu-label">' + esc(d.title || 'Untitled') + '</span></button>').join('');
         }
 
@@ -590,10 +590,10 @@
                 '</span>' +
                 '<button type="button" class="opt-row-btn" data-action="report-export" data-id="' + id + '" ' +
                 'aria-label="' + esc('Export the report for ' + title) + '" title="Export report">' +
-                '<i class="bi bi-download" aria-hidden="true"></i></button>' +
+                '<i class="material-symbols-outlined icon-inline" aria-hidden="true">download</i></button>' +
                 '<button type="button" class="opt-row-btn is-danger" data-action="report-delete" data-id="' + id + '" ' +
                 'aria-label="' + esc('Delete the report for ' + title) + '" title="Delete report">' +
-                '<i class="bi bi-trash3" aria-hidden="true"></i></button>' +
+                '<i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i></button>' +
                 '</div>' +
                 '</div>';
         }).join('');
@@ -749,7 +749,7 @@
             const source = $('[data-kw-source]');
             const countryName = country && country.options[country.selectedIndex]
                 ? country.options[country.selectedIndex].textContent : '';
-            source.innerHTML = '<i class="bi bi-file-earmark-text" aria-hidden="true"></i> ' +
+            source.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i> ' +
                 'Keywords found in <strong>' + esc(data.blog_title || 'this draft') + '</strong>' +
                 (countryName ? ', measured for ' + esc(countryName) : '');
 
@@ -826,7 +826,7 @@
             const result = await requestJson('/api/optimization/url-metrics?url=' + encodeURIComponent(url));
             const data = result.data || {};
 
-            $('[data-url-source]').innerHTML = '<i class="bi bi-link-45deg" aria-hidden="true"></i> ' +
+            $('[data-url-source]').innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">link</i> ' +
                 'Metrics for <strong>' + esc(url) + '</strong>' +
                 (result.cached ? ' <span class="opt-raw-count">(cached)</span>' : '');
 
@@ -947,7 +947,7 @@
             const result = await requestJson('/api/optimization/site-audit?domain=' + encodeURIComponent(domain));
             const data = result.data;
 
-            $('[data-domain-source]').innerHTML = '<i class="bi bi-globe2" aria-hidden="true"></i> ' +
+            $('[data-domain-source]').innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">public</i> ' +
                 'Keywords <strong>' + esc(domain) + '</strong> ranks for' +
                 (result.cached ? ' <span class="opt-raw-count">(cached)</span>' : '');
 

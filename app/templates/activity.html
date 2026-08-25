@@ -22,8 +22,8 @@
 'settings': 'Settings', 'newsletter': 'Newsletter', 'category': 'Category'
 } %}
 {% set TYPE_ICON = {
-'blog': 'file-post', 'user': 'person', 'comment': 'chat-dots',
-'settings': 'gear', 'newsletter': 'envelope', 'category': 'tags'
+'blog': 'article', 'user': 'person', 'comment': 'chat_bubble',
+'settings': 'settings', 'newsletter': 'mail', 'category': 'label'
 } %}
 {% set BLOG_TYPES = ['blog', 'generated', 'edited', 'published', 'deleted', 'status_change', 'seo_optimized'] %}
 
@@ -59,7 +59,7 @@
   </span>
 
   <span class="type-pill type-{{ kind }}">
-    <i class="bi bi-{{ TYPE_ICON.get(kind, 'activity') }}" aria-hidden="true"></i>
+    <i class="material-symbols-outlined icon-inline" aria-hidden="true">{{ TYPE_ICON.get(kind, 'monitoring') }}</i>
     {{ TYPE_LABEL.get(kind, 'Other') }}
   </span>
 
@@ -114,7 +114,7 @@
     #}
     <div class="activity-stats reveal">
       <div class="stat-card">
-        <span class="stat-icon stat-all"><i class="bi bi-activity" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-all"><i class="material-symbols-outlined icon-inline" aria-hidden="true">monitoring</i></span>
         <span class="stat-info">
           <span class="stat-label">Recorded</span>
           <span class="stat-count" data-stat-total>{{ total }}</span>
@@ -122,7 +122,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-content"><i class="bi bi-file-post" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-content"><i class="material-symbols-outlined icon-inline" aria-hidden="true">article</i></span>
         <span class="stat-info">
           <span class="stat-label">Content</span>
           <span class="stat-count" data-stat-blog>{{ blog }}</span>
@@ -136,7 +136,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-people"><i class="bi bi-person" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-people"><i class="material-symbols-outlined icon-inline" aria-hidden="true">person</i></span>
         <span class="stat-info">
           <span class="stat-label">People</span>
           <span class="stat-count" data-stat-user>{{ people }}</span>
@@ -150,7 +150,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-rest"><i class="bi bi-sliders" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-rest"><i class="material-symbols-outlined icon-inline" aria-hidden="true">tune</i></span>
         <span class="stat-info">
           <span class="stat-label">Everything else</span>
           <span class="stat-count" data-stat-rest>{{ rest }}</span>
@@ -175,22 +175,22 @@
       <div class="seg-tabs" role="group" aria-label="Filter by what changed">
         <button type="button" class="seg-tab is-active" data-filter="all">All</button>
         <button type="button" class="seg-tab" data-filter="blog">
-          <i class="bi bi-file-post" aria-hidden="true"></i> Content
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">article</i> Content
         </button>
         <button type="button" class="seg-tab" data-filter="user">
-          <i class="bi bi-person" aria-hidden="true"></i> People
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">person</i> People
         </button>
         <button type="button" class="seg-tab" data-filter="comment">
-          <i class="bi bi-chat-dots" aria-hidden="true"></i> Comments
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">chat_bubble</i> Comments
         </button>
         <button type="button" class="seg-tab" data-filter="settings">
-          <i class="bi bi-gear" aria-hidden="true"></i> Settings
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">settings</i> Settings
         </button>
         <button type="button" class="seg-tab" data-filter="newsletter">
-          <i class="bi bi-envelope" aria-hidden="true"></i> Newsletter
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">mail</i> Newsletter
         </button>
         <button type="button" class="seg-tab" data-filter="category">
-          <i class="bi bi-tags" aria-hidden="true"></i> Categories
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">label</i> Categories
         </button>
       </div>
 
@@ -202,21 +202,21 @@
         <div class="select-pill" data-select-pill>
           <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
             aria-expanded="false" aria-labelledby="userFilterLabel">
-            <i class="bi bi-person" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">person</i>
             <span class="visually-hidden" id="userFilterLabel">Filter by person</span>
             <span class="filter-pill-label" aria-hidden="true">Anyone</span>
             <span class="filter-pill-value" data-user-value aria-hidden="true" hidden></span>
-            <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
           </button>
 
           <div class="menu is-end" role="listbox" aria-labelledby="userFilterLabel" hidden>
             <button type="button" class="menu-item" role="option" data-value="all">
-              <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
               <span class="menu-label">Anyone</span>
             </button>
             {% for user in initial_users %}
             <button type="button" class="menu-item" role="option" data-value="{{ user.uid }}">
-              <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
               <span class="menu-label">{{ user.name }}</span>
             </button>
             {% endfor %}
@@ -231,13 +231,13 @@
         </div>
 
         <button type="button" class="filter-pill" data-date-open>
-          <i class="bi bi-calendar3" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_month</i>
           <span data-date-label>Any time</span>
-          <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
         </button>
 
         <button type="button" class="filter-clear" data-clear-filters hidden>
-          <i class="bi bi-x-lg" aria-hidden="true"></i> Clear all
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i> Clear all
         </button>
       </div>
     </section>
@@ -260,7 +260,7 @@
           {% for entry in initial_activities %}{{ activity_row(entry) }}{% endfor %}
           {% else %}
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">history</i></span>
             <p>Nothing recorded yet. Every publish, invitation and settings change your team
               makes is written down here.</p>
           </div>
@@ -290,7 +290,7 @@
           <header class="date-modal-head">
             <h2 class="date-modal-title" id="dateRangeTitle">Date range</h2>
             <button type="button" class="date-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 
@@ -308,11 +308,11 @@
               <div class="cal" data-calendar>
                 <div class="cal-head">
                   <button type="button" class="cal-nav" data-cal-prev aria-label="Previous month">
-                    <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i>
                   </button>
                   <span class="cal-title" data-cal-title aria-live="polite"></span>
                   <button type="button" class="cal-nav" data-cal-next aria-label="Next month">
-                    <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                    <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i>
                   </button>
                 </div>
 

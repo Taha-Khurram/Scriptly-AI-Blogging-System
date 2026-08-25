@@ -32,11 +32,11 @@ async function handleNewsletterSubmit(form, subscribeUrl) {
     const button = form.querySelector('button');
     const originalHTML = button.innerHTML;
     const originalText = button.textContent;
-    const isIconButton = button.innerHTML.includes('<i');
+    const isIconButton = button.innerHTML.includes('<i class="material-symbols-outlined icon-inline" ');
 
     // Show loading state
     if (isIconButton) {
-        button.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        button.innerHTML = '<i aria-hidden="true">hourglass_top</i>';
     } else {
         button.textContent = 'Subscribing...';
     }
@@ -74,7 +74,7 @@ async function handleNewsletterSubmit(form, subscribeUrl) {
 
 function showErrorState(button, isIconButton, originalHTML, originalText) {
     if (isIconButton) {
-        button.innerHTML = '<i class="bi bi-x-lg"></i>';
+        button.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>';
     } else {
         button.textContent = 'Failed';
     }

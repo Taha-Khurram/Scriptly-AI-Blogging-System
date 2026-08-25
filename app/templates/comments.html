@@ -51,7 +51,7 @@
 
   {% if ai_label %}
   <span class="ai-pill is-{{ ai }}">
-    <i class="bi bi-robot" aria-hidden="true"></i> {{ ai_label }}
+    <i class="material-symbols-outlined icon-inline" aria-hidden="true">smart_toy</i> {{ ai_label }}
   </span>
   {% else %}
   {# Holds the track open so the two pill columns line up down the page. It
@@ -67,41 +67,41 @@
     {% if st == 'removed' %}
     <button type="button" class="row-action" data-action="restore" title="Put back on the site"
       aria-label="Put the comment from {{ name }} back on the site">
-      <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">undo</i>
     </button>
     {% else %}
     <button type="button" class="row-action" data-action="remove" title="Take off the site"
       aria-label="Take the comment from {{ name }} off the site">
-      <i class="bi bi-eye-slash" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">visibility_off</i>
     </button>
     {% endif %}
 
     <div class="dropdown">
       <button type="button" class="btn-dropdown-trigger" data-bs-toggle="dropdown" aria-expanded="false"
         aria-label="More actions for the comment from {{ name }}">
-        <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>
       </button>
       <ul class="dropdown-menu dropdown-menu-end">
         <li><button type="button" class="dropdown-item" data-action="view">
-            <i class="bi bi-eye" aria-hidden="true"></i> Open comment
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">visibility</i> Open comment
           </button></li>
         {% if st == 'removed' %}
         <li><button type="button" class="dropdown-item" data-action="restore">
-            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Put back on the site
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">undo</i> Put back on the site
           </button></li>
         {% else %}
         <li><button type="button" class="dropdown-item" data-action="remove">
-            <i class="bi bi-eye-slash" aria-hidden="true"></i> Take off the site
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">visibility_off</i> Take off the site
           </button></li>
         {% endif %}
         <li><button type="button" class="dropdown-item" data-action="copy-email">
-            <i class="bi bi-envelope" aria-hidden="true"></i> Copy email address
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">mail</i> Copy email address
           </button></li>
         <li>
           <hr class="dropdown-divider">
         </li>
         <li><button type="button" class="dropdown-item text-danger" data-action="delete">
-            <i class="bi bi-trash3" aria-hidden="true"></i> Delete permanently
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i> Delete permanently
           </button></li>
       </ul>
     </div>
@@ -151,7 +151,7 @@
     #}
     <div class="comments-stats reveal">
       <div class="stat-card">
-        <span class="stat-icon stat-all"><i class="bi bi-chat-square-text" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-all"><i class="material-symbols-outlined icon-inline" aria-hidden="true">forum</i></span>
         <span class="stat-info">
           <span class="stat-label">{{ 'Comment' if total == 1 else 'Comments' }}</span>
           <span class="stat-count" data-stat-total>{{ total }}</span>
@@ -159,7 +159,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-live"><i class="bi bi-eye" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-live"><i class="material-symbols-outlined icon-inline" aria-hidden="true">visibility</i></span>
         <span class="stat-info">
           <span class="stat-label">Visible</span>
           <span class="stat-count" data-stat-live>{{ live }}</span>
@@ -178,7 +178,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-hidden"><i class="bi bi-shield-x" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-hidden"><i class="material-symbols-outlined icon-inline" aria-hidden="true">gpp_bad</i></span>
         <span class="stat-info">
           <span class="stat-label">Removed</span>
           <span class="stat-count" data-stat-hidden>{{ hidden }}</span>
@@ -230,7 +230,7 @@
           {% for c in initial_comments %}{{ comment_row(c) }}{% endfor %}
           {% else %}
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-chat-square-text" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">forum</i></span>
             <p>No comments yet. When a reader writes one on a published post it lands here, already
               checked by the moderation filter, for you to keep or take down.</p>
           </div>
@@ -261,20 +261,20 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="commentModalTitle">Comment</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 
           <div class="comment-tabbar">
             <div class="seg-tabs" role="tablist" aria-label="Comment sections">
               <button type="button" class="seg-tab is-active" role="tab" aria-selected="true" data-tab="details">
-                <i class="bi bi-chat-left-text" aria-hidden="true"></i> The comment
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">chat</i> The comment
               </button>
               <button type="button" class="seg-tab" role="tab" aria-selected="false" data-tab="log">
-                <i class="bi bi-clock-history" aria-hidden="true"></i> History
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">history</i> History
               </button>
               <button type="button" class="seg-tab" role="tab" aria-selected="false" data-tab="edit">
-                <i class="bi bi-pencil" aria-hidden="true"></i> Edit
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">edit</i> Edit
               </button>
             </div>
           </div>
@@ -293,15 +293,15 @@
 
               <div class="comment-facts">
                 <span class="comment-fact">
-                  <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i>
                   <span data-modal-post></span>
                 </span>
                 <span class="comment-fact">
-                  <i class="bi bi-calendar3" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_month</i>
                   <span data-modal-when></span>
                 </span>
                 <span class="comment-fact" data-modal-verdict-chip hidden>
-                  <i class="bi bi-robot" aria-hidden="true"></i>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">smart_toy</i>
                   <span data-modal-verdict></span>
                 </span>
               </div>
@@ -368,7 +368,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="deleteCommentTitle">Delete comment</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 

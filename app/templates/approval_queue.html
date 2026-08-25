@@ -47,7 +47,7 @@
 
   {% if requested %}
   <span class="status-pill status-requested">
-    <i class="bi bi-calendar-event" aria-hidden="true"></i>
+    <i class="material-symbols-outlined icon-inline" aria-hidden="true">event</i>
     <time datetime="{{ requested }}" data-day>{{ requested[:10] }}</time>
   </span>
   {% else %}
@@ -65,29 +65,29 @@
        Everything it does is also in the menu beside it. #}
     <button type="button" class="row-action is-publish" data-action="publish" title="Publish {{ title }} now"
       aria-label="Publish {{ title }} now">
-      <i class="bi bi-check2-circle" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">check_circle</i>
     </button>
 
     <div class="dropdown">
       <button type="button" class="btn-dropdown-trigger" data-bs-toggle="dropdown" aria-expanded="false"
         aria-label="More actions for {{ title }}">
-        <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">more_vert</i>
       </button>
       <ul class="dropdown-menu dropdown-menu-end">
         <li><button type="button" class="dropdown-item" data-action="preview">
-            <i class="bi bi-eye" aria-hidden="true"></i> Read it first
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">visibility</i> Read it first
           </button></li>
         <li><button type="button" class="dropdown-item" data-action="publish">
-            <i class="bi bi-check2-circle" aria-hidden="true"></i> Publish now
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">check_circle</i> Publish now
           </button></li>
         <li><button type="button" class="dropdown-item" data-action="schedule">
-            <i class="bi bi-calendar-event" aria-hidden="true"></i> Schedule…
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">event</i> Schedule…
           </button></li>
         <li>
           <hr class="dropdown-divider">
         </li>
         <li><button type="button" class="dropdown-item text-danger" data-action="reject">
-            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Send back to drafts
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">undo</i> Send back to drafts
           </button></li>
       </ul>
     </div>
@@ -129,7 +129,7 @@
 
     <div class="approval-stats reveal">
       <div class="stat-card">
-        <span class="stat-icon stat-waiting"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-waiting"><i class="material-symbols-outlined icon-inline" aria-hidden="true">hourglass_top</i></span>
         <span class="stat-info">
           <span class="stat-label">{{ 'Submission' if total == 1 else 'Submissions' }}</span>
           <span class="stat-count" data-stat-total>{{ total }}</span>
@@ -137,7 +137,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-requested"><i class="bi bi-calendar-event" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-requested"><i class="material-symbols-outlined icon-inline" aria-hidden="true">event</i></span>
         <span class="stat-info">
           <span class="stat-label">Asked for a date</span>
           <span class="stat-count" data-stat-requested>{{ requested }}</span>
@@ -159,7 +159,7 @@
          because it is long, it is a problem because something has been sitting
          in it. Filled by approval.js from data-since. #}
       <div class="stat-card">
-        <span class="stat-icon stat-oldest"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-oldest"><i class="material-symbols-outlined icon-inline" aria-hidden="true">history</i></span>
         <span class="stat-info">
           <span class="stat-label">Waiting longest</span>
           <span class="stat-count is-text" data-stat-waiting data-since="{{ waiting_since }}">—</span>
@@ -180,7 +180,7 @@
         <div id="approvalList" class="data-rows">
           {% for blog in pending_blogs %}{{ queue_row(blog) }}{% else %}
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-check2-all" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">done_all</i></span>
             <p>Nothing is waiting on you. Posts your writers submit for review arrive here.</p>
           </div>
           {% endfor %}
@@ -207,30 +207,30 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="previewTitle" data-preview-title>Preview</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 
           <div class="app-modal-body">
             <div class="preview-facts">
               <span class="preview-fact">
-                <i class="bi bi-person" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">person</i>
                 <span data-preview-author>—</span>
               </span>
               <span class="preview-fact">
-                <i class="bi bi-folder2" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">folder</i>
                 <span data-preview-category>—</span>
               </span>
               <span class="preview-fact">
-                <i class="bi bi-stopwatch" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">timer</i>
                 <span data-preview-reading>—</span>
               </span>
               <span class="preview-fact">
-                <i class="bi bi-body-text" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">notes</i>
                 <span data-preview-words>—</span>
               </span>
               <span class="preview-fact">
-                <i class="bi bi-clock-history" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">history</i>
                 <span data-preview-submitted>—</span>
               </span>
             </div>
@@ -240,7 +240,7 @@
                one instead of as another meta chip — and it can be granted from
                here in a single click. #}
             <p class="preview-request" data-preview-request hidden>
-              <i class="bi bi-calendar-event" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">event</i>
               <span>The writer asked for <strong data-preview-request-when></strong>.</span>
               <button type="button" class="preview-request-btn" data-action="schedule-requested">
                 Schedule for then
@@ -248,7 +248,7 @@
             </p>
 
             <details class="preview-toc" data-preview-toc hidden>
-              <summary><i class="bi bi-list-ul" aria-hidden="true"></i> Table of contents</summary>
+              <summary><i class="material-symbols-outlined icon-inline" aria-hidden="true">toc</i> Table of contents</summary>
               <div data-preview-toc-body></div>
             </details>
 
@@ -261,10 +261,10 @@
             <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Close</button>
             <button type="button" class="app-btn is-danger" data-action="reject">Send back</button>
             <button type="button" class="app-btn is-quiet" data-action="schedule">
-              <i class="bi bi-calendar-event" aria-hidden="true"></i> Schedule
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">event</i> Schedule
             </button>
             <button type="button" class="app-btn is-primary" data-action="publish">
-              <i class="bi bi-check2-circle" aria-hidden="true"></i> Publish now
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">check_circle</i> Publish now
             </button>
           </footer>
         </div>
@@ -278,7 +278,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="scheduleTitle">Schedule publication</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 
@@ -301,11 +301,11 @@
                 <div class="cal" data-cal>
                   <div class="cal-head">
                     <button type="button" class="cal-nav" data-cal-prev aria-label="Previous month">
-                      <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                      <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i>
                     </button>
                     <span class="cal-title" data-cal-title aria-live="polite"></span>
                     <button type="button" class="cal-nav" data-cal-next aria-label="Next month">
-                      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                      <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i>
                     </button>
                   </div>
                   <div class="cal-dow" aria-hidden="true">
@@ -328,7 +328,7 @@
               {# The label for what the confirm button is about to do, the same
                  job the summary line does in the date-range dialog. #}
               <p class="when-summary" data-when-summary>
-                <i class="bi bi-calendar-event" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">event</i>
                 <span data-when-text>Pick a day, then a time.</span>
               </p>
 
@@ -337,7 +337,7 @@
 
             <div class="besttime" data-besttime>
               <p class="besttime-head">
-                <i class="bi bi-robot" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">smart_toy</i>
                 Publish Time Agent
               </p>
               <div class="besttime-list" data-besttime-list>

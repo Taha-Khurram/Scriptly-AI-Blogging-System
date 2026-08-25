@@ -58,7 +58,7 @@
     #}
     <div class="opt-stats reveal">
       <div class="stat-card">
-        <span class="stat-icon stat-runs"><i class="bi bi-magic" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-runs"><i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_fix_high</i></span>
         <span class="stat-info">
           <span class="stat-label">{{ 'Optimization run' if report_count == 1 else 'Optimizations run' }}</span>
           <span class="stat-count" data-stat-runs title="{{ report_count }}">{{ report_count }}</span>
@@ -68,7 +68,7 @@
       </div>
 
       <div class="stat-card">
-        <span class="stat-icon stat-gain"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-gain"><i class="material-symbols-outlined icon-inline" aria-hidden="true">trending_up</i></span>
         <span class="stat-info">
           <span class="stat-label">Average gain</span>
           <span class="stat-count" data-stat-gain title="{{ avg_gain }}">{{ '+' if avg_gain > 0 }}{{ avg_gain }}</span>
@@ -80,7 +80,7 @@
       {# A score out of 100 is a ratio, not a series, so this slot is a meter
          rather than a sparkline. #}
       <div class="stat-card">
-        <span class="stat-icon stat-best"><i class="bi bi-trophy" aria-hidden="true"></i></span>
+        <span class="stat-icon stat-best"><i class="material-symbols-outlined icon-inline" aria-hidden="true">trophy</i></span>
         <span class="stat-info">
           <span class="stat-label">Best SEO score</span>
           <span class="stat-count" data-stat-best title="{{ best_score }}">{{ best_score }}</span>
@@ -135,9 +135,9 @@
           <div class="select-pill" data-select-pill>
             <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
               aria-expanded="false" aria-labelledby="optimizeDraftLabel">
-              <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i>
               <span class="filter-pill-label" data-pill-text>Loading drafts…</span>
-              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
             </button>
             <select id="optimizeDraftSelect" data-drafts-for="optimize" aria-labelledby="optimizeDraftLabel">
               <option value="">Select a draft</option>
@@ -151,9 +151,9 @@
           <div class="select-pill" data-select-pill>
             <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
               aria-expanded="false" aria-labelledby="optimizeRegionLabel">
-              <i class="bi bi-globe2" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">public</i>
               <span class="filter-pill-label" data-pill-text>United States</span>
-              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
             </button>
             <select id="optimizeRegionSelect" aria-labelledby="optimizeRegionLabel">
               {% for code, name in opt_regions %}
@@ -164,7 +164,7 @@
               {% for code, name in opt_regions %}
               <button type="button" class="menu-item{{ ' is-selected' if loop.first }}" role="option"
                 aria-selected="{{ 'true' if loop.first else 'false' }}" data-value="{{ code }}">
-                <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
                 <span class="menu-label">{{ name }}</span>
               </button>
               {% endfor %}
@@ -173,7 +173,7 @@
         </div>
 
         <button type="button" class="app-btn is-primary opt-run" data-action="optimize">
-          <i class="bi bi-magic" aria-hidden="true"></i> Optimize
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_fix_high</i> Optimize
         </button>
       </div>
 
@@ -181,7 +181,7 @@
 
         <div class="opt-state" data-for="empty">
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-magic" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_fix_high</i></span>
             <p>Pick a draft and a region, and Scriptly will research it, rewrite it for search, and
               show you every change it made.</p>
           </div>
@@ -208,7 +208,7 @@
            panel looking exactly like a run you never started. #}
         <div class="opt-state" data-for="error">
           <div class="list-empty opt-error">
-            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>
             <p data-error-text>Something went wrong.</p>
             <button type="button" class="app-btn is-ghost" data-action="optimize">Try again</button>
           </div>
@@ -229,7 +229,7 @@
               <span class="opt-grade-caption">grade</span>
             </span>
             <button type="button" class="app-btn is-ghost opt-export" data-action="export-current">
-              <i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i> Export report
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">file_save</i> Export report
             </button>
           </div>
 
@@ -253,11 +253,11 @@
 
           <div class="opt-lists">
             <div class="opt-list-card" data-changes-card hidden>
-              <h3 class="opt-subhead"><i class="bi bi-list-check" aria-hidden="true"></i> Changes made</h3>
+              <h3 class="opt-subhead"><i class="material-symbols-outlined icon-inline" aria-hidden="true">checklist</i> Changes made</h3>
               <ul class="opt-list opt-list-done" data-changes-list></ul>
             </div>
             <div class="opt-list-card" data-recs-card hidden>
-              <h3 class="opt-subhead"><i class="bi bi-lightbulb" aria-hidden="true"></i> Go further</h3>
+              <h3 class="opt-subhead"><i class="material-symbols-outlined icon-inline" aria-hidden="true">lightbulb</i> Go further</h3>
               <ul class="opt-list opt-list-todo" data-recs-list></ul>
             </div>
           </div>
@@ -276,7 +276,7 @@
       <div class="opt-body" data-body="reports" data-state="empty">
         <div class="opt-state" data-for="empty">
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">history</i></span>
             <p>No reports yet. Run Optimize on a draft and the record of what changed lands here.</p>
           </div>
         </div>
@@ -290,7 +290,7 @@
 
         <div class="opt-state" data-for="error">
           <div class="list-empty opt-error">
-            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>
             <p data-error-text>Could not load your reports.</p>
             <button type="button" class="app-btn is-ghost" data-action="reload-reports">Try again</button>
           </div>
@@ -317,9 +317,9 @@
           <div class="select-pill" data-select-pill>
             <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
               aria-expanded="false" aria-labelledby="kwDraftLabel">
-              <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i>
               <span class="filter-pill-label" data-pill-text>Loading drafts…</span>
-              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
             </button>
             <select id="draftSelect" data-drafts-for="keywords" aria-labelledby="kwDraftLabel">
               <option value="">Select a draft</option>
@@ -333,9 +333,9 @@
           <div class="select-pill" data-select-pill>
             <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
               aria-expanded="false" aria-labelledby="kwCountryLabel">
-              <i class="bi bi-globe2" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">public</i>
               <span class="filter-pill-label" data-pill-text>United States</span>
-              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
             </button>
             <select id="countrySelect" aria-labelledby="kwCountryLabel">
               {% for code, name in kw_countries %}
@@ -346,7 +346,7 @@
               {% for code, name in kw_countries %}
               <button type="button" class="menu-item{{ ' is-selected' if loop.first }}" role="option"
                 aria-selected="{{ 'true' if loop.first else 'false' }}" data-value="{{ code }}">
-                <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
                 <span class="menu-label">{{ name }}</span>
               </button>
               {% endfor %}
@@ -355,14 +355,14 @@
         </div>
 
         <button type="button" class="app-btn is-primary opt-run" data-action="keywords">
-          <i class="bi bi-search" aria-hidden="true"></i> Research
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i> Research
         </button>
       </div>
 
       <div class="opt-body" data-body="keywords" data-state="empty">
         <div class="opt-state" data-for="empty">
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-key" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">key</i></span>
             <p>Select a draft to see the search volume, difficulty and value of the keywords it already
               targets.</p>
           </div>
@@ -382,7 +382,7 @@
 
         <div class="opt-state" data-for="error">
           <div class="list-empty opt-error">
-            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>
             <p data-error-text>Something went wrong.</p>
             <button type="button" class="app-btn is-ghost" data-action="keywords">Try again</button>
           </div>
@@ -425,14 +425,14 @@
             autocomplete="off" spellcheck="false" data-submit="url">
         </div>
         <button type="button" class="app-btn is-primary opt-run" data-action="url">
-          <i class="bi bi-search" aria-hidden="true"></i> Analyze
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i> Analyze
         </button>
       </div>
 
       <div class="opt-body" data-body="url" data-state="empty">
         <div class="opt-state" data-for="empty">
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">speed</i></span>
             <p>Enter a URL to see its domain rating, backlink profile and organic traffic.</p>
           </div>
         </div>
@@ -451,7 +451,7 @@
 
         <div class="opt-state" data-for="error">
           <div class="list-empty opt-error">
-            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>
             <p data-error-text>Something went wrong.</p>
             <button type="button" class="app-btn is-ghost" data-action="url">Try again</button>
           </div>
@@ -467,7 +467,7 @@
              a disclosure and labelled as what it is. #}
           <details class="opt-raw" data-url-raw hidden>
             <summary class="opt-raw-summary">
-              <i class="bi bi-chevron-right opt-raw-caret" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline opt-raw-caret" aria-hidden="true">chevron_right</i>
               Everything else the API returned <span class="opt-raw-count" data-url-raw-count></span>
             </summary>
             <div class="opt-raw-grid" data-url-raw-grid></div>
@@ -495,14 +495,14 @@
             autocomplete="off" spellcheck="false" data-submit="domain">
         </div>
         <button type="button" class="app-btn is-primary opt-run" data-action="domain">
-          <i class="bi bi-diagram-3" aria-hidden="true"></i> Look up
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">account_tree</i> Look up
         </button>
       </div>
 
       <div class="opt-body" data-body="domain" data-state="empty">
         <div class="opt-state" data-for="empty">
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-diagram-3" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">account_tree</i></span>
             <p>Enter a domain to see the keywords it ranks for.</p>
           </div>
         </div>
@@ -521,7 +521,7 @@
 
         <div class="opt-state" data-for="error">
           <div class="list-empty opt-error">
-            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>
             <p data-error-text>Something went wrong.</p>
             <button type="button" class="app-btn is-ghost" data-action="domain">Try again</button>
           </div>
@@ -559,7 +559,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="optimizeConfirmTitle">Optimize this draft?</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">
@@ -586,14 +586,14 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="reportDetailTitle" data-detail-title>Report</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body" data-detail-body></div>
           <footer class="app-modal-foot">
             <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Close</button>
             <button type="button" class="app-btn is-primary" data-detail-export>
-              <i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i> Export report
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">file_save</i> Export report
             </button>
           </footer>
         </div>
@@ -610,7 +610,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="reportDeleteTitle">Delete this report?</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">

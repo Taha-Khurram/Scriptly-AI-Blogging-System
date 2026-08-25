@@ -1,3 +1,4 @@
+{% from 'partials/brand_icon.html' import brand_icon %}
 <!-- Newsletter Section -->
 {% if not settings.footer or settings.footer.show_newsletter %}
 <section class="footer-newsletter-section">
@@ -33,21 +34,21 @@
                 <div class="footer-social-icons">
                     {% if settings.social_links and settings.social_links.twitter %}
                     <a href="{{ settings.social_links.twitter }}" target="_blank" rel="noopener noreferrer" title="Twitter">
-                        <i class="bi bi-twitter-x"></i>
+                        {{ brand_icon('x') }}
                     </a>
                     {% endif %}
                     {% if settings.social_links and settings.social_links.linkedin %}
                     <a href="{{ settings.social_links.linkedin }}" target="_blank" rel="noopener noreferrer" title="LinkedIn">
-                        <i class="bi bi-linkedin"></i>
+                        {{ brand_icon('linkedin') }}
                     </a>
                     {% endif %}
                     {% if settings.social_links and settings.social_links.github %}
                     <a href="{{ settings.social_links.github }}" target="_blank" rel="noopener noreferrer" title="GitHub">
-                        <i class="bi bi-github"></i>
+                        {{ brand_icon('github') }}
                     </a>
                     {% endif %}
                     <a href="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true)) }}" title="RSS Feed">
-                        <i class="bi bi-rss"></i>
+                        <i class="material-symbols-outlined icon-inline" aria-hidden="true">rss_feed</i>
                     </a>
                 </div>
             </div>
@@ -117,7 +118,7 @@
                 <a href="{{ url_for('site_bp.site_terms_of_service', site_identifier=settings.site_slug|default(user_id, true)) }}">Terms of Service</a>
                 {% endif %}
                 <a href="/" class="footer-status-link">
-                    <i class="bi bi-lightning-charge-fill"></i> Powered by ScriptlyAI
+                    <i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">bolt</i> Powered by ScriptlyAI
                 </a>
             </div>
         </div>
@@ -128,10 +129,10 @@
 <div class="newsletter-modal-overlay" id="newsletter-modal">
     <div class="newsletter-modal">
         <button class="newsletter-modal-close" onclick="closeNewsletterModal()">
-            <i class="bi bi-x-lg"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
         </button>
         <div class="newsletter-modal-icon">
-            <i class="bi bi-envelope-check"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">mark_email_read</i>
         </div>
         <h3 class="newsletter-modal-title">Thank You for Subscribing!</h3>
         <p class="newsletter-modal-message">
@@ -145,10 +146,10 @@
 <div class="newsletter-modal-overlay" id="already-subscribed-modal">
     <div class="newsletter-modal">
         <button class="newsletter-modal-close" onclick="closeAlreadySubscribedModal()">
-            <i class="bi bi-x-lg"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
         </button>
         <div class="newsletter-modal-icon already-subscribed-icon">
-            <i class="bi bi-envelope-heart"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">mark_email_read</i>
         </div>
         <h3 class="newsletter-modal-title">You're Already Subscribed!</h3>
         <p class="newsletter-modal-message">

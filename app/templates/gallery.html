@@ -55,7 +55,7 @@
       <span class="material-symbols-outlined">dark_mode</span>
     </button>
     <button type="button" class="page-header-action is-primary" data-upload-trigger>
-      <i class="bi bi-cloud-arrow-up" aria-hidden="true"></i>
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">cloud_upload</i>
       <span class="page-header-label">Upload</span>
     </button>
     {% endcall %}
@@ -94,17 +94,17 @@
           <div class="select-pill" data-select-pill>
             <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
               aria-expanded="false" aria-labelledby="gallerySortLabel">
-              <i class="bi bi-sort-down" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">sort</i>
               <span class="visually-hidden" id="gallerySortLabel">Sort images</span>
               <span class="filter-pill-value" aria-hidden="true"
                 id="gallerySortValue">{{ sort_labels.get(q.sort, 'Newest first') }}</span>
-              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
             </button>
 
             <div class="menu is-end" role="listbox" aria-labelledby="gallerySortLabel" hidden>
               {% for value, label in sort_labels.items() %}
               <button type="button" class="menu-item" role="option" data-value="{{ value }}">
-                <i class="bi bi-check2 menu-check" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
                 <span class="menu-label">{{ label }}</span>
               </button>
               {% endfor %}
@@ -123,17 +123,17 @@
           <div class="view-toggle" role="group" aria-label="Layout">
             <button type="button" class="view-toggle-btn is-active" data-view="grid" aria-pressed="true"
               title="Grid view">
-              <i class="bi bi-grid-3x3-gap-fill" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">grid_view</i>
               <span class="visually-hidden">Grid view</span>
             </button>
             <button type="button" class="view-toggle-btn" data-view="list" aria-pressed="false" title="List view">
-              <i class="bi bi-list-ul" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">toc</i>
               <span class="visually-hidden">List view</span>
             </button>
           </div>
 
           <button type="button" class="filter-clear" data-clear-filters {{ '' if filtered else 'hidden' }}>
-            <i class="bi bi-x-lg" aria-hidden="true"></i> Clear filters
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i> Clear filters
           </button>
         </div>
       </div>
@@ -143,17 +143,17 @@
       <div class="gallery-selection-bar" data-selection-bar hidden>
         <div class="gallery-selection-lead">
           <button type="button" class="selection-close" data-selection-clear aria-label="Clear selection">
-            <i class="bi bi-x-lg" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
           </button>
           <span class="selection-count" data-selection-count role="status">1 selected</span>
         </div>
         <div class="gallery-selection-actions">
           <button type="button" class="app-btn is-ghost" data-selection-all>Select page</button>
           <button type="button" class="app-btn is-ghost" data-selection-copy>
-            <i class="bi bi-clipboard" aria-hidden="true"></i> Copy URLs
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i> Copy URLs
           </button>
           <button type="button" class="app-btn is-danger" data-selection-delete>
-            <i class="bi bi-trash3" aria-hidden="true"></i> Delete
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i> Delete
           </button>
         </div>
       </div>
@@ -226,7 +226,7 @@
 
               <button type="button" class="media-quick" data-media-copy title="Copy image URL"
                 aria-label="Copy URL for {{ name }}">
-                <i class="bi bi-link-45deg" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">link</i>
               </button>
             </div>
 
@@ -242,16 +242,16 @@
            one, and offering "upload your first image" to someone who has 200
            of them and a typo in the search box is the wrong answer. #}
         <div class="list-empty">
-          <span class="list-empty-icon"><i class="bi bi-search"></i></span>
+          <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">search</i></span>
           <p>No images match those filters.</p>
           <button type="button" class="app-btn is-ghost" data-clear-filters>Clear filters</button>
         </div>
         {% else %}
         <div class="list-empty gallery-empty">
-          <span class="list-empty-icon"><i class="bi bi-images"></i></span>
+          <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">photo_library</i></span>
           <p>No images yet. Upload artwork here once and reuse it as a feature image on any post.</p>
           <button type="button" class="app-btn is-primary" data-upload-trigger>
-            <i class="bi bi-cloud-arrow-up" aria-hidden="true"></i> Upload images
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">cloud_upload</i> Upload images
           </button>
           <span class="gallery-empty-hint">or drop files anywhere on this page — PNG, JPG, GIF, WebP up to 5MB</span>
         </div>
@@ -283,7 +283,7 @@
     #}
     <div class="drop-overlay" data-drop-overlay hidden aria-hidden="true">
       <div class="drop-overlay-inner">
-        <i class="bi bi-cloud-arrow-up-fill" aria-hidden="true"></i>
+        <i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">cloud_upload</i>
         <p class="drop-overlay-title">Drop to upload</p>
         <p class="drop-overlay-hint">PNG, JPG, GIF or WebP · up to 5MB each</p>
       </div>
@@ -300,10 +300,10 @@
         <span class="upload-tray-title" data-tray-title role="status">Uploading…</span>
         <button type="button" class="upload-tray-btn" data-tray-toggle aria-expanded="true"
           aria-label="Collapse uploads">
-          <i class="bi bi-chevron-down" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">expand_more</i>
         </button>
         <button type="button" class="upload-tray-btn" data-tray-close aria-label="Dismiss uploads">
-          <i class="bi bi-x-lg" aria-hidden="true"></i>
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
         </button>
       </header>
       <ul class="upload-tray-list" data-tray-list></ul>
@@ -316,7 +316,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title preview-title" id="previewTitle" data-preview-name>Image</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
 
@@ -326,10 +326,10 @@
             <div class="preview-stage">
               <img data-preview-image src="" alt="">
               <button type="button" class="preview-nav is-prev" data-preview-prev aria-label="Previous image">
-                <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_left</i>
               </button>
               <button type="button" class="preview-nav is-next" data-preview-next aria-label="Next image">
-                <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">chevron_right</i>
               </button>
             </div>
 
@@ -372,10 +372,10 @@
           <footer class="app-modal-foot">
             <span class="app-modal-note" data-preview-position></span>
             <a class="app-btn is-ghost" data-preview-open target="_blank" rel="noopener" href="#">
-              <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Open original
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">open_in_new</i> Open original
             </a>
             <button type="button" class="app-btn is-danger" data-preview-delete>
-              <i class="bi bi-trash3" aria-hidden="true"></i> Delete
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i> Delete
             </button>
           </footer>
         </div>
@@ -389,7 +389,7 @@
           <header class="app-modal-head">
             <h2 class="app-modal-title" id="deleteImageTitle">Delete image</h2>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">

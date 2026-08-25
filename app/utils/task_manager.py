@@ -45,12 +45,39 @@ TERMINAL_STATES = frozenset(('completed', 'failed', 'cancelled'))
 # is small, but the pool's pending work holds whole prompts and draft bodies.
 _MAX_TRACKED_TASKS = 500
 
+# --- Live output ----------------------------------------------------------
+#
+# A generation now reports what it is producing while it produces it: the
+# agent's plan as it is formed, and the draft as it is written. Those buffers
+# are deliberately NOT in the task record. `get_task` hands out a shallow copy
+# and the route serialises it outside the lock, so a growing list in there
+# could be appended to mid-serialisation. They live in a parallel table with
+# their own lock-held slicing instead, and a status poll asks for the slice it
+# has not seen rather than the whole thing every two seconds.
+#
+# Polling, not SSE, for one deployment reason: this app runs gthread with a
+# small fixed thread count, and an SSE connection would pin one thread for the
+# whole multi-minute generation. Cursors over the existing poll cost a little
+# latency and no threads, and they keep the reconnect and resume behaviour the
+# create screen already relies on.
+
+# One blog post is ~7 KB. The ceiling is for a model that will not stop.
+_MAX_STREAM_CHARS = 60_000
+
+# Plan lines are short and few; this is a guard, not a budget.
+_MAX_THOUGHTS = 40
+
+# Largest content slice one poll may carry. A client behind by more than this
+# gets it across consecutive polls, which is what the cursor is for.
+STREAM_DELTA_CHARS = 8_000
+
 
 class TaskManager:
     """Fixed-size worker pool with a bounded admission queue."""
 
     def __init__(self, max_workers=4, max_queue_depth=20, retention_seconds=1800):
         self._tasks = {}
+        self._streams = {}
         self._lock = threading.RLock()
         self._max_workers = max(1, max_workers)
         self._max_queue_depth = max(1, max_queue_depth)
@@ -144,6 +171,15 @@ class TaskManager:
                 'updated_at': now,
                 'started_at': None,
                 'finished_at': None,
+            }
+            # Created with the task, not on first write, so a poll that arrives
+            # before the model has said anything gets empty buffers and cursors
+            # of zero rather than a "no stream" special case.
+            self._streams[task_id] = {
+                'thoughts': [],
+                'content': '',
+                'chars': 0,
+                'truncated': False,
             }
             self._queued += 1
             self._submitted += 1
@@ -265,6 +301,90 @@ class TaskManager:
             self._queued = max(0, self._queued - 1)
             return True
 
+    # --- Live output ------------------------------------------------------
+
+    def add_thought(self, task_id, text, *, kind='note'):
+        """Record one line of the agent's reasoning.
+
+        ``kind`` separates what the model said about its own approach (``plan``)
+        from what the pipeline observed afterwards (``note``) -- a word count,
+        the category it matched. Both belong in the panel; only one of them is
+        the model's.
+        """
+        text = (text or '').strip()
+        if not text:
+            return
+        with self._lock:
+            stream = self._streams.get(task_id)
+            task = self._tasks.get(task_id)
+            if stream is None or task is None:
+                return
+            if len(stream['thoughts']) >= _MAX_THOUGHTS:
+                return
+            started = task.get('started_at') or task['created_at']
+            stream['thoughts'].append({
+                'i': len(stream['thoughts']),
+                'kind': kind,
+                'text': text[:400],
+                'at': round(max(0.0, time.time() - started), 1),
+            })
+
+    def append_content(self, task_id, chunk):
+        """Append generated text to the task's live output.
+
+        Returns the total character count, which the caller uses to drive
+        progress off text actually received instead of off a timer.
+        """
+        if not chunk:
+            return 0
+        with self._lock:
+            stream = self._streams.get(task_id)
+            if stream is None:
+                return 0
+            room = _MAX_STREAM_CHARS - stream['chars']
+            if room <= 0:
+                stream['truncated'] = True
+                return stream['chars']
+            if len(chunk) > room:
+                chunk = chunk[:room]
+                stream['truncated'] = True
+            stream['content'] += chunk
+            stream['chars'] = len(stream['content'])
+            return stream['chars']
+
+    def stream_since(self, task_id, since_thought=0, since_char=0,
+                     max_chars=STREAM_DELTA_CHARS):
+        """The part of a task's output the caller has not seen yet.
+
+        Sliced under the lock and returned as plain values, so the route can
+        serialise it without racing the worker that is still writing. A cursor
+        ahead of the buffer (a client that reconnected to a different task, or a
+        buffer that was trimmed) is clamped rather than raising: the worst case
+        is one repeated slice, and the alternative is a 500 in the middle of a
+        run that is otherwise fine.
+        """
+        with self._lock:
+            stream = self._streams.get(task_id)
+            if stream is None:
+                return {
+                    'thoughts': [], 'content': '',
+                    'thought_cursor': 0, 'char_cursor': 0,
+                    'total_chars': 0, 'truncated': False,
+                }
+
+            t_from = max(0, min(int(since_thought or 0), len(stream['thoughts'])))
+            c_from = max(0, min(int(since_char or 0), stream['chars']))
+            slice_ = stream['content'][c_from:c_from + max(0, int(max_chars))]
+
+            return {
+                'thoughts': [dict(t) for t in stream['thoughts'][t_from:]],
+                'content': slice_,
+                'thought_cursor': len(stream['thoughts']),
+                'char_cursor': c_from + len(slice_),
+                'total_chars': stream['chars'],
+                'truncated': stream['truncated'],
+            }
+
     # --- Reads ------------------------------------------------------------
 
     def get_task(self, task_id):
@@ -328,6 +448,9 @@ class TaskManager:
                 'running': self._running,
                 'queued': self._queued,
                 'tracked': len(self._tasks),
+                # Surfaced so a leak in the live-output buffers is visible on
+                # /healthz rather than only as growing RSS.
+                'stream_chars': sum(s['chars'] for s in self._streams.values()),
                 'submitted_total': self._submitted,
                 'rejected_total': self._rejected,
                 'by_status': by_status,
@@ -352,6 +475,9 @@ class TaskManager:
             ]
             for task_id in expired:
                 del self._tasks[task_id]
+                # The live output is the larger of the two records; leaving it
+                # behind is how a "bounded" table leaks megabytes.
+                self._streams.pop(task_id, None)
         if expired:
             logger.debug('Cleaned up %s expired tasks', len(expired))
         return len(expired)
@@ -366,6 +492,7 @@ class TaskManager:
         )
         for task in terminal[: max(1, _MAX_TRACKED_TASKS // 10)]:
             self._tasks.pop(task['id'], None)
+            self._streams.pop(task['id'], None)
         if len(self._tasks) >= _MAX_TRACKED_TASKS:
             # Every tracked task is still active. Refusing is the only honest
             # answer; accepting would grow memory without bound.

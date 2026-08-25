@@ -532,20 +532,28 @@
     border-bottom: none;
 }
 
+/* Ligature names, not private-use codepoints: Material Symbols resolves
+   content: 'check' to the glyph through the same 'liga' feature the inline
+   icons use. update_icon_font.py harvests these names from this file, but it
+   only trusts `content:` where the file also names the family -- which is why
+   the family is spelled out here instead of inherited. */
 .opt-list li::before {
     position: absolute;
     left: 0;
-    font-family: 'bootstrap-icons';
-    font-size: 0.95em;
+    font-family: 'Material Symbols Outlined';
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    font-feature-settings: 'liga';
+    font-size: 1.05em;
+    line-height: 1.35;
 }
 
 .opt-list-done li::before {
-    content: '\f26e';
+    content: 'check';
     color: var(--success);
 }
 
 .opt-list-todo li::before {
-    content: '\f467';
+    content: 'support';
     color: var(--warning);
 }
 

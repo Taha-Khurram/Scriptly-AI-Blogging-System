@@ -348,7 +348,7 @@
             if (rows().length === 0) {
                 list.innerHTML =
                     '<div class="list-empty">' +
-                    '<span class="list-empty-icon"><i class="bi bi-check2-all" aria-hidden="true"></i></span>' +
+                    '<span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">done_all</i></span>' +
                     '<p>Nothing is waiting on you. Posts your writers submit for review arrive here.</p>' +
                     '</div>';
             }
@@ -846,14 +846,14 @@
 
     function sourceLine(kind, message) {
         if (kind === 'analytics') {
-            return '<p class="besttime-source"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ' +
+            return '<p class="besttime-source"><i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">check_circle</i> ' +
                 'From your Google Analytics traffic over the last 28 days.</p>';
         }
         if (message) {
-            return '<p class="besttime-source is-warning"><i class="bi bi-exclamation-triangle-fill" ' +
-                'aria-hidden="true"></i> ' + esc(message) + '</p>';
+            return '<p class="besttime-source is-warning"><i class="material-symbols-outlined icon-inline icon-fill" ' +
+                'aria-hidden="true">warning</i> ' + esc(message) + '</p>';
         }
-        return '<p class="besttime-source"><i class="bi bi-lightbulb-fill" aria-hidden="true"></i> ' +
+        return '<p class="besttime-source"><i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">lightbulb</i> ' +
             'General best practice — connect Analytics for times based on your own readers.</p>';
     }
 

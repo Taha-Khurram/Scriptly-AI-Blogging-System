@@ -76,7 +76,7 @@
 
 {% macro work_empty(icon, message) %}
 <div class="list-empty">
-    <span class="list-empty-icon"><i class="bi bi-{{ icon }}"></i></span>
+    <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">{{ icon }}</i></span>
     <p>{{ message }}</p>
 </div>
 {% endmacro %}
@@ -99,7 +99,7 @@
             <span class="material-symbols-outlined">dark_mode</span>
         </button>
         <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-primary">
-            <i class="bi bi-stars" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_awesome</i>
             <span class="page-header-label">New blog</span>
         </a>
         {% endcall %}
@@ -114,7 +114,7 @@
 
                 <div class="hero-body">
                     <p class="hero-eyebrow">
-                        <span class="hero-spark" aria-hidden="true"><i class="bi bi-stars"></i></span>
+                        <span class="hero-spark" aria-hidden="true"><i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_awesome</i></span>
                         AI content studio
                     </p>
 
@@ -130,10 +130,10 @@
 
                     <div class="hero-actions">
                         <a href="{{ url_for('blog.create_page') }}" class="hero-cta is-primary">
-                            <i class="bi bi-stars" aria-hidden="true"></i> Start a new blog
+                            <i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_awesome</i> Start a new blog
                         </a>
                         <a href="{{ url_for('blog.drafts_page') }}" class="hero-cta is-ghost">
-                            Continue in drafts <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                            Continue in drafts <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i>
                         </a>
                     </div>
 
@@ -143,25 +143,25 @@
                     <div class="hero-nudges">
                         {% if pipeline_n == 0 %}
                         <span class="hero-nudge">
-                            <i class="bi bi-lightning-charge" aria-hidden="true"></i>
+                            <i class="material-symbols-outlined icon-inline" aria-hidden="true">bolt</i>
                             Nothing here yet — your first post starts with one sentence
                         </span>
                         {% else %}
                         {% if review_n %}
                         <a class="hero-nudge is-live" href="{{ all_blogs_url }}?status=UNDER_REVIEW">
-                            <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                            <i class="material-symbols-outlined icon-inline" aria-hidden="true">hourglass_top</i>
                             {{ review_n }} awaiting review
                         </a>
                         {% endif %}
                         {% if drafts_n %}
                         <a class="hero-nudge" href="{{ url_for('blog.drafts_page') }}">
-                            <i class="bi bi-pencil" aria-hidden="true"></i>
+                            <i class="material-symbols-outlined icon-inline" aria-hidden="true">edit</i>
                             {{ drafts_n }} draft{{ '' if drafts_n == 1 else 's' }} open
                         </a>
                         {% endif %}
                         {% if not review_n and not drafts_n %}
                         <span class="hero-nudge">
-                            <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                            <i class="material-symbols-outlined icon-inline" aria-hidden="true">check_circle</i>
                             All caught up — nothing waiting on you
                         </span>
                         {% endif %}
@@ -175,7 +175,7 @@
                 <header class="card-head">
                     <h2 class="card-title" id="pipelineHeading">Content pipeline</h2>
                     <a class="card-link" href="{{ all_blogs_url }}">
-                        All blogs <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                        All blogs <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i>
                     </a>
                 </header>
 
@@ -265,10 +265,10 @@
                         </div>
                         <p class="work-noresults" data-noresults hidden>No recent work matches that search.</p>
                         <a class="work-more" href="{{ all_blogs_url }}">
-                            View all blogs <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                            View all blogs <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i>
                         </a>
                         {% else %}
-                        {{ work_empty('journal-plus', 'No blogs yet. Your first one starts on the Create screen.') }}
+                        {{ work_empty('post_add', 'No blogs yet. Your first one starts on the Create screen.') }}
                         {% endif %}
                     </div>
 
@@ -280,10 +280,10 @@
                         </div>
                         <p class="work-noresults" data-noresults hidden>Nothing in review matches that search.</p>
                         <a class="work-more" href="{{ all_blogs_url }}?status=UNDER_REVIEW">
-                            View everything in review <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                            View everything in review <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i>
                         </a>
                         {% else %}
-                        {{ work_empty('check2-circle', 'No pending reviews. All caught up.') }}
+                        {{ work_empty('check_circle', 'No pending reviews. All caught up.') }}
                         {% endif %}
                     </div>
 
@@ -295,10 +295,10 @@
                         </div>
                         <p class="work-noresults" data-noresults hidden>Nothing published matches that search.</p>
                         <a class="work-more" href="{{ all_blogs_url }}?status=PUBLISHED">
-                            View everything published <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                            View everything published <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i>
                         </a>
                         {% else %}
-                        {{ work_empty('megaphone', 'Nothing published yet. Approved drafts land here.') }}
+                        {{ work_empty('campaign', 'Nothing published yet. Approved drafts land here.') }}
                         {% endif %}
                     </div>
 
@@ -313,37 +313,37 @@
 
                 <div class="action-grid">
                     <a class="action-tile is-lead" href="{{ url_for('blog.create_page') }}">
-                        <span class="action-icon"><i class="bi bi-stars" aria-hidden="true"></i></span>
+                        <span class="action-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_awesome</i></span>
                         <span class="action-label">Create blog</span>
                     </a>
                     <a class="action-tile" href="{{ url_for('blog.drafts_page') }}">
-                        <span class="action-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+                        <span class="action-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i></span>
                         <span class="action-label">My drafts</span>
                     </a>
                     <a class="action-tile" href="{{ all_blogs_url }}">
-                        <span class="action-icon"><i class="bi bi-collection" aria-hidden="true"></i></span>
+                        <span class="action-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">library_books</i></span>
                         <span class="action-label">All blogs</span>
                     </a>
                     <a class="action-tile" href="{{ url_for('blog.categories_page') }}">
-                        <span class="action-icon"><i class="bi bi-tags" aria-hidden="true"></i></span>
+                        <span class="action-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">label</i></span>
                         <span class="action-label">Categories</span>
                     </a>
                     <a class="action-tile" href="{{ url_for('gallery.gallery_page') }}">
-                        <span class="action-icon"><i class="bi bi-images" aria-hidden="true"></i></span>
+                        <span class="action-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">photo_library</i></span>
                         <span class="action-label">Gallery</span>
                     </a>
                     <a class="action-tile" href="{{ url_for('optimization.optimization_page') }}">
-                        <span class="action-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
+                        <span class="action-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">speed</i></span>
                         <span class="action-label">Optimization</span>
                     </a>
 
                     {% if session.get('user_role') == 'ADMIN' %}
                     <a class="action-tile" href="{{ url_for('blog.approval_page') }}">
-                        <span class="action-icon"><i class="bi bi-check2-square" aria-hidden="true"></i></span>
+                        <span class="action-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">task_alt</i></span>
                         <span class="action-label">Approvals</span>
                     </a>
                     <a class="action-tile" href="{{ url_for('schedule.schedule_page') }}">
-                        <span class="action-icon"><i class="bi bi-calendar3" aria-hidden="true"></i></span>
+                        <span class="action-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_month</i></span>
                         <span class="action-label">Schedule</span>
                     </a>
                     {% endif %}

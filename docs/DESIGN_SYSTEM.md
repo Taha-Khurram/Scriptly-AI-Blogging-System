@@ -1388,7 +1388,8 @@ Reusable pieces, all token-driven:
 
 | Component | Selector | Notes |
 | --- | --- | --- |
-| Nav icons | `.material-symbols-outlined` | Google Material Symbols, `wght 300 / opsz 24`, self-hosted subset (below) |
+| Icons | `.material-symbols-outlined` | Google Material Symbols, self-hosted subset (below). Nav chrome at `wght 300 / opsz 24 / 22px`; add `.icon-inline` for an icon inside text, `.icon-fill` for the filled cut |
+| Brand marks | `.brand-icon` | The four social logos, inline SVG from `partials/brand_icon.html` — Material Symbols has no company logos |
 | Nav rail | `.dashboard-sidebar` | 72px icon rail at rest; `.expanded` → 300px labelled drawer |
 | Brand | `.sidebar-brand` / `.sidebar-lockup` | mark alone in the rail, full lockup in the drawer |
 | Panel toggle | `.sidebar-toggle` | collapses the drawer; in the rail the brand does the opening |
@@ -1524,20 +1525,47 @@ opposite it.
 
 ### The icon font
 
-Material Symbols is **self-hosted**, not loaded from `fonts.gstatic.com`: the
-`@font-face` sits at the top of `dashboard.css` and the file is
-`app/static/fonts/material-symbols-outlined.woff2`, preloaded in `base.html`.
+**Every icon in the app is a Material Symbols ligature.** There is no second
+icon set and no icon CDN. The `@font-face` and the three classes live in
+`app/static/css/icons.css`, loaded by both `base.html` and
+`site_base.html`; the file is `app/static/fonts/material-symbols-outlined.woff2`,
+preloaded in both.
 
-This is not a performance preference. The icons are ligatures, so a font that
-fails to arrive doesn't degrade to blank — every icon renders as its own name
-(`edit_square`, `left_panel_close`) sprayed across the rail. And because sidebar
-navigation is PJAX, nothing reloads, so one failed CDN request stayed broken
-until a hard refresh. Serving it ourselves removes the failure mode entirely;
-verified by rendering with both Google font hosts blackholed.
+```html
+<i class="material-symbols-outlined icon-inline" aria-hidden="true">edit_square</i>
+```
 
-The file is subset to the ~29 glyphs actually used — 5KB, against 4MB for the
-full variable font. The cost is that **an icon added to a template is not in the
-font until the subset is rebuilt**:
+- `.material-symbols-outlined` — the face. 22px, `wght 300`, for nav chrome
+  where the glyph *is* the control.
+- `.icon-inline` — an icon sitting in text: `1.15em`, `wght 400`, so it tracks
+  the line it is on. Deliberately **one** class, so an existing element-scoped
+  override (`.filter-pill > i { font-size: … }`, and there are ~114 of them)
+  still outranks it.
+- `.icon-fill` — the filled cut. Sets only the `FILL` axis, through a custom
+  property, so it composes with any size modifier.
+
+The ligature name is real text in the DOM, so **every icon needs
+`aria-hidden="true"`** or a screen reader announces "more_vert".
+
+Icons are `<i>` elements rather than `<span>` because that is what the
+Bootstrap Icons they replaced were, and ~114 CSS rules select them as `i`.
+
+Brand logos are the one thing the font cannot supply — Material Symbols has no
+company marks. The four social logos are inline SVG from
+`templates/partials/brand_icon.html`, sized by `.brand-icon`.
+
+Self-hosting is not a performance preference. The icons are ligatures, so a
+font that fails to arrive doesn't degrade to blank — every icon renders as its
+own name (`edit_square`, `left_panel_close`) sprayed across the UI. And because
+sidebar navigation is PJAX, nothing reloads, so one failed CDN request stayed
+broken until a hard refresh. This is not hypothetical: the icon webfont *was*
+on a CDN, and a `font-src` directive that listed the stylesheet's host but not
+the font's blanked out all 675 icons in the app at once.
+
+The file is subset to the ~141 glyphs actually used — 19KB, against 4MB for the
+full variable font. `FILL` is kept as a live axis (`0..1`) because `.icon-fill`
+needs it; the rest are pinned. The cost is that **an icon added to a template is
+not in the font until the subset is rebuilt**:
 
 ```
 python scripts/update_icon_font.py           # rescan, refetch, rewrite
@@ -1549,6 +1577,12 @@ against Google's published codepoints list before building — necessary because
 the Fonts API answers `200` with an *empty font* for a name that doesn't exist,
 so a typo would otherwise ship silently. `--check` is the CI form.
 `material-symbols-outlined.txt` next to the font records what went in.
+
+Names chosen at runtime — a lookup table keyed by record type, a severity
+ladder, a delta direction — cannot be found by scanning. Those are listed
+explicitly in `EXTRA_ICONS` in the script; **add to that set when you add a
+data-driven icon**, or it renders as its own name. `tests/test_icons.py` renders
+every page and fails if any icon resolves to a glyph the subset lacks.
 
 ---
 

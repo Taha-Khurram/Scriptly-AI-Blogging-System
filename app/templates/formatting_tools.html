@@ -45,9 +45,9 @@
           <div class="select-pill" data-select-pill>
             <button type="button" class="filter-pill" data-select-trigger aria-haspopup="listbox"
               aria-expanded="false" aria-labelledby="fmtDraftLabel">
-              <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i>
               <span class="filter-pill-label" data-pill-text>Loading drafts…</span>
-              <i class="bi bi-chevron-down filter-pill-caret" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
             </button>
             <select id="fmtDraftSelect" data-draft-select aria-labelledby="fmtDraftLabel">
               <option value="">Select a draft</option>
@@ -58,11 +58,11 @@
 
         <div class="fmt-source-actions">
           <button type="button" class="app-btn is-ghost" data-action="preview-draft">
-            <i class="bi bi-eye" aria-hidden="true"></i> Preview
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">visibility</i> Preview
           </button>
           <button type="button" class="app-btn is-ghost fmt-icon-btn" data-action="reload-drafts"
             aria-label="Reload the draft list" title="Reload the draft list">
-            <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">refresh</i>
           </button>
         </div>
       </div>
@@ -99,10 +99,10 @@ Final thoughts…"></textarea>
 
       <div class="fmt-actions">
         <button type="button" class="app-btn is-primary" data-action="format">
-          <i class="bi bi-magic" aria-hidden="true"></i> Format content
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_fix_high</i> Format content
         </button>
         <button type="button" class="app-btn is-ghost" data-action="clear">
-          <i class="bi bi-x-lg" aria-hidden="true"></i> Clear
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i> Clear
         </button>
       </div>
     </section>
@@ -122,7 +122,7 @@ Final thoughts…"></textarea>
 
         <div class="fmt-state" data-for="empty">
           <div class="list-empty">
-            <span class="list-empty-icon"><i class="bi bi-file-richtext" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">text_snippet</i></span>
             <p>Paste markdown above, or load a draft, then <strong>Format content</strong>. The HTML,
               the table of contents and the statistics all land here.</p>
           </div>
@@ -144,7 +144,7 @@ Final thoughts…"></textarea>
 
         <div class="fmt-state" data-for="error">
           <div class="list-empty fmt-error">
-            <span class="list-empty-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+            <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">warning</i></span>
             <p data-error-text>Something went wrong.</p>
             <button type="button" class="app-btn is-ghost" data-action="retry">Try again</button>
           </div>
@@ -158,19 +158,19 @@ Final thoughts…"></textarea>
              which. #}
           <div class="fmt-facts">
             <span class="fmt-reading">
-              <i class="bi bi-clock" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">schedule</i>
               <span data-reading-time>— min read</span>
             </span>
             <span class="fmt-flag" data-flag="code">
-              <i class="bi bi-code-slash" aria-hidden="true"></i> Code blocks
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">code</i> Code blocks
               <span class="fmt-flag-state" data-flag-state>—</span>
             </span>
             <span class="fmt-flag" data-flag="images">
-              <i class="bi bi-image" aria-hidden="true"></i> Images
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">image</i> Images
               <span class="fmt-flag-state" data-flag-state>—</span>
             </span>
             <span class="fmt-flag" data-flag="tables">
-              <i class="bi bi-table" aria-hidden="true"></i> Tables
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">table</i> Tables
               <span class="fmt-flag-state" data-flag-state>—</span>
             </span>
           </div>
@@ -209,33 +209,33 @@ Final thoughts…"></textarea>
 
             <div class="fmt-panel">
               <h3 class="fmt-subhead">
-                <i class="bi bi-list-nested" aria-hidden="true"></i> Table of contents
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">toc</i> Table of contents
                 <span class="card-count" data-toc-count>0</span>
               </h3>
               <p class="fmt-headings" data-headings hidden></p>
               <div class="fmt-toc" data-toc></div>
               <button type="button" class="app-btn is-ghost fmt-panel-action" data-action="copy-toc">
-                <i class="bi bi-clipboard" aria-hidden="true"></i> Copy as markdown
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i> Copy as markdown
               </button>
             </div>
 
             <div class="fmt-panel">
               <h3 class="fmt-subhead">
-                <i class="bi bi-eye" aria-hidden="true"></i> Rendered preview
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">visibility</i> Rendered preview
               </h3>
               {# The preview shows the reader's own content as the site will
                  draw it, so it is deliberately un-escaped HTML. The raw dump
                  below is the escaped twin, in a value attribute. #}
               <div class="fmt-preview" data-preview></div>
               <button type="button" class="app-btn is-ghost fmt-panel-action" data-action="copy-html">
-                <i class="bi bi-clipboard" aria-hidden="true"></i> Copy HTML
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i> Copy HTML
               </button>
             </div>
           </div>
 
           <details class="fmt-raw">
             <summary class="fmt-raw-summary">
-              <i class="bi bi-chevron-right fmt-raw-caret" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline fmt-raw-caret" aria-hidden="true">chevron_right</i>
               <span>Raw HTML</span>
               <span class="fmt-raw-note" data-raw-size></span>
             </summary>
@@ -244,7 +244,7 @@ Final thoughts…"></textarea>
               <textarea id="fmtRaw" class="fmt-raw-code" data-raw rows="10" readonly
                 spellcheck="false"></textarea>
               <button type="button" class="app-btn is-ghost" data-action="copy-raw">
-                <i class="bi bi-clipboard" aria-hidden="true"></i> Copy raw HTML
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i> Copy raw HTML
               </button>
             </div>
           </details>
@@ -263,22 +263,22 @@ Final thoughts…"></textarea>
               <span class="status-pill status-draft">Draft</span>
             </div>
             <button type="button" class="app-modal-close" data-bs-dismiss="modal" aria-label="Close">
-              <i class="bi bi-x-lg" aria-hidden="true"></i>
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i>
             </button>
           </header>
           <div class="app-modal-body">
             <div class="fmt-modal-meta">
-              <span><i class="bi bi-folder" aria-hidden="true"></i> <span data-draft-category>General</span></span>
-              <span><i class="bi bi-clock" aria-hidden="true"></i> <span data-draft-reading>— min read</span></span>
-              <span><i class="bi bi-file-text" aria-hidden="true"></i> <span data-draft-words>— words</span></span>
-              <span><i class="bi bi-calendar3" aria-hidden="true"></i> <span data-draft-date>—</span></span>
+              <span><i class="material-symbols-outlined icon-inline" aria-hidden="true">folder</i> <span data-draft-category>General</span></span>
+              <span><i class="material-symbols-outlined icon-inline" aria-hidden="true">schedule</i> <span data-draft-reading>— min read</span></span>
+              <span><i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i> <span data-draft-words>— words</span></span>
+              <span><i class="material-symbols-outlined icon-inline" aria-hidden="true">calendar_month</i> <span data-draft-date>—</span></span>
             </div>
             <div class="fmt-modal-content" data-draft-content></div>
           </div>
           <footer class="app-modal-foot">
             <button type="button" class="app-btn is-ghost" data-bs-dismiss="modal">Close</button>
             <button type="button" class="app-btn is-primary" data-action="use-draft">
-              <i class="bi bi-file-richtext" aria-hidden="true"></i> Use for formatting
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">text_snippet</i> Use for formatting
             </button>
           </footer>
         </div>

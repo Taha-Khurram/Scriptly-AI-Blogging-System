@@ -275,11 +275,11 @@
 
         if (menu) {
             menu.innerHTML = '<button type="button" class="menu-item" role="option" data-value="">' +
-                '<i class="bi bi-check2 menu-check" aria-hidden="true"></i>' +
+                '<i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>' +
                 '<span class="menu-label">' + esc(placeholder) + '</span></button>' +
                 drafts.map((d) => '<button type="button" class="menu-item" role="option" ' +
                     'data-value="' + esc(d.id) + '">' +
-                    '<i class="bi bi-check2 menu-check" aria-hidden="true"></i>' +
+                    '<i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>' +
                     '<span class="menu-label">' + esc(d.title || 'Untitled') + '</span></button>').join('');
         }
 
@@ -349,11 +349,11 @@
         return issues.map((issue) => {
             const severity = String((issue && issue.severity) || 'low').toLowerCase();
             const known = ['high', 'medium', 'low'].includes(severity) ? severity : 'low';
-            const glyph = known === 'high' ? 'bi-exclamation-octagon'
-                : known === 'medium' ? 'bi-exclamation-triangle' : 'bi-info-circle';
+            const glyph = known === 'high' ? 'report'
+                : known === 'medium' ? 'warning' : 'info';
             const text = typeof issue === 'string' ? issue : (issue.message || issue.description || '');
             return '<li class="is-' + known + '">' +
-                '<i class="bi ' + glyph + '" aria-hidden="true"></i>' +
+                '<i class="material-symbols-outlined icon-inline" aria-hidden="true">' + glyph + '</i>' +
                 '<span><span class="seo-issue-severity">' + known + ' priority</span>' +
                 esc(text) + '</span></li>';
         }).join('');
@@ -365,7 +365,7 @@
                 ? item
                 : (item && (item.message || item.description || item.text)) || '';
             if (!text) return '';
-            return '<li><i class="bi ' + glyph + '" aria-hidden="true"></i><span>' +
+            return '<li><i class="material-symbols-outlined icon-inline" aria-hidden="true">' + glyph + '</i><span>' +
                 esc(text) + '</span></li>';
         }).join('');
     }
@@ -417,7 +417,7 @@
         const recs = Array.isArray(analysis.recommendations) ? analysis.recommendations : [];
         const recsCard = $('[data-recs-card]', body);
         const recsList = $('[data-recs-list]', body);
-        if (recsList) recsList.innerHTML = textItems(recs, 'bi-arrow-right-short');
+        if (recsList) recsList.innerHTML = textItems(recs, 'arrow_right_alt');
         if (recsCard) recsCard.hidden = recs.length === 0;
 
         setHead('Analysis', 'Nothing written — this is the draft as it stands');
@@ -450,7 +450,7 @@
             '<td class="is-num">' + (cpc || '—') + '</td>' +
             '<td>' + (comp ? '<span class="seo-comp is-' + comp + '">' + comp + '</span>' : '—') + '</td>' +
             '<td><button type="button" class="seo-copy" data-copy="' + esc(keyword) + '">' +
-            '<i class="bi bi-clipboard" aria-hidden="true"></i> Copy</button></td>' +
+            '<i class="material-symbols-outlined icon-inline" aria-hidden="true">content_copy</i> Copy</button></td>' +
             '</tr>';
     }
 
@@ -532,7 +532,7 @@
     function changeItems(changes) {
         return changes.map((change) => {
             if (typeof change === 'string') {
-                return '<li><i class="bi bi-check2" aria-hidden="true"></i><span>' +
+                return '<li><i class="material-symbols-outlined icon-inline" aria-hidden="true">check</i><span>' +
                     esc(change) + '</span></li>';
             }
             const description = (change && change.description) || 'Content updated';
@@ -542,7 +542,7 @@
                 ? '<span class="seo-change-detail"><strong>was</strong> ' + esc(before) + '</span>' +
                   '<span class="seo-change-detail"><strong>now</strong> ' + esc(after) + '</span>'
                 : '';
-            return '<li><i class="bi bi-check2" aria-hidden="true"></i>' +
+            return '<li><i class="material-symbols-outlined icon-inline" aria-hidden="true">check</i>' +
                 '<span>' + esc(description) + detail + '</span></li>';
         }).join('');
     }
@@ -631,7 +631,7 @@
         const next = Array.isArray(data.recommendations) ? data.recommendations : [];
         const nextCard = $('[data-next-card]', body);
         const nextList = $('[data-next-list]', body);
-        if (nextList) nextList.innerHTML = textItems(next, 'bi-arrow-right-short');
+        if (nextList) nextList.innerHTML = textItems(next, 'arrow_right_alt');
         if (nextCard) nextCard.hidden = next.length === 0;
 
         setHead('Optimization result', 'Saved over the draft');

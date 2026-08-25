@@ -98,10 +98,10 @@
     <p>{{ settings.hero_about.cta_subtitle if settings.hero_about else "Discover our latest articles or get in touch with us. We'd love to hear from you!" }}</p>
     <div class="ed-about-cta-actions">
         <a href="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true)) }}" class="btn-primary">
-            <i class="bi bi-journal-text"></i> {{ settings.hero_about.cta_btn_primary if settings.hero_about else 'Browse Articles' }}
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">menu_book</i> {{ settings.hero_about.cta_btn_primary if settings.hero_about else 'Browse Articles' }}
         </a>
         <a href="{{ url_for('site_bp.site_contact', site_identifier=settings.site_slug|default(user_id, true)) }}" class="btn-outline">
-            <i class="bi bi-envelope"></i> {{ settings.hero_about.cta_btn_secondary if settings.hero_about else 'Contact Us' }}
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">mail</i> {{ settings.hero_about.cta_btn_secondary if settings.hero_about else 'Contact Us' }}
         </a>
     </div>
 </section>

@@ -27,14 +27,14 @@
         </h1>
         <p class="ed-cover-lead">{{ excerpt(cover, 220) }}</p>
         <a class="ed-read-link" href="{{ url_for('site_bp.site_post', site_identifier=settings.site_slug|default(user_id, true), slug_or_id=cover.slug or cover.id) }}">
-            <span class="ed-rule"></span> Read the story <i class="bi bi-arrow-right"></i>
+            <span class="ed-rule"></span> Read the story <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i>
         </a>
     </div>
     <a class="ed-cover-media" href="{{ url_for('site_bp.site_post', site_identifier=settings.site_slug|default(user_id, true), slug_or_id=cover.slug or cover.id) }}">
         {% if cover.cover_image %}
         <img src="{{ cover.cover_image }}" alt="{{ cover.title }}" loading="eager">
         {% else %}
-        <span class="ed-cover-fallback"><i class="bi bi-journal-richtext"></i></span>
+        <span class="ed-cover-fallback"><i class="material-symbols-outlined icon-inline" aria-hidden="true">article</i></span>
         {% endif %}
     </a>
 </section>
@@ -47,7 +47,7 @@
 <section class="ed-index" data-animate="fade-up">
     <div class="ed-section-head">
         <h2 class="ed-kicker">{% if current_category %}More in {{ current_category }}{% else %}The Index{% endif %}</h2>
-        <a class="ed-viewall" href="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true)) }}">All articles <i class="bi bi-arrow-up-right"></i></a>
+        <a class="ed-viewall" href="{{ url_for('site_bp.site_blog', site_identifier=settings.site_slug|default(user_id, true)) }}">All articles <i class="material-symbols-outlined icon-inline" aria-hidden="true">north_east</i></a>
     </div>
     <ol class="ed-index-list" data-animate-stagger>
         {% for blog in rest %}
@@ -61,7 +61,7 @@
                 <span class="ed-row-meta">
                     <span class="ed-row-cat">{{ blog.category if blog.category else 'General' }}</span>
                     <span class="ed-row-date">{{ blog.updated_at.strftime('%b %d, %Y') if blog.updated_at else 'Recently' }}</span>
-                    <span class="ed-row-arrow"><i class="bi bi-arrow-right"></i></span>
+                    <span class="ed-row-arrow"><i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i></span>
                 </span>
             </a>
         </li>
@@ -73,7 +73,7 @@
 {% else %}
 <!-- ==================== EMPTY STATE ==================== -->
 <div class="empty-state" data-animate="fade-up">
-    <i class="bi bi-journal-richtext"></i>
+    <i class="material-symbols-outlined icon-inline" aria-hidden="true">article</i>
     <h3>No posts yet</h3>
     <p>Fresh writing is on the way — check back soon.</p>
 </div>
@@ -99,7 +99,7 @@
             </div>
         </div>
         <a href="{{ url_for('site_bp.site_about', site_identifier=settings.site_slug|default(user_id, true)) }}" class="ed-read-link">
-            <span class="ed-rule"></span> {{ settings.hero_home.cta_secondary if settings.hero_home else 'Learn more about us' }} <i class="bi bi-arrow-right"></i>
+            <span class="ed-rule"></span> {{ settings.hero_home.cta_secondary if settings.hero_home else 'Learn more about us' }} <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i>
         </a>
     </div>
 </section>
@@ -111,7 +111,7 @@
     <p>{{ settings.footer.newsletter_description if settings.footer else 'Subscribe and get new articles delivered straight to your inbox — thoughtful, occasional, and never spammy.' }}</p>
     <form class="ed-news-form" id="home-newsletter-form">
         <input type="email" name="email" placeholder="you@example.com" required>
-        <button type="submit">Subscribe <i class="bi bi-arrow-right"></i></button>
+        <button type="submit">Subscribe <i class="material-symbols-outlined icon-inline" aria-hidden="true">arrow_forward</i></button>
     </form>
     <p class="ed-news-note">{{ settings.hero_home.newsletter_disclaimer if settings.hero_home else 'No spam · Unsubscribe anytime' }}</p>
 </section>
@@ -128,7 +128,7 @@
             const button = this.querySelector('button');
             const originalHTML = button.innerHTML;
 
-            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Subscribing...';
+            button.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">hourglass_top</i> Subscribing...';
             button.disabled = true;
 
             try {
@@ -140,15 +140,15 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    button.innerHTML = '<i class="bi bi-check-lg"></i> Subscribed!';
+                    button.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">check</i> Subscribed!';
                     this.querySelector('input').value = '';
                     setTimeout(() => { button.innerHTML = originalHTML; button.disabled = false; }, 3000);
                 } else {
-                    button.innerHTML = '<i class="bi bi-x-lg"></i> Failed';
+                    button.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i> Failed';
                     setTimeout(() => { button.innerHTML = originalHTML; button.disabled = false; }, 2000);
                 }
             } catch (err) {
-                button.innerHTML = '<i class="bi bi-x-lg"></i> Error';
+                button.innerHTML = '<i class="material-symbols-outlined icon-inline" aria-hidden="true">close</i> Error';
                 setTimeout(() => { button.innerHTML = originalHTML; button.disabled = false; }, 2000);
             }
         });

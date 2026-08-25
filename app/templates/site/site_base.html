@@ -59,8 +59,12 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Icons. Material Symbols, self-hosted: the site used to pull an icon
+         webfont from a CDN, and it does not load dashboard.css, so the shared
+         @font-face lives in icons.css. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+        href="{{ url_for('static', filename='fonts/material-symbols-outlined.woff2') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/icons.css') }}?v=1">
 
     <!-- Critical Site Styles (preloaded for faster rendering) -->
     <link rel="preload" href="{{ url_for('static', filename='css/site/site.css') }}" as="style">
@@ -135,7 +139,7 @@
     <div class="cookie-consent-banner" id="cookie-consent" style="display: none;">
         <div class="cookie-consent-content">
             <div class="cookie-consent-text">
-                <i class="bi bi-shield-check"></i>
+                <i class="material-symbols-outlined icon-inline" aria-hidden="true">verified_user</i>
                 <span>{{ settings.legal.cookie_consent_text or 'We use cookies to enhance your browsing experience and analyze site traffic.' }}</span>
             </div>
             <div class="cookie-consent-actions">
