@@ -191,6 +191,16 @@ _DB_RETURN_SHAPES = {
     'get_blogs_without_embeddings': [],
     'get_user_seo_reports': [],
     'get_generation': None,
+    # --- conversational agent ---
+    # `get_chat_session` returning None by default means every chat route
+    # answers 404 unless a test deliberately provides a session. That is the
+    # right default: it is the ownership check, and a mock that quietly grants
+    # access to any session id would make the access tests vacuous.
+    'get_chat_session': None,
+    'get_chat_messages': [],
+    'get_outline': None,
+    'approve_outline': None,
+    'consume_confirmation': None,
 
     # --- paginated results ---
     # Shapes copied from the repositories' own `return` statements. Guessing
@@ -210,6 +220,7 @@ _DB_RETURN_SHAPES = {
                                    'per_page': 10, 'total_pages': 1},
     # Keyset-paged, so a cursor rather than a page number.
     'get_generation_history': {'items': [], 'has_more': False, 'next_cursor': ''},
+    'list_chat_sessions': {'items': [], 'has_more': False, 'next_cursor': ''},
 
     # --- stats maps ---
     'get_activity_stats': {'total': 0, 'blog': 0, 'user': 0, 'comment': 0,
@@ -227,6 +238,15 @@ _DB_RETURN_SHAPES = {
     # --- writes ---
     'save_newsletter_subscriber': ('doc-1', True),
     'create_draft': 'blog-1',
+    'create_chat_session': 'session-1',
+    'append_chat_message': {'id': 'msg-1', 'seq': 0},
+    'update_chat_session': True,
+    'delete_chat_session': True,
+    'create_outline_record': 'outline-1',
+    'supersede_outline': True,
+    'mark_outline_written': True,
+    'create_confirmation': 'token-1',
+    'purge_expired_confirmations': 0,
     'record_generation': 'gen-1',
     'delete_generation': True,
     'clear_generation_history': 0,
@@ -259,7 +279,7 @@ def mock_db(monkeypatch):
         'app.routes.auth', 'app.routes.blog_routes', 'app.routes.site_routes',
         'app.routes.activity_routes', 'app.routes.analytics_routes',
         'app.routes.blogs_listing_routes', 'app.routes.gallery_routes',
-        'app.routes.history_routes',
+        'app.routes.history_routes', 'app.routes.chat_routes',
         'app.routes.leads_routes', 'app.routes.schedule_routes',
         'app.routes.settings_routes', 'app.routes.user_mgmt',
         'app.routes.newsletter_routes', 'app.routes.optimization_routes',

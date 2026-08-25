@@ -228,7 +228,13 @@ def publish_due_blogs():
 
 
 def cleanup_expired_tasks():
-    """Drop finished background-task records past their retention window."""
+    """Drop finished background-task records and agent turn logs.
+
+    Both tables are per-process in-memory state, so this runs without the lease
+    -- each worker owns its own and must sweep it. They are swept together
+    because they describe the same work from two angles: the task record is
+    "was it running", the turn log is "what did it say".
+    """
     try:
         from app.utils.task_manager import task_manager
         removed = task_manager.cleanup_expired()
@@ -236,6 +242,32 @@ def cleanup_expired_tasks():
             logger.debug('Reclaimed %s finished task records', removed)
     except Exception:
         logger.exception('Task cleanup failed')
+
+    try:
+        from app.agent.events import turns
+        dropped = turns.cleanup()
+        if dropped:
+            logger.debug('Reclaimed %s finished agent turn logs', dropped)
+    except Exception:
+        logger.exception('Agent turn cleanup failed')
+
+
+def purge_agent_confirmations():
+    """Delete spent and expired destructive-action tokens.
+
+    Firestore, so it is lease-guarded: every worker running it would issue the
+    same query and pay for the same reads. Unlike the sweeps above this is not
+    a correctness control -- a consumed token is inert and an expired one is
+    refused at redemption -- so its only job is keeping a collection that only
+    grows from doing so forever.
+    """
+    try:
+        from app.firebase.firestore_service import FirestoreService
+        purged = FirestoreService().purge_expired_confirmations()
+        if purged:
+            logger.debug('Purged %s expired agent confirmations', purged)
+    except Exception:
+        logger.exception('Agent confirmation purge failed')
 
 
 def init_scheduler(app):
@@ -286,6 +318,17 @@ def init_scheduler(app):
         trigger=IntervalTrigger(seconds=300),
         id='cleanup_expired_tasks',
         name='Clean up finished background tasks',
+        replace_existing=True,
+    )
+
+    # Firestore-backed and therefore lease-guarded: without the lease every
+    # instance would pay for the same query. Half-hourly, because the tokens it
+    # removes are already inert -- this is cost control, not a safety control.
+    scheduler.add_job(
+        func=_with_lease(purge_agent_confirmations),
+        trigger=IntervalTrigger(seconds=1800),
+        id='purge_agent_confirmations',
+        name='Purge expired agent confirmations',
         replace_existing=True,
     )
 

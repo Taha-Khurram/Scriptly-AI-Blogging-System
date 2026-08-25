@@ -83,22 +83,6 @@
     align-items: flex-start;
 }
 
-.turn-mark {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    margin-top: 18px;
-    border-radius: 50%;
-    background: var(--accent-tint);
-    color: var(--accent);
-}
-
-.turn-mark .material-symbols-outlined {
-    font-size: 18px;
-}
-
 .turn-main {
     flex: 1;
     min-width: 0;
@@ -549,12 +533,6 @@
    ========================================================================== */
 
 @media (max-width: 700px) {
-    /* The mark costs 44px of a 375px column and says nothing the "Scriptly"
-       label above the turn does not. */
-    .turn-mark {
-        display: none;
-    }
-
     /* Stage and metrics stack rather than squeeze: "Formatting and styling"
        and "54% · 0:32" cannot share a narrow line without one of them
        truncating. */

@@ -156,6 +156,32 @@ class BaseConfig:
     GEMINI_TIMEOUT_SECONDS = _env_int('GEMINI_TIMEOUT_SECONDS', 180)
     GEMINI_MAX_RETRIES = _env_int('GEMINI_MAX_RETRIES', 2)
 
+    # --- Conversational agent --------------------------------------------
+    # Guards against a runaway tool-calling loop. Both are ceilings on ONE
+    # user message, and both matter: the iteration cap bounds cost, the
+    # deadline bounds how long a worker thread is held. The per-tool call
+    # budgets are separate and live on the turn context, because they are a
+    # property of the tool rather than of the deployment.
+    #
+    # Seven iterations is the longest legitimate chain plus one spare:
+    # search, search, outline, approve, write, reply.
+    AGENT_MAX_ITERATIONS = _env_int('AGENT_MAX_ITERATIONS', 7)
+    # Generous because writing a long post is legitimately 60-120s and a turn
+    # may write twice; finite because the thread is not free.
+    AGENT_TURN_DEADLINE_SECONDS = _env_int('AGENT_TURN_DEADLINE_SECONDS', 420)
+
+    # --- Web search (the agent's research tool) ---------------------------
+    # Unset means no research: the agent still works, says it is writing from
+    # its own knowledge, and is instructed never to invent a citation. That
+    # degradation is deliberate -- a missing key is a deployment fact, not a
+    # request failure. /healthz reports which provider is live.
+    SEARCH_PROVIDER = os.getenv('SEARCH_PROVIDER', '')
+    SEARCH_API_KEY = os.getenv('SEARCH_API_KEY')
+    SEARCH_MAX_RESULTS = _env_int('SEARCH_MAX_RESULTS', 5)
+    # Short on purpose: a search sits inside a turn the user is watching, so a
+    # slow provider must degrade to "no sources" rather than to a stalled chat.
+    SEARCH_TIMEOUT_SECONDS = _env_int('SEARCH_TIMEOUT_SECONDS', 12)
+
     # --- Third-party APIs -------------------------------------------------
     RAPIDAPI_KEY = os.getenv('RAPIDAPI_KEY')
     AHREFS_RAPIDAPI_KEY = os.getenv('AHREFS_RAPIDAPI_KEY')
@@ -186,6 +212,10 @@ class BaseConfig:
     RATELIMIT_PUBLIC_WRITE = os.getenv('RATELIMIT_PUBLIC_WRITE', '5 per minute')
     RATELIMIT_AUTH = os.getenv('RATELIMIT_AUTH', '20 per minute')
     RATELIMIT_AI_GENERATE = os.getenv('RATELIMIT_AI_GENERATE', '30 per hour')
+    # Chat turns. Higher than one-shot generation because most turns are a
+    # sentence and a tool read, not a blog post -- but still per hour, since any
+    # one of them can become a blog post.
+    RATELIMIT_CHAT = os.getenv('RATELIMIT_CHAT', '90 per hour')
 
     # --- Background work --------------------------------------------------
     TASK_MAX_WORKERS = _env_int('TASK_MAX_WORKERS', 4)

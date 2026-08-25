@@ -1,5 +1,6 @@
 account_tree
 add
+add_comment
 admin_panel_settings
 ads_click
 alt_route
@@ -39,6 +40,7 @@ content_copy
 dark_mode
 dashboard
 delete
+delete_forever
 delete_sweep
 description
 desktop_windows
@@ -47,6 +49,7 @@ download
 draft
 drafts
 edit
+edit_note
 edit_square
 error
 event
@@ -67,6 +70,7 @@ hourglass_top
 image
 inbox
 info
+inventory_2
 key
 label
 language
@@ -99,6 +103,7 @@ photo_camera
 photo_library
 post_add
 public
+public_off
 refresh
 remove
 remove_circle
@@ -131,6 +136,7 @@ timer
 title
 toc
 translate
+travel_explore
 trending_up
 trophy
 tune

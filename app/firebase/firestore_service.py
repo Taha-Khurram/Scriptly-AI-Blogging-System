@@ -23,6 +23,7 @@ The behaviour now lives in :mod:`app.repositories`, one module per domain:
 * :class:`~app.repositories.gallery.GalleryRepository` -- metadata for the media library. the bytes live in storage_service
 * :class:`~app.repositories.seo_reports.SeoReportRepository` -- saved seo audit reports
 * :class:`~app.repositories.generations.GenerationRepository` -- blog generation runs: the transcript of every conversation with the agent
+* :class:`~app.repositories.chat.ChatRepository` -- the conversational agent: sessions, messages, outline approvals and destructive-action confirmations
 
 ``FirestoreService`` composes them. Its public surface is byte-for-byte the
 method set it had before, so every existing call site works unchanged -- the
@@ -34,6 +35,7 @@ from app.core.logging import get_logger
 from app.firebase.firebase_admin import FirebaseLoader
 from app.repositories import (
     BlogRepository,
+    ChatRepository,
     CategoryRepository,
     ActivityRepository,
     UserRepository,
@@ -69,6 +71,7 @@ __all__ = [
 
 class FirestoreService(
     BlogRepository,
+    ChatRepository,
     CategoryRepository,
     ActivityRepository,
     UserRepository,
@@ -99,3 +102,10 @@ class FirestoreService(
         # app/repositories/generations.py for why the transcript is durable
         # while the task record that produced it is not.
         self.generation_collection = "generations"
+        # The conversational agent's own state. Four collections rather than
+        # one because they have four different shapes and lifetimes -- see
+        # app/repositories/chat.py for the reasoning on each.
+        self.chat_session_collection = "chat_sessions"
+        self.chat_message_collection = "chat_messages"
+        self.outline_collection = "blog_outlines"
+        self.confirmation_collection = "agent_confirmations"

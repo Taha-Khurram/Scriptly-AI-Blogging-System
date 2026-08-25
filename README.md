@@ -28,6 +28,7 @@ SEO tooling, team collaboration, and a 13-agent AI pipeline.
 
 ## 🌟 Highlights
 
+- **💬 Conversational blog agent** — a chat studio (`/chat`) that researches a topic, proposes an outline and **stops for your approval** before writing a word, then keeps the conversation going: revise sections, change the tone, write another, tidy up old drafts. Tool-calling loop, streamed turns that survive a closed tab, two-phase deletes. See [docs/AGENT.md](docs/AGENT.md).
 - **📝 AI blog pipeline** — 13 specialized agents take a topic to a finished, SEO-scored article: outline → content → formatting → SEO → categorization, orchestrated end-to-end.
 - **🕵️ AI Humanizer** — beats detectors (GPTZero, Originality.ai, ZeroGPT) with 2-chunk rotating-prompt rewriting, E-E-A-T enforcement, and a **5-pass** zero-cost post-processor.
 - **🔎 Semantic Search Agent** — agentic search with intent classification, query expansion, and hybrid vector + keyword retrieval, with the agent's reasoning shown to users.
@@ -44,7 +45,7 @@ SEO tooling, team collaboration, and a 13-agent AI pipeline.
 
 | Area | Screens |
 |------|---------|
-| **Create & draft** | Create Blog (streaming) · Drafts · Approval Queue · All Blogs |
+| **Create & draft** | **Studio (chat agent)** · Create Blog (streaming) · Drafts · Approval Queue · All Blogs |
 | **Publish** | Schedule (AI-recommended times) · Categories · Newsletter |
 | **Engage** | Comment Moderation · Leads (contact submissions) · Gallery |
 | **Insights** | Analytics · SEO Tools · Optimization (Ahrefs) · Activity Log |

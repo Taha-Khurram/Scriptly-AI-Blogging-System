@@ -400,6 +400,133 @@ class GeminiClient:
             )
         # Nothing specific to say; the caller raises the general case.
 
+    def stream_with_tools(self, contents, tools, *, model=None,
+                          generation_config=None, system_instruction=None,
+                          timeout=None, max_retries=None, tool_config=None,
+                          label='tools'):
+        """Run a tool-enabled turn, yielding text and tool calls as they arrive.
+
+        Yields ``('text', str)`` for prose and ``('call', {'name', 'args'})``
+        for each function call the model requests, in the order the model
+        produced them. The caller runs the tools and calls this again with the
+        results appended to ``contents`` -- the loop lives in
+        :mod:`app.agent.loop`, not here, because the *policy* about when to stop
+        calling tools is an application decision and this class is a transport.
+
+        Streaming rather than :meth:`generate_text` for the same reason the blog
+        writer streams: a model that says "let me look that up" before calling
+        ``search_web`` should have said it on screen *before* the search runs,
+        not after it finishes. With a non-streaming call the user watches
+        nothing happen for the length of the whole turn.
+
+        Function calls arrive as complete parts -- Gemini does not split a call's
+        arguments across chunks the way some APIs split a delta -- so a call can
+        be dispatched the moment its part is seen, with no accumulation buffer.
+
+        Retries follow :meth:`stream_text`: only while nothing has been yielded.
+        Once the caller has been handed a token it has shown it, and restarting
+        would duplicate text on screen. Once it has been handed a *call* it may
+        have run it, and restarting could run it twice -- which for a tool that
+        writes is the difference between one draft and two.
+        """
+        self._require_configured()
+        handle = self.get_model(
+            model, generation_config=generation_config,
+            system_instruction=system_instruction,
+        )
+        deadline = timeout or self._timeout
+        attempts = (max_retries if max_retries is not None else self._max_retries) + 1
+
+        last_error = None
+        for attempt in range(attempts):
+            started = time.perf_counter()
+            emitted = 0
+            try:
+                kwargs = {'tools': tools}
+                if tool_config is not None:
+                    kwargs['tool_config'] = tool_config
+                if _SUPPORTS_REQUEST_OPTIONS:
+                    kwargs['request_options'] = {'timeout': deadline}
+
+                stream = handle.generate_content(contents, stream=True, **kwargs)
+
+                calls = 0
+                for chunk in stream:
+                    for kind, payload in self._chunk_parts(chunk):
+                        emitted += 1
+                        if kind == 'call':
+                            calls += 1
+                        yield kind, payload
+
+                if not emitted:
+                    # A turn that produced neither text nor a call is a failure
+                    # with a reason attached; the reason is only readable once
+                    # the iterator is drained.
+                    self._raise_for_empty_stream(stream)
+
+                logger.info(
+                    'Gemini %s ok', label,
+                    extra={'label': label, 'model': model or self._default_model,
+                           'attempt': attempt + 1, 'streamed': True,
+                           'tool_calls': calls, 'parts': emitted,
+                           'duration_ms': round((time.perf_counter() - started) * 1000, 1)},
+                )
+                return
+
+            except (GeminiSafetyError, GeminiResponseError):
+                raise
+
+            except Exception as exc:
+                retryable, error_class = _classify(exc)
+                last_error = error_class(str(exc)[:300])
+                logger.warning(
+                    'Gemini %s failed (attempt %s/%s, %s parts in): %s',
+                    label, attempt + 1, attempts, emitted, exc,
+                    extra={'label': label, 'retryable': retryable},
+                )
+                if emitted:
+                    raise last_error from exc
+                if not retryable or attempt == attempts - 1:
+                    break
+                time.sleep(min(2 ** attempt, 8) * (0.5 + random.random()))
+
+        raise last_error or GeminiError()
+
+    @staticmethod
+    def _chunk_parts(chunk):
+        """``(kind, payload)`` pairs out of one streaming chunk.
+
+        Reads ``candidates[0].content.parts`` directly rather than going through
+        ``chunk.text``, which raises whenever a chunk carries a function call
+        instead of prose -- the normal case in a tool-enabled turn. Each accessor
+        is guarded: a chunk holding only a finish reason or a safety rating has
+        no parts at all, and that is routine mid-stream rather than a fault.
+        """
+        try:
+            candidates = getattr(chunk, 'candidates', None) or []
+            if not candidates:
+                return
+            parts = getattr(getattr(candidates[0], 'content', None), 'parts', None) or []
+        except Exception:
+            return
+
+        for part in parts:
+            call = getattr(part, 'function_call', None)
+            # A proto message is falsy when empty, so `if call:` correctly
+            # skips the default-constructed FunctionCall that sits on a
+            # text-only part.
+            if call and getattr(call, 'name', ''):
+                try:
+                    args = dict(call.args) if call.args else {}
+                except Exception:
+                    args = {}
+                yield 'call', {'name': str(call.name), 'args': _plain(args)}
+                continue
+
+            text = getattr(part, 'text', '') or ''
+            if text:
+                yield 'text', text
+
     def generate_json(self, prompt, *, model=None, generation_config=None,
                       system_instruction=None, timeout=None, max_retries=None,
                       label='generate_json', default=None):
@@ -514,6 +641,35 @@ class GeminiClient:
             raise GeminiResponseError('The AI returned an empty response.')
 
         return text
+
+
+def _plain(value):
+    """Convert proto-backed containers into plain Python, recursively.
+
+    Function-call arguments come back as ``MapComposite`` and
+    ``RepeatedComposite`` -- dict-like and list-like, but neither
+    JSON-serialisable nor safe to hold past the response. They are logged, stored
+    in an audit trail and handed to tool functions, so they have to be real
+    dicts, lists and scalars before they leave this module.
+
+    The isinstance checks are deliberately duck-typed on ``items``/iterability
+    rather than on the proto classes: those types are private to the marshalling
+    layer and have moved between SDK versions.
+    """
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if hasattr(value, 'items'):
+        try:
+            return {str(k): _plain(v) for k, v in value.items()}
+        except Exception:
+            return str(value)
+    if isinstance(value, (list, tuple)):
+        return [_plain(v) for v in value]
+    # RepeatedComposite is iterable but is not a list or tuple.
+    try:
+        return [_plain(v) for v in value]
+    except TypeError:
+        return str(value)
 
 
 _FENCE_RE = re.compile(r'```(?:json)?\s*(.*?)\s*```', re.S | re.I)

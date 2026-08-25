@@ -166,6 +166,34 @@ def _check_tasks():
     }
 
 
+def _check_search():
+    """Whether the agent can research, and where.
+
+    Degraded rather than failed when unconfigured: the agent works without it
+    and is instructed to say so, but a deployment that *meant* to have research
+    and does not should be able to see that here rather than infer it from
+    posts that stopped citing anything.
+    """
+    from app.services.search_service import search
+
+    snapshot = search.stats()
+    return {
+        'status': 'ok' if snapshot.get('available') else 'degraded',
+        **snapshot,
+    }
+
+
+def _check_agent():
+    """Live conversational turns held in this process.
+
+    Per-process, like the task pool, and for the same reason -- so a leak in
+    the turn logs shows up on a dashboard rather than only as growing RSS.
+    """
+    from app.agent.events import turns
+
+    return {'status': 'ok', **turns.stats()}
+
+
 # Firestore and the session store are required to serve an authenticated
 # request; everything else degrades. The cache falling back to in-process
 # storage is slower, not broken, and AI being unconfigured breaks the AI
@@ -180,6 +208,8 @@ _CHECKS = {
     'ai': _check_ai,
     'tasks': _check_tasks,
     'storage': _check_storage,
+    'search': _check_search,
+    'agent': _check_agent,
 }
 
 

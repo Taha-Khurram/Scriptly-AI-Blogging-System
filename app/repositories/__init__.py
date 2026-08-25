@@ -5,6 +5,7 @@ Each module owns one domain of the Firestore schema. Import the composed
 needs to exercise one domain in isolation.
 """
 from app.repositories.blogs import BlogRepository
+from app.repositories.chat import ChatRepository
 from app.repositories.categories import CategoryRepository
 from app.repositories.activity import ActivityRepository
 from app.repositories.users import UserRepository
@@ -21,6 +22,7 @@ from app.repositories.generations import GenerationRepository
 
 __all__ = [
     'BlogRepository',
+    'ChatRepository',
     'CategoryRepository',
     'ActivityRepository',
     'UserRepository',

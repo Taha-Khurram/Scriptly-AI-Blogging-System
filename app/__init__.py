@@ -129,6 +129,7 @@ def _init_infrastructure(app):
         warn_if_not_shared,
     )
     from app.services.gemini_client import gemini
+    from app.services.search_service import search
     from app.utils.cache import cache
     from app.utils.task_manager import task_manager
 
@@ -150,6 +151,16 @@ def _init_infrastructure(app):
         embedding_model=app.config.get('GEMINI_EMBEDDING_MODEL'),
         timeout=app.config.get('GEMINI_TIMEOUT_SECONDS', 180),
         max_retries=app.config.get('GEMINI_MAX_RETRIES', 2),
+    )
+
+    # The conversational agent's research tool. An unset provider is a
+    # supported state, not a failure: the agent says it is writing from its own
+    # knowledge instead of citing sources. See app/services/search_service.py.
+    search.configure(
+        provider=app.config.get('SEARCH_PROVIDER'),
+        api_key=app.config.get('SEARCH_API_KEY'),
+        timeout=app.config.get('SEARCH_TIMEOUT_SECONDS', 12),
+        max_results=app.config.get('SEARCH_MAX_RESULTS', 5),
     )
 
     task_manager.configure(
@@ -300,6 +311,7 @@ _BLUEPRINTS = (
     ('app.routes.activity_routes', 'activity_bp', None),
     ('app.routes.blogs_listing_routes', 'blogs_bp', None),
     ('app.routes.history_routes', 'history_bp', None),
+    ('app.routes.chat_routes', 'chat_bp', None),
     ('app.routes.analytics_routes', 'analytics_bp', None),
     ('app.routes.schedule_routes', 'schedule_bp', None),
     ('app.routes.leads_routes', 'leads_bp', None),

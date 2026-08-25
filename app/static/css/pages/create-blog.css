@@ -435,18 +435,6 @@
    css/components/thread.css, which History renders too. What stays here is the
    part that only makes sense while a run is in flight. */
 
-/* Turns gently only while there is something to wait for. */
-.create-stage[data-state="working"] .turn:not(.is-settled) .turn-mark {
-    animation: turnMarkTurn 3.2s linear infinite;
-}
-
-@keyframes turnMarkTurn {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-
 /* ==========================================================================
    RESPONSIVE
    ========================================================================== */

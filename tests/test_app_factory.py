@@ -207,8 +207,12 @@ class TestHealthEndpoints:
         # counters. It is a *critical* check: unreadable, every request is
         # anonymous and nobody can stay signed in, so the instance should be
         # drained rather than left serving login redirects.
+        # 'search' and 'agent' cover the conversational agent: which web-search
+        # provider is live (degraded when none is, since the agent still works
+        # and says so), and how many turns this process is holding.
         assert set(checks) == {
             'firestore', 'store', 'cache', 'ai', 'tasks', 'storage',
+            'search', 'agent',
         }
         for name, result in checks.items():
             assert result['status'] in ('ok', 'degraded', 'fail'), name

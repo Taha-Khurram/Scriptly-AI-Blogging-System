@@ -11,6 +11,7 @@ Complete documentation for Scriptly - an AI-powered blog content generation plat
 3. [Configuration](#configuration)
 4. [Features](#features)
 5. [AI Agents](#ai-agents)
+5b. [The conversational agent](AGENT.md) — the `/chat` studio, in its own document
 6. [Public Site](#public-site)
 7. [API Reference](#api-reference)
 8. [Database Schema](#database-schema)
@@ -247,18 +248,34 @@ For production, configure Firestore rules to restrict access. Collections are cr
 
 ## AI Agents
 
+There are two ways into the pipeline, and they share every specialist below.
+
+**Single-shot** (`/create`) — one prompt in, a finished draft out. Fastest path
+when you already know what you want.
+
+**Conversational** (`/chat`) — an ongoing session that researches, plans, writes,
+revises and manages the library, with you approving the plan before anything is
+written. It does not replace the pipeline; it drives it one step at a time.
+Its architecture, guarantees and migration notes are in **[docs/AGENT.md](AGENT.md)**.
+
 ### Architecture Overview
 
-Scriptly implements a multi-agent system with 13 specialized agents. Each agent can operate independently or as part of an orchestrated pipeline.
+Scriptly implements a multi-agent system of specialized agents. Each can operate
+independently or as part of an orchestrated pipeline.
 
 ```
-Blog Agent (Orchestrator)
-├── Outline Agent → structured outline
-├── Content Agent → full article (parallel where safe)
-├── Formatting Agent → TOC, reading time
-├── SEO Agent → optimization pass
-└── Category Agent → auto-categorization
+Blog Agent (single-shot orchestrator)      Chat Agent (conversational orchestrator)
+├── Content Agent → full article           ├── search_web        → live research
+├── Formatting Agent → TOC, reading time   ├── Outline Agent     → plan, awaiting approval
+├── SEO Agent → optimization pass          ├── Content Agent     → writes from the approved plan
+└── Category Agent → auto-categorization   ├── Edit Agent        → one targeted change
+                                           ├── Formatting/Category Agents
+                                           └── list / get / delete (two-phase)
 ```
+
+The specialists (`app/agents/`) know how to do one thing to a piece of text. The
+orchestrators decide what to do and when — and in the conversational case,
+whether you have agreed to it yet (`app/agent/`).
 
 ### Blog Agent (`blog_agent.py`)
 
@@ -266,11 +283,45 @@ The orchestrator that coordinates the full generation pipeline. Manages the flow
 
 ### Outline Agent (`outline_agent.py`)
 
-Generates structured blog outlines from topics. Produces hierarchical heading structures with section descriptions that guide the Content Agent.
+Produces the structured plan a human approves before anything is written: a
+working title, the angle, the named audience, and sections with the concrete
+claim each will make. Returns JSON rather than prose, because an outline that
+gets approved, revised and diffed has to be storable — see
+[docs/AGENT.md](AGENT.md#the-two-guarantees).
+
+Never invents sources. Research notes are passed in from `search_web` results or
+not at all; a model asked to "include sources" with nothing to cite produces
+plausible URLs that do not exist, and an outline approved *because* of its
+sources is the worst place for that.
 
 ### Content Agent (`content_agent.py`)
 
-Expands outlines into complete blog articles. Takes the structured outline and generates full prose for each section while maintaining coherence across the entire post.
+Writes the post. Three entry points over **one** writing brief (the shared
+`WRITING_RULES` constant — the AEO rules, the E-E-A-T rules, the banned AI tells,
+the formatting requirements):
+
+- `generate_blog(topic)` — waits for the whole post. For callers that only use
+  the finished text.
+- `stream_blog(topic, ...)` — streams the post, planning out loud first. What
+  `/create` uses; the plan appears as the agent's reasoning.
+- `stream_from_outline(outline, ...)` — writes against an outline a human already
+  approved. **No planning block**: the plan exists and was agreed to, and asking
+  the model to plan again is how an approved outline becomes a post that does not
+  follow it.
+
+One brief, not three copies, because three would drift and the difference would
+only ever surface as "why does the chat version keep saying 'delve'".
+
+### Edit Agent (`edit_agent.py`)
+
+Applies one natural-language instruction to a post that already exists — rewrite
+a section, change the tone, fix the intro. Returns the **whole** post with only
+that change made, and reports what actually moved (word delta, section list) so
+an over-edit is visible in the same turn rather than a week later.
+
+Full document rather than a patch, deliberately: markdown has no stable line
+identity, a model miscounts, and a mis-applied patch corrupts a post silently.
+A full return is checkable.
 
 ### SEO Agent (`seo_agent.py`)
 
@@ -475,6 +526,28 @@ Configurable via Dashboard > Site Settings:
 | POST | `/blogs/<blog_id>/delete` | Delete blog |
 | POST | `/blogs/<blog_id>/humanize` | Humanize content |
 | POST | `/blogs/<blog_id>/seo` | Run SEO analysis |
+
+### Conversational agent (`/chat`)
+
+See [docs/AGENT.md](AGENT.md) for the flow and the guarantees behind these.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/chat` | The studio. `?s=<id>` opens one conversation |
+| GET | `/api/chat/sessions` | List conversations (keyset-paged on `before`) |
+| POST | `/api/chat/sessions` | Open a conversation |
+| GET | `/api/chat/sessions/<id>` | One conversation, its messages, and any turn still running in it |
+| POST | `/api/chat/sessions/<id>` | Rename |
+| DELETE | `/api/chat/sessions/<id>` | Delete the conversation. The posts it produced are untouched |
+| POST | `/api/chat/sessions/<id>/messages` | Send a message. **202** with a `turn_id`; `409 agent_busy` if a turn is already running |
+| GET | `/api/chat/turns/<id>/stream` | Tail a turn as SSE. Bounded lifetime; sends `reconnect` with a cursor, honours `Last-Event-ID` |
+| GET | `/api/chat/turns/<id>?cursor=N` | The same event log by poll. Omit `cursor` to replay from the start |
+| POST | `/api/chat/outlines/<id>/approve` | **The human in the loop.** Approves and starts the write. `?write=0` approves only |
+| POST | `/api/chat/confirm` | Redeem a single-use confirmation token — the only path that performs a destructive action |
+
+Neither of the last two is reachable by the agent. That is the approval
+guarantee expressed as routing: its tools can propose, and a request from your
+own browser disposes.
 
 ### Blog Listing & Filtering
 
