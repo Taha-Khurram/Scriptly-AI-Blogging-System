@@ -1,8 +1,12 @@
 # The conversational blog agent
 
-Scriptly's `/chat` studio: an ongoing conversation that researches topics, plans
-posts, writes them, revises them and manages the library — with a human
-approving the plan before anything is written.
+Scriptly's Studio at **`/create`**: an ongoing conversation that researches
+topics, plans posts, writes them, revises them and manages the library — with a
+human approving the plan before anything is written.
+
+It *is* the create screen. There is no separate chat tab: describing a topic,
+revising a section and clearing out an old draft are the same activity, so they
+happen in one place. `/chat` (its address for one release) redirects here.
 
 This document covers the architecture, the guarantees and how it was built on
 top of the existing single-shot generator rather than beside it.
@@ -29,13 +33,19 @@ top of the existing single-shot generator rather than beside it.
 
 ## What changed, and what did not
 
-The single-shot generator (`/create` → `/api/generate` → `BlogAgent.run_pipeline`)
-**still works exactly as it did**. It is the right tool when you know what you
-want and want it now: one prompt, one model call, a draft in your library.
+The single-shot generation **backend** (`/api/generate` →
+`BlogAgent.run_pipeline` → the status poll) is **untouched and still tested**.
+What was replaced is the UI in front of it: `/create` now serves the Studio, and
+`create_blog.html` / `create-blog.js` / `create-blog.css` are deleted.
 
-The conversational agent is a second front door onto the same machinery. It does
-not replace the pipeline; it *drives* it, one step at a time, with you in the
-loop between the steps.
+That leaves `/api/generate` reachable by nothing in the product — deliberately.
+It is a working, tested API surface, and removing it is a separable decision
+from replacing the screen above it. Delete it when you are sure nothing external
+calls it; the Studio's `create_blog` tool already writes the same document and
+the same `generations` transcript, so History does not depend on it either.
+
+The conversational agent does not replace the specialist pipeline; it *drives*
+it, one step at a time, with you in the loop between the steps.
 
 Concretely, of the nine specialist agents in `app/agents/`, the chat agent reuses
 five unchanged (content, formatting, category, SEO, humanize — the last two via
@@ -46,10 +56,10 @@ existing routes) and adds two:
 | `content_agent.py` | **extended** | New `stream_from_outline()` entry point. The writing brief is now a shared `WRITING_RULES` constant so all three entry points compose one copy. The existing topic-driven prompt is **byte-identical** — there is a test that proves it. |
 | `outline_agent.py` | **new** | Real structured outlines. `BlogAgent` derives an "outline" by regexing `##` headings out of a finished post; that is fine when nobody reads it, and useless when a human has to approve it. |
 | `edit_agent.py` | **new** | Targeted edits to an existing post. Previously only possible by hand in TinyMCE, or by regenerating and losing every edit since. |
-| `blog_agent.py` | untouched | Still the one-shot orchestrator. |
+| `blog_agent.py` | untouched | Still the one-shot orchestrator, still driven by `/api/generate`. No UI points at it. |
 | `formatting_agent.py`, `category_agent.py`, `seo_agent.py`, `humanize_agent.py` | untouched | Called by the chat tools exactly as the create screen calls them. |
 
-The document a chat-written post produces is **the same shape** `/api/generate`
+The document the Studio produces is **the same shape** `/api/generate`
 writes. That is deliberate and load-bearing: Drafts, the approval queue, the
 public site, the SEO tools and the scheduler all read that shape, and a
 chat-written post that differed subtly would be a bug in every one of those
@@ -157,10 +167,10 @@ app/agents/                   the specialists (plural) — unchanged convention
 
 app/services/search_service.py   NEW  pluggable web search (tavily/serper/brave)
 app/repositories/chat.py         NEW  sessions, messages, outlines, confirmations
-app/routes/chat_routes.py        NEW  the page, SSE, poll, approve, confirm
-app/templates/chat.html          NEW
-app/static/js/pages/chat.js      NEW
-app/static/css/pages/chat.css    NEW
+app/routes/chat_routes.py        NEW  serves /create, plus SSE, poll, approve, confirm
+app/templates/chat.html          NEW  (replaced create_blog.html)
+app/static/js/pages/chat.js      NEW  (replaced create-blog.js)
+app/static/css/pages/chat.css    NEW  (replaced create-blog.css)
 ```
 
 `app/agent/` (singular) is the orchestrator; `app/agents/` (plural) holds the
@@ -430,7 +440,7 @@ RATELIMIT_CHAT=90 per hour
 **Search is optional and its absence is first-class.** With no provider the
 agent still works: it says once, briefly, that it is writing from its own
 knowledge rather than live sources, and it is instructed never to invent a
-citation to fill the gap. The empty state on `/chat` says so too, because a user
+citation to fill the gap. The empty state on the Studio says so too, because a user
 who asked for research and got none deserves to know it is a deployment setting
 and not the agent ignoring them. A *misspelled* provider is refused at boot with
 an error rather than silently ignored — a typo would otherwise present as an
@@ -492,15 +502,19 @@ Nothing was replaced. The order this was built in, and the order to review it:
    untouched.
 6. **`agent/`** — the new orchestrator package.
 7. **`routes/chat_routes.py`** — a new blueprint, registered in `_BLUEPRINTS`.
+   It took over `/create` from `blog_routes.create_page`, which was deleted; the
+   seven templates that linked to `blog.create_page` now link to
+   `chat.studio_page`, and `/chat` redirects for continuity.
 8. **UI** — a new page reusing `components/thread.css`, which Create and History
    already share. A live turn, a finished run and a conversation from last week
    are the same exchange at different times, and they look it.
 
 ### If you want to go further
 
-- **Retire `/create`.** Not recommended. One prompt to a finished draft is
-  genuinely the faster path when you know what you want, and the chat flow
-  deliberately costs you an approval step.
+- **Remove `/api/generate`.** The one-shot backend now has no caller in the
+  product. Removing it drops ~250 lines of route and background task plus their
+  tests. Left in place because "no UI calls it" is not the same as "nothing
+  calls it", and that is a question about your deployment, not the code.
 - **Publish from chat.** Add a `publish_blog` tool behind the same two-phase
   confirmation as delete. Publishing is currently a human action on the Drafts
   or Approval screen, which is the right default.

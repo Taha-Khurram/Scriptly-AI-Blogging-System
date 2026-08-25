@@ -783,16 +783,21 @@ class TestAssetWiring:
         assert (page.index('js/components/draft-markdown.js')
                 < page.index('js/pages/history.js'))
 
-    def test_create_loads_the_same_component(self):
-        """The extraction must not have left Create reading a global nobody sets."""
-        page = self._template('create_blog.html')
+    def test_the_studio_loads_the_same_component(self):
+        """The extraction must not have left the Studio reading an unset global.
+
+        Retargeted from ``create_blog.html``: the Studio replaced that screen at
+        /create and renders the same draft previews, so it has the same
+        dependency on the shared markdown component.
+        """
+        page = self._template('chat.html')
         assert 'js/components/draft-markdown.js' in page
         assert (page.index('js/components/draft-markdown.js')
-                < page.index('js/pages/create-blog.js'))
+                < page.index('js/pages/chat.js'))
 
     def test_both_screens_load_the_shared_thread_stylesheet(self):
         """The thread markup is in two templates; its CSS is in one file."""
-        for name in ('history.html', 'create_blog.html'):
+        for name in ('history.html', 'chat.html'):
             assert 'css/components/thread.css' in self._template(name), name
 
     def test_every_global_the_history_script_reads_is_provided(self):

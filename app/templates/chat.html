@@ -13,7 +13,11 @@
 {% endblock %}
 
 {#
-  Studio — the conversational agent.
+  Studio — where blogs are created and changed, by talking.
+
+  This is the create screen (/create). The single-shot composer that used to
+  live here is gone: describing a topic, revising a section and clearing out an
+  old draft are the same activity now, so they happen in one place.
 
   Three regions in one shell:
 
@@ -50,7 +54,7 @@
 
   <main class="dashboard-main">
 
-    {% call page_header(title='Studio', eyebrow='Blog agent') %}
+    {% call page_header(title='Studio', eyebrow='Create & revise') %}
     <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
       aria-label="Switch to dark theme" title="Switch to dark theme">
       <span class="material-symbols-outlined">dark_mode</span>
@@ -84,7 +88,7 @@
           {% for s in sessions %}
           <div class="chat-row {{ 'is-active' if active_session and s.id == active_session.id }}" role="listitem"
             data-row data-id="{{ s.id }}" data-at="{{ s.updated_at }}">
-            <a class="chat-row-main" href="{{ url_for('chat.chat_page', s=s.id) }}">
+            <a class="chat-row-main" href="{{ url_for('chat.studio_page', s=s.id) }}">
               <span class="chat-row-title">{{ s.title or 'New conversation' }}</span>
               <span class="chat-row-meta">
                 {% if s.blog_count %}

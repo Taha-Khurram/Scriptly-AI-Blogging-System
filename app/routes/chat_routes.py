@@ -1,4 +1,10 @@
-"""The chat surface: sessions, turns, approvals and confirmations.
+"""The Studio: sessions, turns, approvals and confirmations.
+
+Serves ``/create`` -- the create screen, which is now a conversation. There is no
+separate chat tab, because creating a post, revising it and clearing out an old
+one are all the same activity now, and two screens offering two ways to do it
+would mean the reader has to decide which one a request belongs to before making
+it.
 
 Its own blueprint rather than more routes in ``blog_routes`` (already 2,000
 lines across fifteen concerns), because nothing here touches a blog document
@@ -64,9 +70,10 @@ logger = get_logger(__name__)
 chat_bp = Blueprint('chat', __name__)
 db_service = FirestoreService()
 
-# Ceiling on one chat message. Higher than the create screen's 2,000-character
-# prompt because a message here can legitimately be a long editing brief, but
-# still bounded -- an unbounded field is a token bill and a memory footprint.
+# Ceiling on one chat message. Higher than the 2,000-character limit the
+# single-shot composer used, because a message here can legitimately be a long
+# editing brief -- but still bounded: an unbounded field is a token bill and a
+# memory footprint.
 MAX_CHAT_MESSAGE = MAX_MESSAGE_CHARS
 
 # Sessions in the sidebar's first page.
@@ -107,9 +114,18 @@ def add_cache_headers(response):
 # Page
 # ---------------------------------------------------------------------------
 
-@chat_bp.route('/chat')
-def chat_page():
-    """The chat panel, its sidebar, and one conversation open in it.
+@chat_bp.route('/create')
+def studio_page():
+    """The Studio: the chat panel, its sidebar, and one conversation open in it.
+
+    Served at ``/create`` because this **is** the create screen. There is no
+    separate chat tab: creating a post, revising it, and clearing out an old one
+    are all things you now do by talking, so a second page offering a different
+    way to create would be two answers to one question -- and the reader would
+    have to know which screen a request belonged to before making it.
+
+    The old single-shot composer that lived here is gone. Its backend
+    (``/api/generate``) is untouched and still tested; only the UI is replaced.
 
     The first page of sessions and the open conversation's messages are both
     server-rendered. They are the whole content of the screen, and shipping an
@@ -132,9 +148,13 @@ def chat_page():
                                                 limit=DEFAULT_HISTORY_LIMIT)
 
     return render_template(
+        # The template, the page script and the stylesheet keep their `chat`
+        # names: the *feature* is the chat agent (chat_bp, /api/chat/*), and the
+        # *page* it is presented as is the Studio. Renaming only the template
+        # would split that naming for no gain.
         'chat.html',
-        # Passed explicitly, as `create_page` does -- there is no context
-        # processor supplying it, and the empty state greets the reader by name.
+        # Passed explicitly -- there is no context processor supplying it, and
+        # the empty state greets the reader by name.
         username=user.name or 'there',
         sessions=sessions['items'],
         sessions_has_more=sessions['has_more'],
@@ -143,6 +163,18 @@ def chat_page():
         messages=messages,
         search_available=search.is_available,
     )
+
+
+@chat_bp.route('/chat')
+def chat_redirect():
+    """``/chat`` was the studio's address for one release. Keep it working.
+
+    Cheap to keep and it costs nothing: a bookmark, a link in a message, or a
+    docs page written against the old URL lands on the page it meant instead of
+    a 404. The query string carries over so a deep link to one conversation
+    survives too.
+    """
+    return redirect(url_for('chat.studio_page', **request.args.to_dict()))
 
 
 # ---------------------------------------------------------------------------

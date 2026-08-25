@@ -3,9 +3,11 @@
 
    Shared component. Two screens render the same conversation:
 
-     • Create (`create_blog.html`) shows a run *as it happens* — the reasoning
-       arriving line by line, the draft streaming into the message body, a
-       status line and a bar at the foot of the turn.
+     • The Studio (`chat.html`, at /create) shows a turn *as it happens* — the
+       steps arriving one by one, the draft streaming into the message body, a
+       status line at the foot of the live turn. Its turns accumulate: a
+       conversation is many of these, and the settled ones sit above the live
+       one looking exactly like History's.
      • History (`history.html`) shows a run *afterwards* — the same exchange,
        read back from Firestore, with every live cue already settled.
 

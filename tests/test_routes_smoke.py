@@ -94,7 +94,7 @@ class TestAuthenticatedPages:
         assert not failures, f'server errors: {failures}'
 
     @pytest.mark.parametrize('path', [
-        '/dashboard', '/create-blog', '/drafts', '/all-blogs', '/categories',
+        '/dashboard', '/create', '/drafts', '/all-blogs', '/categories',
         '/approval', '/comments', '/schedule', '/gallery', '/activity-log',
         '/newsletter', '/leads', '/seo-tools', '/formatting-tools',
         '/optimization', '/site-settings', '/app-settings', '/profile',

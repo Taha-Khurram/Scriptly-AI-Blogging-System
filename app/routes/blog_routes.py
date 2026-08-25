@@ -143,17 +143,11 @@ def home():
             published_blogs=[]
         )
         
-@blog_bp.route('/create')
-def create_page():
-    # The role decides which destination the composer can offer: auto_submit
-    # publishes outright for an admin and routes to the approval queue for
-    # everyone else (see _run_generation_task), so the screen has to know which
-    # outcome it is naming.
-    return render_template(
-        'create_blog.html',
-        username=session.get('user_name', 'User'),
-        user_role=session.get('user_role', 'USER')
-    )
+# `/create` is served by app/routes/chat_routes.py now. The single-shot composer
+# that lived here was replaced by the Studio: the same screen, driven by
+# conversation. The generation *backend* below (`/api/generate` and its status
+# poll) is deliberately untouched -- it is a working, tested API surface, and
+# removing it is a separable decision from replacing the UI in front of it.
 
 
 @blog_bp.route('/drafts')

@@ -286,7 +286,18 @@ always with a label.
 Enter hands the query to All Blogs (`?search=`), which can search the whole
 collection rather than the five rows on screen.
 
-### Agent start state — `create_blog.html`
+### Studio start state — `chat.html`
+
+> **Superseded, and mostly carried over.** `/create` is now the Studio: one
+> conversation instead of one prompt. The *start state* below survived almost
+> intact — the aura, the eyebrow, the gradient clause, the lede, the starter
+> chips and the prompt box are the same patterns in `chat.css`
+> (`.chat-blank*`, `.chat-starter`, `.chat-composer .prompt-box`), and the
+> `[data-state]` switch moved from `.create-stage` to `.chat-shell`
+> (`blank` | `open`). What went is the destination pill: an agent that asks
+> before it writes has no use for a control that names where an unwritten post
+> will land. What is new is the rail of past conversations beside it. The
+> reasoning below still applies; only the class names moved.
 
 Two panels in one stage under the shared page header, switched by one attribute
 (`.create-stage[data-state]`) exactly as the optimization panels switch: the
@@ -335,7 +346,17 @@ sense of what detail buys you.
 hint that the prompt has become an essay, not an error. The field accepts up to
 `maxlength`; nothing is blocked.
 
-### Working session — `create_blog.html` → `drafts.html`
+### Working session — `chat.html` → `drafts.html`
+
+> **Superseded in form, kept in substance.** The standalone run card described
+> here is gone; a run is now one turn in an ongoing thread, and the thread keeps
+> going after it. The progress bar and percentage went with it, because a
+> conversation does not have a completion percentage — the status line at the
+> foot of the live turn says what stage the agent is on and nothing pretends to
+> know how much is left. The `.turn-*` markup, the reasoning disclosure and the
+> streamed draft are unchanged, which is why they were extracted into
+> `components/thread.css` in the first place.
+
 
 ```
    ┌ .run-card ───────────────────────────────────────────────┐
@@ -412,7 +433,8 @@ a live run in.
 ```
 
 **The thread is a shared component** — `css/components/thread.css`, extracted
-from `create-blog.css` and rendered by both screens. A finished generation and a
+from the create screen's stylesheet and now rendered by both the Studio
+(`chat.css`) and History (`history.css`). A finished generation and a
 running one are the same conversation at two moments, and a reader who watched a
 draft being written should recognise it a week later. What each page keeps is
 what is genuinely its own: Create keeps the working-state animation on the
@@ -781,8 +803,8 @@ and no undo. Now:
 - Both send controls are **disabled while the mail transport is unconfigured**.
   The old screen left them live and let the request fail.
 
-**Compose opens on a prompt, not a form.** The starting state borrows
-`create_blog.html`'s idiom — one question, one field, one action — because the
+**Compose opens on a prompt, not a form.** The starting state borrows the
+Studio's idiom (`chat.html`) — one question, one field, one action — because the
 first act here is also "ask the agent for something". With nothing published it
 says so up front instead of letting Generate fail.
 

@@ -83,12 +83,12 @@ def post(client, url, payload=None):
 class TestPage:
 
     def test_the_page_requires_a_session(self, client, mock_db):
-        response = client.get('/chat')
+        response = client.get('/create')
         assert response.status_code == 302
         assert '/login' in response.headers['Location']
 
     def test_the_page_renders_with_no_conversations(self, signed_in, mock_db):
-        response = signed_in().get('/chat')
+        response = signed_in().get('/create')
         assert response.status_code == 200
         assert b'data-chat' in response.data
 
@@ -104,7 +104,7 @@ class TestPage:
              'tool_calls': [{'name': 'create_outline', 'summary': 'ok'}]},
         ]
 
-        response = signed_in().get('/chat?s=s1')
+        response = signed_in().get('/create?s=s1')
 
         assert response.status_code == 200
         assert b'Write about pricing pages' in response.data
@@ -115,10 +115,34 @@ class TestPage:
     def test_an_unknown_conversation_renders_the_empty_state(
             self, signed_in, mock_db):
         mock_db.get_chat_session.return_value = None
-        response = signed_in().get('/chat?s=nope')
+        response = signed_in().get('/create?s=nope')
         # Not a 404: a stale link should land on a usable screen, not an error.
         assert response.status_code == 200
         assert b'data-state="blank"' in response.data
+
+    def test_the_old_chat_url_still_lands_on_the_studio(self, signed_in, mock_db):
+        """`/chat` was the studio's address for one release.
+
+        A bookmark or a link in a message should reach the page it meant, not a
+        404 -- and the query string has to survive, or a deep link to one
+        conversation quietly becomes a link to the empty state.
+        """
+        response = signed_in().get('/chat?s=s1')
+
+        assert response.status_code == 302
+        assert '/create' in response.headers['Location']
+        assert 's=s1' in response.headers['Location']
+
+    def test_there_is_no_second_create_screen(self, app):
+        """One page owns /create.
+
+        The Studio replaced the single-shot composer rather than sitting beside
+        it. Two views on one rule would be a routing conflict; two views on two
+        URLs would be two answers to "where do I write a post".
+        """
+        owners = [rule.endpoint for rule in app.url_map.iter_rules()
+                  if rule.rule == '/create']
+        assert owners == ['chat.studio_page']
 
 
 # ---------------------------------------------------------------------------

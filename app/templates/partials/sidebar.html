@@ -20,15 +20,12 @@
     </div>
 
     <div class="sidebar-menu">
-        {# Studio first: it is the conversational way in, and it covers what
-           every screen below it does one at a time — plan, write, revise, tidy
-           up. Create Blog stays as the one-shot path, which is still the right
-           tool when you know exactly what you want and want it now. #}
-        <a href="{{ url_for('chat.chat_page') }}" class="nav-link" data-page="chat">
+        {# The Studio is where blogs are made and changed — one entry, at
+           /create, because it replaced the create screen rather than sitting
+           beside it. A second nav item for "chat" would ask the reader to
+           decide which page a request belongs to before making it. #}
+        <a href="{{ url_for('chat.studio_page') }}" class="nav-link" data-page="studio">
             <span class="material-symbols-outlined">auto_awesome</span> <span class="nav-label">Studio</span>
-        </a>
-        <a href="{{ url_for('blog.create_page') }}" class="nav-link" data-page="create">
-            <span class="material-symbols-outlined">edit_square</span> <span class="nav-label">Create Blog</span>
         </a>
         <a href="{{ url_for('history.history_page') }}" class="nav-link" data-page="history">
             <span class="material-symbols-outlined">forum</span> <span class="nav-label">History</span>

@@ -24,7 +24,7 @@
       aria-label="Switch to dark theme" title="Switch to dark theme">
       <span class="material-symbols-outlined">dark_mode</span>
     </button>
-    <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-primary">
+    <a href="{{ url_for('chat.studio_page') }}" class="page-header-action is-primary">
       <i class="material-symbols-outlined icon-inline" aria-hidden="true">add</i>
       <span class="page-header-label">New draft</span>
     </a>
@@ -128,7 +128,7 @@
         <div class="list-empty">
           <span class="list-empty-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">description</i></span>
           <p>No drafts yet. Anything you generate lands here until you send it for approval.</p>
-          <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-ghost">Create one</a>
+          <a href="{{ url_for('chat.studio_page') }}" class="page-header-action is-ghost">Create one</a>
         </div>
         {% endif %}
       </div>

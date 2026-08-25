@@ -1236,15 +1236,36 @@ const Pjax = (() => {
                 <div class="skeleton" style="width:130px;height:40px;border-radius:8px;"></div>
             </div>`,
 
-        // Create Blog: centered layout with prompt box
+        // Studio (/create): the conversation rail beside the pane, with the
+        // composer at its foot. A skeleton is a promise about the shape that is
+        // coming, so it shows both columns — this screen used to be a centred
+        // composer, and a skeleton still promising one would resolve into a
+        // two-column layout, which is the jump this avoids.
         create: `
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;text-align:center;padding:2rem;">
-                <div class="skeleton skeleton-text" style="width:200px;height:14px;margin-bottom:1rem;"></div>
-                <div class="skeleton skeleton-text" style="width:340px;height:32px;margin-bottom:2.5rem;"></div>
-                <div class="skeleton" style="width:100%;max-width:600px;height:120px;border-radius:16px;margin-bottom:1.5rem;"></div>
-                <div style="display:flex;gap:1rem;align-items:center;">
-                    <div class="skeleton" style="width:140px;height:36px;border-radius:20px;"></div>
-                    <div class="skeleton skeleton-text" style="width:180px;height:14px;"></div>
+            <header class="dashboard-header skeleton-header">
+                <div><div class="skeleton skeleton-text" style="height:14px;width:110px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:120px;"></div></div>
+                <div class="skeleton" style="width:120px;height:38px;border-radius:20px;"></div>
+            </header>
+            <div style="display:grid;grid-template-columns:19rem minmax(0,1fr);gap:1.5rem;align-items:start;">
+                <div class="skeleton-card" style="padding:1rem;">
+                    <div class="skeleton skeleton-text sm" style="width:60%;margin-bottom:1rem;"></div>
+                    <div style="padding:0.75rem 0;"><div class="skeleton skeleton-text" style="width:85%;margin-bottom:6px;"></div><div class="skeleton skeleton-text sm" style="width:40%;"></div></div>
+                    <div style="padding:0.75rem 0;"><div class="skeleton skeleton-text" style="width:70%;margin-bottom:6px;"></div><div class="skeleton skeleton-text sm" style="width:35%;"></div></div>
+                    <div style="padding:0.75rem 0;"><div class="skeleton skeleton-text" style="width:90%;margin-bottom:6px;"></div><div class="skeleton skeleton-text sm" style="width:45%;"></div></div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:1.5rem;min-height:60vh;">
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;padding:2rem 0;">
+                        <div class="skeleton skeleton-text" style="width:150px;height:14px;"></div>
+                        <div class="skeleton skeleton-text" style="width:320px;height:32px;"></div>
+                        <div class="skeleton skeleton-text" style="width:80%;max-width:420px;height:14px;"></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0.75rem;max-width:44rem;margin:0 auto;width:100%;">
+                        <div class="skeleton" style="height:72px;border-radius:12px;"></div>
+                        <div class="skeleton" style="height:72px;border-radius:12px;"></div>
+                        <div class="skeleton" style="height:72px;border-radius:12px;"></div>
+                        <div class="skeleton" style="height:72px;border-radius:12px;"></div>
+                    </div>
+                    <div class="skeleton" style="margin-top:auto;width:100%;height:96px;border-radius:24px;"></div>
                 </div>
             </div>`,
 

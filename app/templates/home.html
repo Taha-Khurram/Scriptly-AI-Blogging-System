@@ -98,7 +98,7 @@
             aria-label="Switch to dark theme" title="Switch to dark theme">
             <span class="material-symbols-outlined">dark_mode</span>
         </button>
-        <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-primary">
+        <a href="{{ url_for('chat.studio_page') }}" class="page-header-action is-primary">
             <i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_awesome</i>
             <span class="page-header-label">New blog</span>
         </a>
@@ -129,7 +129,7 @@
                     </p>
 
                     <div class="hero-actions">
-                        <a href="{{ url_for('blog.create_page') }}" class="hero-cta is-primary">
+                        <a href="{{ url_for('chat.studio_page') }}" class="hero-cta is-primary">
                             <i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_awesome</i> Start a new blog
                         </a>
                         <a href="{{ url_for('blog.drafts_page') }}" class="hero-cta is-ghost">
@@ -312,7 +312,7 @@
                 </header>
 
                 <div class="action-grid">
-                    <a class="action-tile is-lead" href="{{ url_for('blog.create_page') }}">
+                    <a class="action-tile is-lead" href="{{ url_for('chat.studio_page') }}">
                         <span class="action-icon"><i class="material-symbols-outlined icon-inline" aria-hidden="true">auto_awesome</i></span>
                         <span class="action-label">Create blog</span>
                     </a>

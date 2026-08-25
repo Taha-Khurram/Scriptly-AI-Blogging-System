@@ -11,7 +11,7 @@ Complete documentation for Scriptly - an AI-powered blog content generation plat
 3. [Configuration](#configuration)
 4. [Features](#features)
 5. [AI Agents](#ai-agents)
-5b. [The conversational agent](AGENT.md) — the `/chat` studio, in its own document
+5b. [The conversational agent](AGENT.md) — the Studio at `/create`, in its own document
 6. [Public Site](#public-site)
 7. [API Reference](#api-reference)
 8. [Database Schema](#database-schema)
@@ -250,13 +250,15 @@ For production, configure Firestore rules to restrict access. Collections are cr
 
 There are two ways into the pipeline, and they share every specialist below.
 
-**Single-shot** (`/create`) — one prompt in, a finished draft out. Fastest path
-when you already know what you want.
+**Conversational** — the **Studio** at `/create`. An ongoing session that
+researches, plans, writes, revises and manages the library, with you approving
+the plan before anything is written. This is the only create screen; the
+single-shot composer that used to live here was replaced by it. Architecture,
+guarantees and migration notes: **[docs/AGENT.md](AGENT.md)**.
 
-**Conversational** (`/chat`) — an ongoing session that researches, plans, writes,
-revises and manages the library, with you approving the plan before anything is
-written. It does not replace the pipeline; it drives it one step at a time.
-Its architecture, guarantees and migration notes are in **[docs/AGENT.md](AGENT.md)**.
+**Single-shot** (`/api/generate`) — one prompt in, a finished draft out, via
+`BlogAgent.run_pipeline`. Still working and still tested, but no longer reachable
+from the UI. See [what changed](AGENT.md#what-changed-and-what-did-not).
 
 ### Architecture Overview
 
@@ -518,7 +520,7 @@ Configurable via Dashboard > Site Settings:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/dashboard` | Home dashboard |
-| GET | `/blogs/create` | Blog creation page |
+| GET | `/create` | The Studio (see below) |
 | POST | `/blogs/generate` | Generate blog with AI (streaming) |
 | GET | `/blogs/<blog_id>` | View/edit blog |
 | POST | `/blogs/<blog_id>/save` | Save blog changes |
@@ -527,13 +529,13 @@ Configurable via Dashboard > Site Settings:
 | POST | `/blogs/<blog_id>/humanize` | Humanize content |
 | POST | `/blogs/<blog_id>/seo` | Run SEO analysis |
 
-### Conversational agent (`/chat`)
+### The Studio (`/create`)
 
 See [docs/AGENT.md](AGENT.md) for the flow and the guarantees behind these.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/chat` | The studio. `?s=<id>` opens one conversation |
+| GET | `/create` | The Studio. `?s=<id>` opens one conversation. `/chat` redirects here |
 | GET | `/api/chat/sessions` | List conversations (keyset-paged on `before`) |
 | POST | `/api/chat/sessions` | Open a conversation |
 | GET | `/api/chat/sessions/<id>` | One conversation, its messages, and any turn still running in it |
@@ -783,7 +785,7 @@ FYP-main/
 │   ├── templates/              # Jinja2 templates (35 files)
 │   │   ├── base.html             # Main dashboard layout
 │   │   ├── home.html             # Dashboard home
-│   │   ├── create_blog.html      # Blog creation
+│   │   ├── chat.html             # The Studio (/create)
 │   │   ├── history.html          # Generation history
 │   │   ├── drafts.html           # Draft listing
 │   │   ├── approval_queue.html   # Approval interface

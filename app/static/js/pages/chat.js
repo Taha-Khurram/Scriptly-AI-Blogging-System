@@ -108,6 +108,10 @@
     const COUNT_FROM = 400;      // below this a character counter is just noise
     const SOFT_LIMIT = 6000;     // where the counter turns amber
 
+    // Where History's "Reuse prompt" leaves a prompt for this page. The key is
+    // History's to change, not ours — see takeHandoff().
+    const HANDOFF_KEY = 'scriptly-create-draft';
+
     const STAGE_LABEL = {
         thinking: 'Thinking',
         searching: 'Researching',
@@ -785,7 +789,7 @@
         // The URL carries the conversation so a reload stays in it, without a
         // navigation that would tear down this script mid-turn.
         window.history.replaceState({}, '',
-            '/chat?s=' + encodeURIComponent(state.sessionId));
+            '/create?s=' + encodeURIComponent(state.sessionId));
         return state.sessionId;
     }
 
@@ -1177,7 +1181,7 @@
         row.setAttribute('role', 'listitem');
 
         const main = node('a', 'chat-row-main');
-        main.href = '/chat?s=' + encodeURIComponent(session.id);
+        main.href = '/create?s=' + encodeURIComponent(session.id);
         main.appendChild(node('span', 'chat-row-title',
             session.title || 'New conversation'));
         const meta = node('span', 'chat-row-meta');
@@ -1208,7 +1212,7 @@
             // A navigation, not an in-place reset: a fresh page is the simplest
             // way to be certain no state from the previous conversation — a
             // focus pointer, a half-watched turn — survives into the new one.
-            window.location.href = '/chat';
+            window.location.href = '/create';
         }, { signal: signal });
     });
 
@@ -1232,7 +1236,7 @@
                 const row = button.closest('.chat-row');
                 if (row) row.remove();
                 toast('Conversation deleted', data.message || '', 'success');
-                if (id === state.sessionId) window.location.href = '/chat';
+                if (id === state.sessionId) window.location.href = '/create';
             } catch (error) {
                 if (error.name !== 'AbortError') {
                     toast('Could not delete', error.message, 'error');
@@ -1252,7 +1256,7 @@
                     row.dataset.id = session.id;
                     row.setAttribute('role', 'listitem');
                     const main = node('a', 'chat-row-main');
-                    main.href = '/chat?s=' + encodeURIComponent(session.id);
+                    main.href = '/create?s=' + encodeURIComponent(session.id);
                     main.appendChild(node('span', 'chat-row-title',
                         session.title || 'New conversation'));
                     const meta = node('span', 'chat-row-meta');
@@ -1281,7 +1285,50 @@
     // Start
     // ------------------------------------------------------------------
 
+    /**
+     * Pick up a prompt handed over from another screen.
+     *
+     * History's "Reuse prompt" writes the prompt to sessionStorage and
+     * navigates here. That contract predates the Studio — it was written for
+     * the single-shot composer this page replaced — and honouring it is what
+     * keeps the feature working rather than silently dropping the prompt on the
+     * floor after telling the reader it came with them.
+     *
+     * Read-and-remove: a prompt that survived into the next visit would appear
+     * unbidden in a conversation it has nothing to do with.
+     */
+    function takeHandoff() {
+        var raw = null;
+        try {
+            raw = sessionStorage.getItem(HANDOFF_KEY);
+            sessionStorage.removeItem(HANDOFF_KEY);
+        } catch (e) {
+            return;             // private mode, or storage disabled
+        }
+        if (!raw) return;
+
+        var text = '';
+        try {
+            var parsed = JSON.parse(raw);
+            text = (parsed && parsed.text) || '';
+            // Stale by more than an hour is not a handoff, it is litter.
+            if (parsed && parsed.at && (Date.now() - parsed.at) > 3600000) return;
+        } catch (e) {
+            text = raw;
+        }
+        if (!text.trim()) return;
+
+        el.input.value = text;
+        el.input.focus();
+        syncComposer();
+        // Not sent automatically. The prompt arrived from a different screen and
+        // may want editing before it becomes a turn — and a page that starts
+        // spending model time on load is a page you cannot visit to look around.
+        toast('Prompt carried over', 'Edit it if you like, then send.', 'info');
+    }
+
     hydrate();
+    takeHandoff();
     syncComposer();
 
     // Reattach to a turn that is still running in this conversation. The check
