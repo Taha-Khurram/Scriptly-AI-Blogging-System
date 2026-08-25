@@ -43,17 +43,44 @@ class FakeDoc:
 
 
 class FakeQuery:
-    def __init__(self, rows):
+    """One Firestore query, with the index requirement modelled.
+
+    ``indexed=False`` is a project whose composite index has not been deployed:
+    a query that both filters and orders raises ``FailedPrecondition``, exactly
+    as Firestore does, while a filter on its own still works off the automatic
+    single-field index. That distinction is the whole point of the fallback, so
+    the fake has to make it.
+    """
+
+    def __init__(self, rows, indexed=True, filtered=False, ordered=False):
         self._rows = rows
+        self._indexed = indexed
+        self._filtered = filtered
+        self._ordered = ordered
+
+    def _derive(self, rows, **flags):
+        state = {'indexed': self._indexed, 'filtered': self._filtered,
+                 'ordered': self._ordered}
+        state.update(flags)
+        return FakeQuery(rows, **state)
 
     def where(self, filter=None):
         field, op, value = filter.field_path, filter.op_string, filter.value
         assert op == '=='
-        return FakeQuery([r for r in self._rows if r[1].get(field) == value])
+        return self._derive([r for r in self._rows if r[1].get(field) == value],
+                            filtered=True)
 
     def order_by(self, field, direction=None):
+        # Firestore drops documents that do not carry the ordered field from an
+        # ordered query -- they are simply not in that index. Modelled, because
+        # it is the one behaviour that makes the indexed and unindexed reads
+        # differ on a malformed row.
         reverse = direction == 'DESCENDING'
-        return FakeQuery(sorted(self._rows, key=lambda r: r[1][field], reverse=reverse))
+        present = [r for r in self._rows if field in r[1]]
+        return self._derive(
+            sorted(present, key=lambda r: r[1][field], reverse=reverse),
+            ordered=True,
+        )
 
     def select(self, fields):
         # Projections are applied for real, so a test notices when a field the
@@ -61,7 +88,7 @@ class FakeQuery:
         kept = []
         for doc_id, data in self._rows:
             kept.append((doc_id, {k: v for k, v in data.items() if k in fields}))
-        return FakeQuery(kept)
+        return self._derive(kept)
 
     def start_after(self, snapshot):
         field, value = next(iter(snapshot.items()))
@@ -71,12 +98,19 @@ class FakeQuery:
                 out.append(row)
             elif row[1].get(field) == value:
                 seen = True
-        return FakeQuery(out)
+        return self._derive(out)
 
     def limit(self, n):
-        return FakeQuery(self._rows[:n])
+        return self._derive(self._rows[:n])
 
     def stream(self):
+        if not self._indexed and self._filtered and self._ordered:
+            from google.api_core.exceptions import FailedPrecondition
+
+            raise FailedPrecondition(
+                '400 The query requires an index. You can create it here: '
+                'https://console.firebase.google.com/…'
+            )
         return [FakeDoc(doc_id, data) for doc_id, data in self._rows]
 
 
@@ -114,8 +148,9 @@ class FakeBatch:
 
 
 class FakeCollection:
-    def __init__(self, store):
+    def __init__(self, store, indexed=True):
         self._store = store
+        self._indexed = indexed
         self._counter = 0
 
     def _rows(self):
@@ -128,18 +163,21 @@ class FakeCollection:
         return FakeDocRef(self._store, doc_id)
 
     def where(self, filter=None):
-        return FakeQuery(self._rows()).where(filter=filter)
+        return FakeQuery(self._rows(), indexed=self._indexed).where(filter=filter)
 
     def order_by(self, field, direction=None):
-        return FakeQuery(self._rows()).order_by(field, direction=direction)
+        return FakeQuery(self._rows(), indexed=self._indexed).order_by(
+            field, direction=direction)
 
 
 class FakeClient:
-    def __init__(self):
+    def __init__(self, indexed=True):
         self.stores = {}
+        self.indexed = indexed
 
     def collection(self, name):
-        return FakeCollection(self.stores.setdefault(name, {}))
+        return FakeCollection(self.stores.setdefault(name, {}),
+                              indexed=self.indexed)
 
     def batch(self):
         return FakeBatch(self.stores.setdefault('generations', {}))
@@ -158,6 +196,22 @@ def repo(monkeypatch):
     class Repo(GenerationRepository):
         def __init__(self):
             self.db = FakeClient()
+            self.generation_collection = 'generations'
+
+    return Repo()
+
+
+@pytest.fixture
+def unindexed_repo(monkeypatch):
+    """A repository against a project where the composite index is missing."""
+    from app.repositories.generations import GenerationRepository
+    from firebase_admin import firestore
+
+    monkeypatch.setattr(firestore.Query, 'DESCENDING', 'DESCENDING', raising=False)
+
+    class Repo(GenerationRepository):
+        def __init__(self):
+            self.db = FakeClient(indexed=False)
             self.generation_collection = 'generations'
 
     return Repo()
@@ -318,6 +372,134 @@ class TestHistoryListing:
         page = repo.get_generation_history('u1', limit=10_000)
 
         assert len(page['items']) == MAX_PAGE_SIZE
+
+
+class TestMissingIndex:
+    """The bug that shipped: three transcripts in the database, none on screen.
+
+    Filtering by ``user_id`` while ordering by ``created_at`` needs a composite
+    index. It was declared in ``firestore.indexes.json`` and never deployed, so
+    Firestore answered ``FailedPrecondition`` -- and the listing caught that
+    along with everything else and returned an empty page. The screen then said
+    "No conversations yet" to a user who had three, which reads as "the feature
+    does not work" rather than as "one deploy step is outstanding".
+    """
+
+    def test_the_page_is_still_served(self, unindexed_repo):
+        _seed(unindexed_repo, 3)
+        page = unindexed_repo.get_generation_history('u1')
+
+        assert [i['title'] for i in page['items']] == ['Title 2', 'Title 1', 'Title 0']
+
+    def test_the_indexed_path_really_is_failing(self, unindexed_repo):
+        """Guards the test above from passing for the wrong reason."""
+        from google.api_core.exceptions import FailedPrecondition
+
+        _seed(unindexed_repo, 1)
+        from firebase_admin import firestore
+        from google.cloud.firestore_v1.base_query import FieldFilter
+
+        with pytest.raises(FailedPrecondition):
+            list(unindexed_repo.db.collection('generations')
+                 .where(filter=FieldFilter('user_id', '==', 'u1'))
+                 .order_by('created_at', direction=firestore.Query.DESCENDING)
+                 .stream())
+
+    def test_it_says_what_to_do_about_it(self, unindexed_repo):
+        """An error a deploy fixes must name the deploy, not just complain.
+
+        Captured with a handler of our own rather than with ``caplog``:
+        ``create_app`` reconfigures logging globally (it clears the root
+        handlers and, under TestingConfig, sets the root level to CRITICAL), so
+        a caplog assertion here passes or fails depending on whether some other
+        test built an app first. Attaching to the one logger under test is
+        immune to that.
+        """
+        import logging
+
+        records = []
+
+        class Capture(logging.Handler):
+            def emit(self, record):
+                records.append(self.format(record))
+
+        logger = logging.getLogger('app.repositories.generations')
+        handler = Capture()
+        handler.setFormatter(logging.Formatter('%(message)s'))
+        previous_level, previous_disable = logger.level, logging.root.manager.disable
+        logger.addHandler(handler)
+        logger.setLevel(logging.ERROR)
+        logging.disable(logging.NOTSET)
+        try:
+            _seed(unindexed_repo, 1)
+            unindexed_repo.get_generation_history('u1')
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous_level)
+            logging.disable(previous_disable)
+
+        logged = '\n'.join(records)
+        assert 'firebase deploy --only firestore:indexes' in logged
+        assert 'console.firebase.google.com' in logged   # passed through from Firestore
+
+    def test_the_fallback_pages(self, unindexed_repo):
+        _seed(unindexed_repo, 5)
+        page = unindexed_repo.get_generation_history('u1', limit=2)
+
+        assert [i['title'] for i in page['items']] == ['Title 4', 'Title 3']
+        assert page['has_more'] is True
+        assert page['next_cursor']
+
+    def test_the_fallback_honours_the_cursor(self, unindexed_repo):
+        _seed(unindexed_repo, 5)
+        first = unindexed_repo.get_generation_history('u1', limit=2)
+        second = unindexed_repo.get_generation_history(
+            'u1', limit=2, before=first['next_cursor'])
+
+        assert [i['title'] for i in second['items']] == ['Title 2', 'Title 1']
+
+    def test_the_fallback_reaches_the_end_cleanly(self, unindexed_repo):
+        """Paging to the end must stop, not loop on the last row."""
+        _seed(unindexed_repo, 3)
+
+        seen, cursor = [], None
+        for _ in range(5):
+            page = unindexed_repo.get_generation_history('u1', limit=2, before=cursor)
+            seen.extend(i['title'] for i in page['items'])
+            if not page['has_more']:
+                break
+            cursor = page['next_cursor']
+
+        assert seen == ['Title 2', 'Title 1', 'Title 0']
+
+    def test_the_fallback_is_still_scoped_to_one_user(self, unindexed_repo):
+        """Losing the index must not lose the ownership filter with it."""
+        _seed(unindexed_repo, 2, user_id='u1')
+        _seed(unindexed_repo, 3, user_id='u2')
+
+        page = unindexed_repo.get_generation_history('u2')
+        assert len(page['items']) == 3
+        assert all(i['id'].startswith('u2-') for i in page['items'])
+
+    def test_a_row_with_no_timestamp_does_not_break_the_listing(self, unindexed_repo):
+        """One malformed document must not take out the whole screen."""
+        _seed(unindexed_repo, 2)
+        unindexed_repo.db.stores['generations']['broken'] = {
+            'user_id': 'u1', 'prompt': 'no timestamp', 'title': 'Broken',
+        }
+
+        titles = [i['title'] for i in unindexed_repo.get_generation_history('u1')['items']]
+        assert titles[:2] == ['Title 1', 'Title 0']
+        assert 'Broken' in titles          # sorted to the bottom, not dropped
+
+    def test_other_failures_still_degrade_to_empty(self, repo):
+        """A connection that is down has no fallback worth attempting."""
+        repo.db = MagicMock()
+        repo.db.collection.side_effect = RuntimeError('firestore is down')
+
+        assert repo.get_generation_history('u1') == {
+            'items': [], 'has_more': False, 'next_cursor': ''
+        }
 
 
 class TestReadOne:
@@ -574,6 +756,75 @@ class TestHistoryRoutes:
 
         assert body['deleted'] == 7
         assert mock_db.clear_generation_history.call_args[0] == ('u9',)
+
+
+class TestAssetWiring:
+    """The failure a unit test cannot see and a screenshot can.
+
+    ``history.js`` reads ``window.DraftMarkdown`` -- a component in its own
+    file. The page rendered, the rail rendered, every route test passed, and
+    the reading pane still showed "Cannot read properties of undefined" for
+    every conversation, because the template never loaded the component. A
+    script tag is a dependency; this asserts it the way an import would be.
+    """
+
+    def _template(self, name):
+        import io
+        return io.open('app/templates/%s' % name, encoding='utf-8').read()
+
+    def test_history_loads_the_markdown_component(self):
+        page = self._template('history.html')
+        assert 'js/components/draft-markdown.js' in page
+        assert 'js/pages/history.js' in page
+
+    def test_the_component_is_loaded_before_the_page_script(self):
+        """Order matters: the page script reads the global at boot."""
+        page = self._template('history.html')
+        assert (page.index('js/components/draft-markdown.js')
+                < page.index('js/pages/history.js'))
+
+    def test_create_loads_the_same_component(self):
+        """The extraction must not have left Create reading a global nobody sets."""
+        page = self._template('create_blog.html')
+        assert 'js/components/draft-markdown.js' in page
+        assert (page.index('js/components/draft-markdown.js')
+                < page.index('js/pages/create-blog.js'))
+
+    def test_both_screens_load_the_shared_thread_stylesheet(self):
+        """The thread markup is in two templates; its CSS is in one file."""
+        for name in ('history.html', 'create_blog.html'):
+            assert 'css/components/thread.css' in self._template(name), name
+
+    def test_every_global_the_history_script_reads_is_provided(self):
+        """Catches the *next* one: any `window.X` the page script depends on.
+
+        Only the names it reads as a dependency count -- the ones it assigns
+        (its own abort handle) and the browser's own API surface do not.
+        """
+        import io
+        import re
+
+        source = io.open('app/static/js/pages/history.js', encoding='utf-8').read()
+        page = self._template('history.html')
+
+        builtin = {
+            'location', 'confirm', 'matchMedia', 'fetch', 'sessionStorage',
+            'localStorage', 'addEventListener', 'removeEventListener',
+            'showToast', 'syncThemeControls', '__historyAbort',
+        }
+        provided = {'DraftMarkdown': 'js/components/draft-markdown.js'}
+
+        for name in set(re.findall(r'window\.([A-Za-z_][A-Za-z0-9_]*)', source)):
+            if name in builtin:
+                continue
+            assert name in provided, (
+                'history.js reads window.%s -- add it to this test, and make '
+                'sure history.html loads whatever defines it' % name
+            )
+            assert provided[name] in page, (
+                'history.js reads window.%s but history.html does not load %s'
+                % (name, provided[name])
+            )
 
 
 class TestNavigation:

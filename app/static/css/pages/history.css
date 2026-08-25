@@ -320,8 +320,14 @@
     display: none;
 }
 
+/* A hairline above the footer, so a list scrolled mid-row reads as scrollable
+   rather than as clipped. Without it the half-row the scroller cuts off sits
+   flush against an opaque button, which looks like a rendering fault instead
+   of like "there is more below". */
 .hist-more {
+    margin-top: var(--sp-3);
     padding-top: var(--sp-3);
+    border-top: 1px solid var(--border-subtle);
 }
 
 .hist-more .app-btn {

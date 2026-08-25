@@ -156,6 +156,7 @@ For production, configure Firestore rules to restrict access. Collections are cr
 - `newsletter_history` - Sent newsletters
 - `contact_submissions` - Contact form entries
 - `activities` - Activity audit log
+- `generations` - One transcript per AI generation run (prompt, plan, outcome)
 - `comments` - Blog comments
 
 ---
@@ -484,6 +485,20 @@ Configurable via Dashboard > Site Settings:
 | GET | `/all-blogs` | All blogs (admin only) |
 | GET | `/blogs/filter` | Filter blogs by criteria |
 
+### Creation History
+
+Every AI generation writes one transcript, read back at `/history` as a
+conversation. Scoped to the signed-in user in every case -- a transcript holds
+the prompt somebody typed, so there is no team-wide view of this.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/history` | Past conversations with the blog agent |
+| GET | `/api/history` | One page of runs, keyset-paged on `?before=` |
+| GET | `/api/history/<generation_id>` | One transcript in full |
+| DELETE | `/api/history/<generation_id>` | Remove one transcript (the blog is untouched) |
+| DELETE | `/api/history` | Clear the caller's history |
+
 ### User Management
 
 | Method | Endpoint | Description |
@@ -671,6 +686,7 @@ FYP-main/
 │   │   ├── auth.py                # Authentication (login, signup, reset)
 │   │   ├── blog_routes.py         # Blog CRUD & AI generation
 │   │   ├── blogs_listing_routes.py # Filtering, drafts, approval queue
+│   │   ├── history_routes.py      # AI generation transcripts
 │   │   ├── user_mgmt.py           # User management
 │   │   ├── site_routes.py         # Public blog site
 │   │   ├── newsletter_routes.py   # Newsletter management
@@ -695,6 +711,7 @@ FYP-main/
 │   │   ├── base.html             # Main dashboard layout
 │   │   ├── home.html             # Dashboard home
 │   │   ├── create_blog.html      # Blog creation
+│   │   ├── history.html          # Generation history
 │   │   ├── drafts.html           # Draft listing
 │   │   ├── approval_queue.html   # Approval interface
 │   │   ├── comments.html         # Comment moderation

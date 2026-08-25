@@ -40,6 +40,9 @@ to reason about. Sizes are capped at write time rather than at read time --
 post itself is one ``blog_id`` away, and duplicating a 7 KB body into a second
 collection would double the storage for every draft the app has ever made.
 """
+from datetime import datetime, timezone
+
+from google.api_core.exceptions import FailedPrecondition
 from google.cloud.firestore_v1.base_query import FieldFilter
 from firebase_admin import firestore
 
@@ -71,6 +74,12 @@ MAX_PROMPT_CHARS = 2000
 # than a first paint that waits on a hundred documents.
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 50
+
+# How many documents the unindexed fallback will read before it gives up on
+# being complete (see `_history_scan`). Sized for the shape of this collection
+# -- one document per generation, per user -- so it covers a real history
+# comfortably while still being a bound rather than a whole-collection scan.
+FALLBACK_SCAN_LIMIT = 200
 
 # Everything the conversation rail renders: enough to draw a row and decide
 # whether to open it, and nothing else. `thoughts` and `excerpt` are the bulk
@@ -175,40 +184,90 @@ class GenerationRepository:
         datetime. An unparseable value is treated as absent, which returns the
         first page: a bad cursor should show the reader the top of their
         history, not an error.
-        """
-        try:
-            limit = max(1, min(int(limit or DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE))
 
+        **On the missing index.** Filtering by ``user_id`` while ordering by
+        ``created_at`` needs a composite index, declared in
+        ``firestore.indexes.json`` -- and a declaration is not a deployment.
+        Until someone runs ``firebase deploy --only firestore:indexes`` the
+        query raises ``FailedPrecondition``, and the first version of this
+        method caught that with everything else and returned an empty page. The
+        screen then said "No conversations yet" to a user with a database full
+        of them, which is the worst answer available: it is wrong, it is
+        silent, and it looks like the feature simply does not work.
+
+        So the failure is now separated from the fallback. The index error is
+        logged with the URL that creates it, and the page is served from an
+        unindexed read instead (see :meth:`_history_scan`). Every other failure
+        still degrades to empty, because there is nothing better to do with a
+        connection that is down.
+        """
+        limit = max(1, min(int(limit or DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE))
+        cursor = _as_datetime(before)
+
+        try:
             query = (self.db.collection(self.generation_collection)
                      .where(filter=FieldFilter('user_id', '==', user_id))
                      .order_by('created_at', direction=firestore.Query.DESCENDING)
                      .select(list(GENERATION_LIST_FIELDS)))
 
-            cursor = _as_datetime(before)
             if cursor is not None:
                 query = query.start_after({'created_at': cursor})
 
             # One extra row, purely to answer "is there another page?" without a
             # second query or a count. It is dropped before returning.
             docs = list(query.limit(limit + 1).stream())
-            has_more = len(docs) > limit
+            return _page(docs, limit)
 
-            items = []
-            for doc in docs[:limit]:
-                data = doc.to_dict() or {}
-                data['id'] = doc.id
-                _serialize_dates(data)
-                items.append(data)
+        except FailedPrecondition as exc:
+            # Actionable, and at error level: this is a deployment step someone
+            # has to take, not a transient blip. The message Firestore returns
+            # carries a one-click console URL, so it is passed through whole.
+            logger.error(
+                'Generation history is running unindexed -- deploy the '
+                'composite index (user_id ASC, created_at DESC) on '
+                '`%s` with `firebase deploy --only firestore:indexes`. '
+                'Firestore said: %s',
+                self.generation_collection, exc,
+            )
+            return self._history_scan(user_id, limit, cursor)
 
-            return {
-                'items': items,
-                'has_more': has_more,
-                # The cursor for the next page, so the caller never has to know
-                # which field the keyset is built on.
-                'next_cursor': items[-1]['created_at'] if (items and has_more) else '',
-            }
         except Exception:
             logger.exception('Error fetching generation history')
+            return {'items': [], 'has_more': False, 'next_cursor': ''}
+
+    def _history_scan(self, user_id, limit, cursor):
+        """The same page, without the composite index.
+
+        An equality filter on its own needs only the single-field index every
+        Firestore collection has automatically, so this always works. The
+        ordering and the keyset are then applied in Python, which is only
+        defensible because it is bounded: at most ``FALLBACK_SCAN_LIMIT``
+        documents, projected to the handful of fields the rail renders.
+
+        That bound is also the catch, and the reason this is a fallback rather
+        than the design. Past ``FALLBACK_SCAN_LIMIT`` runs the oldest ones stop
+        being reachable, and every page costs the same scan. It keeps the
+        screen honest until the index is deployed; it is not a substitute for
+        deploying it.
+        """
+        try:
+            docs = list(self.db.collection(self.generation_collection)
+                        .where(filter=FieldFilter('user_id', '==', user_id))
+                        .select(list(GENERATION_LIST_FIELDS))
+                        .limit(FALLBACK_SCAN_LIMIT)
+                        .stream())
+
+            rows = [(_sort_key(doc), doc) for doc in docs]
+            rows.sort(key=lambda row: row[0], reverse=True)
+
+            if cursor is not None:
+                # Strictly older than the cursor, which is what `start_after`
+                # means on a descending order.
+                rows = [row for row in rows if row[0] < cursor]
+
+            return _page([doc for _, doc in rows[:limit + 1]], limit)
+        except Exception:
+            logger.exception('Error fetching generation history (unindexed)')
             return {'items': [], 'has_more': False, 'next_cursor': ''}
 
     def get_generation(self, generation_id, user_id):
@@ -234,24 +293,6 @@ class GenerationRepository:
         except Exception:
             logger.exception('Error fetching generation record')
             return None
-
-    def count_generations(self, user_id, cap=200):
-        """How many runs a user has, counted up to ``cap``.
-
-        Projected to a single field and capped, because this only exists to
-        label the rail ("12 conversations") -- a number nobody scrolls past a
-        couple of hundred of, and not worth an unbounded scan to make exact.
-        """
-        try:
-            docs = (self.db.collection(self.generation_collection)
-                    .where(filter=FieldFilter('user_id', '==', user_id))
-                    .select(['user_id'])
-                    .limit(max(1, int(cap)))
-                    .stream())
-            return sum(1 for _ in docs)
-        except Exception:
-            logger.exception('Error counting generation history')
-            return 0
 
     # --- Deletes ----------------------------------------------------------
 
@@ -309,6 +350,48 @@ class GenerationRepository:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _sort_key(doc):
+    """``created_at`` as something sortable, for the unindexed path.
+
+    A document written before this field existed, or with a value Firestore
+    handed back as something other than a datetime, sorts to the bottom rather
+    than raising -- one malformed row must not take out the whole listing.
+
+    Note this is the one place the two reads differ: an *ordered* Firestore
+    query excludes documents that do not carry the ordered field, so the
+    indexed path drops such a row and this one keeps it at the end. Being more
+    forgiving in the fallback is the harmless direction to differ in.
+    """
+    value = (doc.to_dict() or {}).get('created_at')
+    aware = ensure_aware(value) if value is not None else None
+    return aware or datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _page(docs, limit):
+    """Turn ``limit + 1`` documents into one page plus its cursor.
+
+    Shared by the indexed and unindexed reads so the two cannot disagree about
+    what `has_more` means or which row the next cursor comes from -- the sort
+    of drift that only shows up as a page that repeats itself.
+    """
+    has_more = len(docs) > limit
+
+    items = []
+    for doc in docs[:limit]:
+        data = doc.to_dict() or {}
+        data['id'] = doc.id
+        _serialize_dates(data)
+        items.append(data)
+
+    return {
+        'items': items,
+        'has_more': has_more,
+        # The cursor for the next page, so the caller never has to know which
+        # field the keyset is built on.
+        'next_cursor': items[-1]['created_at'] if (items and has_more) else '',
+    }
+
 
 def _as_datetime(value):
     """Coerce a cursor to an aware datetime, or ``None`` if it is not one.

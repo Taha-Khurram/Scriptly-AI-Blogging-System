@@ -388,6 +388,69 @@ misses are tolerated, since the generation is server-side and does not care that
 one poll missed. `404`/`403` from the status endpoint are terminal — the old
 poller checked only `data.status`, so an expired task meant polling forever.
 
+### Creation history — `history.html`
+
+Every conversation with the agent, kept. Two panes: an index of past runs, and
+the one the reader picked, read back as the same thread the create screen paints
+a live run in.
+
+```
+┌ .hist-shell ────────────────────────────────────────────────┐
+│ ╭ .hist-rail (20rem, sticky) ╮ ╭ .hist-pane ──────────────╮ │
+│ │ 🔍 filter          ( Clear)│ │                    YOU   │ │
+│ │ ✦ How to Set an Ad Budget… │ │   ╭ prompt bubble ─────╮ │ │
+│ │   3 hours ago · Growth     │ │   ╰────────────────────╯ │ │
+│ │ ✦ RAG, Explained Without…  │ │ SCRIPTLY                 │ │
+│ │   20 hours ago · AI        │ │ ✦ ⣿ Its thinking · 5 ▾   │ │
+│ │ ⚠ Ten practical ideas for… │ │   H2 the title it chose  │ │
+│ │   2 days ago · Stopped     │ │   the opening of the…    │ │
+│ │ ───────────────────────────│ │   ✔ 1,043 words · 5 min  │ │
+│ │ ( Load older )             │ │   ✔ Filed under Growth   │ │
+│ ╰────────────────────────────╯ │   ( Open ) ( Reuse )  🗑  │ │
+│                                ╰──────────────────────────╯ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**The thread is a shared component** — `css/components/thread.css`, extracted
+from `create-blog.css` and rendered by both screens. A finished generation and a
+running one are the same conversation at two moments, and a reader who watched a
+draft being written should recognise it a week later. What each page keeps is
+what is genuinely its own: Create keeps the working-state animation on the
+turn mark; History keeps the title, the excerpt note and the action row, none of
+which exist while a run is still going.
+
+**Reasoning is collapsed here and open on Create.** While a run works, its plan
+is the only thing to read; afterwards the outcome is, and the plan is there for
+the reader who wants to know why the piece took the angle it did. The
+disclosure is labelled by what it knows — *Its thinking · 5 steps* — rather than
+by a duration it did not watch.
+
+**The excerpt is the opening, and says so.** A transcript stores ~900 characters
+of the draft, not the draft: the post is one link away, and duplicating a 7 KB
+body into a second collection would double the storage for every draft the app
+has made. The note under it carries the link, and disappears when the blog it
+pointed at is gone.
+
+**Selection is a URL, not a state.** `?run=<id>` is written with `replaceState`,
+so a reload or a copied link lands on the conversation being read, while PJAX
+keeps owning the page's real history entries — pushing an entry per row would
+make Back mean "the previous row I glanced at".
+
+**Paging is keyset, filtering is local.** *Load older* passes the `created_at`
+of the oldest row on screen; the filter field searches what is already loaded
+and hides the button while a query is active, because loading a page the filter
+would then hide reads as a broken button.
+
+**A run that stopped is a first-class row.** It is marked in the rail (`--danger`
+medallion, *Stopped*) rather than only inside, because the failed run is the one
+a reader is most likely to come back for — it is the only kind that leaves
+nothing in Drafts to explain itself. Its turn carries the error where the draft
+would have been, and offers the prompt back.
+
+**Deleting a transcript never touches the blog.** The two are separate objects
+with separate lifetimes, and the copy says so in the confirm, in the toast and
+in the API's own response.
+
 ### Content editor — `drafts.html`, `approval_queue.html`
 
 Modal on `--surface-1` at `--radius-lg` / `--elev-3`. Title input, slug group,
