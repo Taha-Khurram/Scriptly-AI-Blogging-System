@@ -17,6 +17,7 @@ from app.repositories.newsletter import NewsletterRepository
 from app.repositories.embeddings import EmbeddingRepository
 from app.repositories.gallery import GalleryRepository
 from app.repositories.seo_reports import SeoReportRepository
+from app.repositories.generations import GenerationRepository
 
 __all__ = [
     'BlogRepository',
@@ -32,4 +33,5 @@ __all__ = [
     'EmbeddingRepository',
     'GalleryRepository',
     'SeoReportRepository',
+    'GenerationRepository',
 ]

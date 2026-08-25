@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% from 'partials/page_header.html' import page_header with context %}
+
+{% block title %}History | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
+
+{% block extra_css %}
+{# The thread is the same component the create screen renders a live run in —
+   see css/components/thread.css. history.css adds the rail around it. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/thread.css') }}?v=1">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/history.css') }}?v=1">
+{% endblock %}
+
+{#
+  History — every conversation with the blog agent, kept.
+
+  Two panes in one shell: an index of past runs on the left, the selected one
+  read as a thread on the right. The same shape the create screen's run panel
+  uses, deliberately — a finished generation and a live one are the same
+  exchange at different times, and a reader who watched one being written
+  should recognise it when they come back to it a week later.
+
+    ┌ .hist-shell ──────────────────────────────────────────────┐
+    │ ╭ .hist-rail ─────╮ ╭ .hist-pane ───────────────────────╮ │
+    │ │ 🔍 filter       │ │                        YOU        │ │
+    │ │ ─────────────── │ │        ╭ prompt bubble ─────────╮ │ │
+    │ │ ▸ Ad budgets  ✓ │ │        ╰────────────────────────╯ │ │
+    │ │   2h ago        │ │ SCRIPTLY                          │ │
+    │ │ ▸ RAG explained │ │ ✦ ⣿ Thought for 4 steps        ▾  │ │
+    │ │   yesterday   ! │ │   the plan, line by line          │ │
+    │ │ ( Load older )  │ │   the opening of the draft…       │ │
+    │ ╰─────────────────╯ │   ✔ 1,043 words · 5 sections      │ │
+    │                     │   ( Open draft ) ( Reuse prompt ) │ │
+    │                     ╰───────────────────────────────────╯ │
+    └───────────────────────────────────────────────────────────┘
+
+  The rail's first page is server-rendered because it is the content of the
+  screen; the thread is fetched per selection because a transcript carries the
+  reasoning and an excerpt, and inlining twenty of those to show one would make
+  the page twenty times its useful size.
+
+  Everything lives inside .dashboard-main. PJAX swaps only that element's
+  innerHTML, so the page header has to be its first child and nothing may sit
+  outside it.
+#}
+
+{% block content %}
+<div class="dashboard-layout">
+
+  {% include 'partials/sidebar.html' %}
+
+  <main class="dashboard-main">
+
+    {% call page_header(title='History', eyebrow='Blog studio') %}
+    <button type="button" class="page-header-icon-btn" data-theme-toggle aria-pressed="false"
+      aria-label="Switch to dark theme" title="Switch to dark theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+    <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-primary">
+      <i class="material-symbols-outlined icon-inline" aria-hidden="true">add</i>
+      <span class="page-header-label">New blog</span>
+    </a>
+    {% endcall %}
+
+    {# [data-state] on the shell is the whole switch between "there is a history"
+       and "there is not", the same idiom .create-stage uses. #}
+    <div class="hist-shell" data-history data-state="{{ 'ready' if runs else 'empty' }}"
+      data-selected="{{ selected_id }}">
+
+      {% if runs %}
+      <!-- ===================== RAIL ===================== -->
+      <aside class="hist-rail" aria-label="Past conversations">
+
+        <div class="hist-rail-head">
+          <div class="hist-filter">
+            <span class="hist-filter-icon" aria-hidden="true">
+              <i class="material-symbols-outlined icon-inline">search</i>
+            </span>
+            <label class="visually-hidden" for="histFilter">Filter conversations</label>
+            <input type="search" id="histFilter" class="hist-filter-input" data-filter autocomplete="off"
+              placeholder="Filter by prompt or title">
+          </div>
+
+          <button type="button" class="hist-clear" data-clear-all
+            title="Delete every conversation in this list">
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete_sweep</i>
+            <span>Clear</span>
+          </button>
+        </div>
+
+        {# .hist-list and .hist-row are load-bearing: history.js appends the
+           next page into this list and finds rows through them. #}
+        <ol class="hist-list" data-list>
+          {% for run in runs %}
+          {% set label = run.title if (run.status == 'completed' and run.title) else run.prompt %}
+          <li class="hist-item">
+            <button type="button" class="hist-row" data-row data-id="{{ run.id }}"
+              data-search="{{ ((run.title or '') ~ ' ' ~ (run.prompt or '') ~ ' ' ~ (run.category or '')) | lower }}"
+              aria-pressed="false">
+              <span class="hist-row-mark {{ 'is-failed' if run.status == 'failed' }}" aria-hidden="true">
+                <i class="material-symbols-outlined icon-inline">
+                  {{ 'error' if run.status == 'failed' else 'auto_awesome' }}
+                </i>
+              </span>
+              <span class="hist-row-body">
+                <span class="hist-row-title">{{ (label or 'Untitled run') | replace('**', '') }}</span>
+                <span class="hist-row-meta">
+                  <time datetime="{{ run.created_at }}" data-relative>{{ run.created_at[:10] }}</time>
+                  {% if run.status == 'failed' %}
+                  <span class="hist-row-flag">Stopped</span>
+                  {% elif run.category %}
+                  <span class="hist-row-cat">{{ run.category }}</span>
+                  {% endif %}
+                </span>
+              </span>
+            </button>
+          </li>
+          {% endfor %}
+        </ol>
+
+        <p class="hist-noresults" data-noresults hidden>Nothing matches that filter.</p>
+
+        {# Keyset paging: the cursor is the created_at of the oldest row on
+           screen, so "older" is always relative to what the reader actually
+           has rather than to a page number that shifts as new runs land. #}
+        <div class="hist-more">
+          <button type="button" class="app-btn is-quiet" data-more data-cursor="{{ next_cursor }}"
+            {{ 'hidden' if not has_more }}>
+            Load older
+          </button>
+        </div>
+      </aside>
+
+      <!-- ===================== PANE ===================== -->
+      {#
+        The reading pane. Its states are attributes, not separate blocks the
+        script shows and hides by hand: [data-pane-state] is one of resting /
+        loading / ready / error, and the CSS decides which child exists.
+      #}
+      <section class="hist-pane" data-pane data-pane-state="resting" aria-label="Conversation"
+        aria-live="polite" aria-busy="false">
+
+        {# Resting. Not an error and not empty — the reader has a history and
+           has simply not picked a row yet, which is a different thing to say. #}
+        <div class="hist-resting" data-pane-resting>
+          <span class="hist-resting-mark" aria-hidden="true">
+            <i class="material-symbols-outlined icon-inline">forum</i>
+          </span>
+          <p class="hist-resting-text">Pick a conversation to read what you asked for and what Scriptly wrote back.</p>
+        </div>
+
+        <div class="hist-loading" data-pane-loading aria-hidden="true">
+          <div class="skeleton skeleton-text lg"></div>
+          <div class="skeleton skeleton-text md"></div>
+          <div class="skeleton skeleton-text xl"></div>
+          <div class="skeleton skeleton-text xl"></div>
+          <div class="skeleton skeleton-text md"></div>
+        </div>
+
+        <div class="hist-error" data-pane-error>
+          <span class="hist-error-icon" aria-hidden="true">
+            <i class="material-symbols-outlined icon-inline icon-fill">warning</i>
+          </span>
+          <p class="hist-error-text" data-pane-error-text>That conversation could not be loaded.</p>
+          <button type="button" class="app-btn is-ghost" data-pane-retry>Try again</button>
+        </div>
+
+        {# The thread. Same class names as the create screen's run panel, and
+           the same reading order — the ask, the reasoning, the draft, then what
+           it did — so a finished run looks like the one you watched. #}
+        <div class="thread" data-thread>
+
+          <article class="turn is-you">
+            <p class="turn-who">You</p>
+            <div class="turn-bubble" data-run-prompt></div>
+          </article>
+
+          <article class="turn is-agent is-settled">
+            <span class="turn-mark" aria-hidden="true">
+              <span class="material-symbols-outlined">auto_awesome</span>
+            </span>
+
+            <div class="turn-main">
+              <p class="turn-who">Scriptly</p>
+
+              {# Collapsed by default, unlike the live run. While a run is
+                 working the plan is the only thing to read; afterwards the
+                 outcome is, and the reasoning is there for the reader who
+                 wants to know why the piece took the angle it did. #}
+              <div class="reason" data-reason hidden>
+                <button type="button" class="reason-head" data-reason-toggle aria-expanded="false"
+                  aria-controls="histReasonBody">
+                  <span class="reason-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span class="reason-title" data-reason-title>Its thinking</span>
+                  <i class="material-symbols-outlined icon-inline reason-caret" aria-hidden="true">expand_more</i>
+                </button>
+                <div class="reason-body" id="histReasonBody" data-reason-body>
+                  <ol class="reason-list" data-reason-list></ol>
+                </div>
+              </div>
+
+              {# The failure, where the draft would have been. In the thread
+                 rather than in a toast, because the toast faded the day it
+                 happened and this screen is what the reader came back to. #}
+              <div class="turn-fail" data-run-fail hidden>
+                <span class="turn-fail-icon" aria-hidden="true">
+                  <i class="material-symbols-outlined icon-inline icon-fill" aria-hidden="true">warning</i>
+                </span>
+                <div class="turn-fail-body">
+                  <p class="turn-fail-title">Generation stopped</p>
+                  <p class="turn-fail-text" data-run-fail-text></p>
+                </div>
+              </div>
+
+              <h2 class="hist-title" data-run-title hidden></h2>
+
+              {# The opening of the piece, not the piece. The full draft is one
+                 link away and must not be mistaken for this. #}
+              <div class="draft" data-excerpt hidden>
+                <div class="draft-body" data-excerpt-body></div>
+                <p class="hist-excerpt-note" data-excerpt-note hidden>
+                  The opening of the draft. <a href="#" data-open-blog>Read all of it &rarr;</a>
+                </p>
+              </div>
+
+              <ol class="trail" data-trail></ol>
+
+              {#
+                The actions, in the template rather than built by the script.
+
+                Two reasons, and the second is the one that bites. Markup here
+                is markup the reader of this file can see — the script only
+                sets an href, a label and `hidden`. And the icon font is
+                *subset to the glyphs this app uses*, scanned out of templates
+                and JS by scripts/update_icon_font.py: a name that reaches the
+                DOM as a variable is invisible to that scan, so the glyph is
+                left out of the font and renders as the raw text
+                "restart_alt" in the UI.
+              #}
+              <div class="hist-actions" data-actions>
+                <a class="app-btn is-primary" data-open-blog-btn href="#" hidden>
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">open_in_new</i>
+                  Open the blog
+                </a>
+                <button type="button" class="app-btn is-ghost" data-action="reuse">
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">refresh</i>
+                  <span data-reuse-label>Reuse this prompt</span>
+                </button>
+                <button type="button" class="app-btn is-quiet hist-delete" data-action="delete">
+                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+      {% else %}
+      <!-- ===================== EMPTY ===================== -->
+      <div class="list-empty hist-empty">
+        <span class="list-empty-icon">
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">forum</i>
+        </span>
+        <p>
+          No conversations yet. Every blog you generate is kept here &mdash; what you asked for,
+          how Scriptly planned it, and where the draft landed.
+        </p>
+        <a href="{{ url_for('blog.create_page') }}" class="page-header-action is-primary">
+          <i class="material-symbols-outlined icon-inline" aria-hidden="true">add</i>
+          <span class="page-header-label">Write your first one</span>
+        </a>
+      </div>
+      {% endif %}
+
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# The draft excerpt is rendered with the same markdown subset the create
+   screen streams a live draft through; it has to be in place before the page
+   script reads it. PJAX loads these in order. #}
+<script src="{{ url_for('static', filename='js/components/draft-markdown.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pages/history.js') }}?v=1"></script>
+{% endblock %}

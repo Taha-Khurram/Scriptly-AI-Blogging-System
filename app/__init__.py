@@ -299,6 +299,7 @@ _BLUEPRINTS = (
     ('app.routes.settings_routes', 'settings_bp', None),
     ('app.routes.activity_routes', 'activity_bp', None),
     ('app.routes.blogs_listing_routes', 'blogs_bp', None),
+    ('app.routes.history_routes', 'history_bp', None),
     ('app.routes.analytics_routes', 'analytics_bp', None),
     ('app.routes.schedule_routes', 'schedule_bp', None),
     ('app.routes.leads_routes', 'leads_bp', None),

@@ -16,6 +16,7 @@ from app.core.extensions import limiter
 from app.core.security import api_login_required, current_user
 from datetime import datetime
 import math
+import time
 import markdown
 from app.core.security import admin_required
 from app.core.logging import get_logger
@@ -455,6 +456,13 @@ def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, au
     The pipeline reports three things back into the task record as it works --
     its plan, the draft text, and the stage it is actually on -- so the create
     screen can show the run instead of a bar that sat at 30% for a minute.
+
+    Whichever way it ends, the run is then written to the generation history
+    (``/history``) as a durable transcript. Everything the create screen shows
+    while a run is live is ephemeral -- the prompt sits in ``sessionStorage``
+    and the task record is evicted from memory ten minutes after it finishes --
+    so without this write the question "what did I ask for, and what did it
+    decide to write?" has no answer once the tab is closed.
     """
     with app.app_context():
         # Progress across the writing stage comes from characters actually
@@ -466,6 +474,12 @@ def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, au
         PROGRESS_STEP_CHARS = 400   # how often a chunk is worth a status write
 
         state = {'chars': 0, 'marked': 0}
+
+        # The transcript is assembled as the run goes rather than reconstructed
+        # from the task manager at the end: those buffers are trimmed at their
+        # own ceilings and evicted on a timer, and reading them back would make
+        # the durable record depend on the lifetime of the ephemeral one.
+        record = {'thoughts': [], 'started': time.time()}
 
         def on_content(chunk):
             total = task_manager.append_content(task_id, chunk)
@@ -481,9 +495,31 @@ def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, au
 
         def on_thought(text, kind='note'):
             task_manager.add_thought(task_id, text, kind=kind)
+            record['thoughts'].append({'text': text, 'kind': kind})
 
         def on_stage(stage, progress):
             task_manager.update_task(task_id, stage, progress)
+
+        def save_transcript(db, **fields):
+            """Write the run to the history. Never raises, never blocks the run.
+
+            A transcript is a record *about* work that already happened, so a
+            failure to store it must not turn a blog the user can already see
+            in their drafts into an error on their screen -- hence the swallow
+            here on top of the repository's own.
+            """
+            try:
+                db.record_generation(
+                    user_id, prompt,
+                    user_name=user_name,
+                    destination='submit' if auto_submit else 'draft',
+                    thoughts=record['thoughts'],
+                    duration_seconds=time.time() - record['started'],
+                    **fields,
+                )
+            except Exception:
+                logger.exception('Could not record generation history',
+                                 extra={'task_id': task_id})
 
         try:
             task_manager.update_task(task_id, 'content', WRITE_FLOOR)
@@ -501,6 +537,15 @@ def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, au
                 task_manager.fail_task(
                     task_id, error_msg,
                     code=generated_data.get('error_code'),
+                )
+                # A failed run is the one a reader is most likely to come back
+                # looking for: it is the only kind that leaves nothing in
+                # Drafts to explain itself.
+                save_transcript(
+                    FirestoreService(),
+                    status='failed',
+                    error=error_msg,
+                    error_code=generated_data.get('error_code'),
                 )
                 return
 
@@ -579,7 +624,26 @@ def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, au
             generated_data['author_id'] = user_id
             generated_data['author'] = user_name
 
-            db.create_draft(generated_data, user_id)
+            blog_id = db.create_draft(generated_data, user_id)
+
+            # `create_draft` fills the slug in on the dict it was handed, so
+            # the transcript can link straight at the published post without a
+            # second read.
+            stats = (formatting_obj.get('statistics') or {})
+            save_transcript(
+                db,
+                status='completed',
+                title=generated_data.get('title', 'Untitled'),
+                category=category,
+                blog_id=blog_id or '',
+                blog_status=status,
+                blog_slug=generated_data.get('slug', ''),
+                word_count=stats.get('word_count') or len(content_text.split()),
+                section_count=len(formatting_obj.get('toc') or []),
+                reading_time=formatting_obj.get('reading_time', ''),
+                model_used=(generated_data.get('metadata') or {}).get('model_used', ''),
+                excerpt=content_text,
+            )
 
             db.log_activity(
                 user_id=user_id,
@@ -601,6 +665,7 @@ def _run_generation_task(task_id, app, user_id, user_name, user_role, prompt, au
         except Exception as e:
             logger.exception("Background Task Error")
             task_manager.fail_task(task_id, str(e))
+            save_transcript(FirestoreService(), status='failed', error=str(e))
 
 
 @blog_bp.route('/api/generate/status/<task_id>', methods=['GET'])

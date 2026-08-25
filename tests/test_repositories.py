@@ -92,9 +92,12 @@ class TestComposition:
         from app.firebase.firestore_service import FirestoreService
 
         provided = set(dir(FirestoreService))
-        # Set in FirestoreService.__init__ rather than on a class body.
-        provided |= {'db', 'collection_name', 'activity_collection',
-                     'user_collection'}
+        # Whatever __init__ sets on the instance rather than on a class body
+        # (`db`, the collection names). Read off a real instance instead of
+        # listed here: a hardcoded list fails the next time a repository is
+        # added with its own collection, which is a true statement about the
+        # list and nothing at all about the code under test.
+        provided |= set(vars(FirestoreService()))
 
         unresolved = set()
         for path in glob.glob('app/repositories/*.py'):

@@ -22,6 +22,7 @@ The behaviour now lives in :mod:`app.repositories`, one module per domain:
 * :class:`~app.repositories.embeddings.EmbeddingRepository` -- vector embeddings that back semantic search over published posts
 * :class:`~app.repositories.gallery.GalleryRepository` -- metadata for the media library. the bytes live in storage_service
 * :class:`~app.repositories.seo_reports.SeoReportRepository` -- saved seo audit reports
+* :class:`~app.repositories.generations.GenerationRepository` -- blog generation runs: the transcript of every conversation with the agent
 
 ``FirestoreService`` composes them. Its public surface is byte-for-byte the
 method set it had before, so every existing call site works unchanged -- the
@@ -45,6 +46,7 @@ from app.repositories import (
     EmbeddingRepository,
     GalleryRepository,
     SeoReportRepository,
+    GenerationRepository,
 )
 
 logger = get_logger(__name__)
@@ -79,6 +81,7 @@ class FirestoreService(
     EmbeddingRepository,
     GalleryRepository,
     SeoReportRepository,
+    GenerationRepository,
 ):
     """Every Firestore operation the application performs.
 
@@ -92,3 +95,7 @@ class FirestoreService(
         self.collection_name = "blogs"
         self.activity_collection = "activities"
         self.user_collection = "users"
+        # One document per finished generation run -- see
+        # app/repositories/generations.py for why the transcript is durable
+        # while the task record that produced it is not.
+        self.generation_collection = "generations"

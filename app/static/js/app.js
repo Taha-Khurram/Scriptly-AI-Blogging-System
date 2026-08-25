@@ -1248,6 +1248,30 @@ const Pjax = (() => {
                 </div>
             </div>`,
 
+        // History: the conversation rail beside the reading pane. A skeleton is a
+        // promise about the shape that is coming, so it shows both columns —
+        // arriving at one column and being handed two is the jump this avoids.
+        history: `
+            <header class="dashboard-header skeleton-header">
+                <div><div class="skeleton skeleton-text" style="height:14px;width:90px;margin-bottom:8px;"></div><div class="skeleton skeleton-title" style="width:140px;"></div></div>
+                <div class="skeleton" style="width:120px;height:38px;border-radius:20px;"></div>
+            </header>
+            <div style="display:grid;grid-template-columns:20rem minmax(0,1fr);gap:1.5rem;align-items:start;">
+                <div class="skeleton-card" style="padding:1rem;">
+                    <div class="skeleton" style="width:100%;height:34px;border-radius:999px;margin-bottom:0.75rem;"></div>
+                    <div style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.75rem 0;"><div class="skeleton skeleton-circle" style="width:28px;height:28px;flex-shrink:0;"></div><div style="flex:1;"><div class="skeleton skeleton-text" style="width:85%;margin-bottom:6px;"></div><div class="skeleton skeleton-text sm" style="width:45%;"></div></div></div>
+                    <div style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.75rem 0;"><div class="skeleton skeleton-circle" style="width:28px;height:28px;flex-shrink:0;"></div><div style="flex:1;"><div class="skeleton skeleton-text" style="width:70%;margin-bottom:6px;"></div><div class="skeleton skeleton-text sm" style="width:40%;"></div></div></div>
+                    <div style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.75rem 0;"><div class="skeleton skeleton-circle" style="width:28px;height:28px;flex-shrink:0;"></div><div style="flex:1;"><div class="skeleton skeleton-text" style="width:90%;margin-bottom:6px;"></div><div class="skeleton skeleton-text sm" style="width:50%;"></div></div></div>
+                </div>
+                <div style="max-width:44rem;margin:0 auto;padding-top:1.5rem;width:100%;">
+                    <div class="skeleton" style="width:60%;height:56px;border-radius:20px;margin:0 0 2rem auto;"></div>
+                    <div class="skeleton skeleton-text lg" style="margin-bottom:1.25rem;"></div>
+                    <div class="skeleton skeleton-text xl" style="margin-bottom:0.5rem;"></div>
+                    <div class="skeleton skeleton-text xl" style="margin-bottom:0.5rem;"></div>
+                    <div class="skeleton skeleton-text md"></div>
+                </div>
+            </div>`,
+
         // Manage Users: header with invite button + table (user, email, role, status, actions)
         manageUsers: `
             <header class="dashboard-header skeleton-header">
@@ -1310,6 +1334,7 @@ const Pjax = (() => {
         '/activity': 'activity',
         '/analytics': 'analytics',
         '/create': 'create',
+        '/history': 'history',
         '/app-settings': 'appSettings',
         '/users/manage-users': 'manageUsers',
         '/optimization': 'optimization'
@@ -1341,7 +1366,7 @@ const Pjax = (() => {
 
         // Only intercept dashboard navigation (sidebar links)
         const dashboardPaths = [
-            '/dashboard', '/create', '/drafts', '/all-blogs',
+            '/dashboard', '/create', '/history', '/drafts', '/all-blogs',
             '/categories', '/gallery', '/seo-tools', '/newsletter',
             '/formatting-tools', '/site-settings', '/approval',
             '/comments', '/schedule', '/leads', '/activity',
@@ -1860,7 +1885,7 @@ document.addEventListener("click", (e) => {
         // Dashboard links are handled by Pjax
         if (currentHost === linkHost) {
             const dashboardPaths = [
-                '/dashboard', '/create', '/drafts', '/all-blogs',
+                '/dashboard', '/create', '/history', '/drafts', '/all-blogs',
                 '/categories', '/gallery', '/seo-tools', '/newsletter',
                 '/formatting-tools', '/site-settings', '/approval',
                 '/comments', '/schedule', '/leads', '/activity',

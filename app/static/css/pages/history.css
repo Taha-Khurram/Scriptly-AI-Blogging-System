@@ -1,0 +1,539 @@
+/* ==========================================================================
+   History — every conversation with the blog agent, kept
+
+   Two panes under the shared page header: an index of past runs, and the one
+   the reader picked, read back as a thread.
+
+     ┌ .hist-shell ────────────────────────────────────────────────┐
+     │ ╭ .hist-rail ───────╮ ╭ .hist-pane ───────────────────────╮ │
+     │ │ 🔍 filter  (Clear)│ │                          YOU      │ │
+     │ │ ───────────────── │ │        ╭ prompt bubble ────────╮  │ │
+     │ │ ✦ Ad budgets      │ │        ╰───────────────────────╯  │ │
+     │ │   2h ago · Growth │ │ SCRIPTLY                          │ │
+     │ │ ⚠ RAG explained   │ │ ✦ ⣿ Its thinking               ▾  │ │
+     │ │   yesterday · !   │ │   H2 the title it chose           │ │
+     │ │ ( Load older )    │ │   the opening of the draft…       │ │
+     │ ╰───────────────────╯ │   ✔ 1,043 words · 5 sections      │ │
+     │                       │   ( Open draft ) ( Reuse prompt ) │ │
+     │                       ╰───────────────────────────────────╯ │
+     └─────────────────────────────────────────────────────────────┘
+
+   The thread itself is not styled here. It is css/components/thread.css, the
+   same component the create screen renders a live run in — this file is the
+   furniture around it: the rail, the pane's four states, and the things a
+   *finished* run has that a running one does not (a title, an excerpt note, a
+   row of actions).
+
+   Every colour is a token from dashboard.css. There is no gradient on this
+   screen: the brand gradient is rationed to branding and to whatever is
+   currently working (DESIGN_SYSTEM §4), and nothing here is working.
+   ========================================================================== */
+
+/* ==========================================================================
+   SHELL
+   ========================================================================== */
+
+/* The rail is a fixed measure and the pane takes the rest. `minmax(0, 1fr)`
+   rather than `1fr`: a grid track's default minimum is its content, so a long
+   unbroken word in a draft excerpt would push the pane wider than the canvas
+   and put a horizontal scrollbar on the page. */
+.hist-shell[data-state="ready"] {
+    display: grid;
+    grid-template-columns: 20rem minmax(0, 1fr);
+    gap: var(--sp-6);
+    align-items: start;
+}
+
+/* One attribute decides whether there is a history at all, the same idiom
+   .create-stage[data-state] uses. */
+.hist-shell[data-state="empty"] {
+    display: block;
+}
+
+.hist-empty {
+    margin-top: var(--sp-12);
+}
+
+/* ==========================================================================
+   RAIL — the index of conversations
+   ========================================================================== */
+
+/* Sticky, and its own scroller. The pane beside it is a thousand words of
+   prose; without this the list scrolls away on the first screen and the reader
+   has to come back up to change conversation.
+
+   The offset clears the sticky page header (its condensed height plus the
+   canvas inset), so the first row is never underneath it. */
+.hist-rail {
+    position: sticky;
+    top: calc(var(--sp-16) + var(--sp-2));
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - var(--sp-16) - var(--sp-8));
+    padding: var(--sp-4);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    box-shadow: var(--elev-1);
+}
+
+.hist-rail-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+}
+
+/* --- Filter -------------------------------------------------------------- */
+
+/* A soft-filled field with no hard stroke, like the prompt box — it lifts to
+   the raised surface on focus rather than growing a border. */
+.hist-filter {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
+.hist-filter-icon {
+    position: absolute;
+    top: 50%;
+    left: var(--sp-3);
+    transform: translateY(-50%);
+    display: flex;
+    color: var(--text-faint);
+    pointer-events: none;
+}
+
+.hist-filter-icon .icon-inline {
+    font-size: 18px;
+}
+
+.hist-filter-input {
+    width: 100%;
+    padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-8);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--text-1);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+}
+
+.hist-filter-input::placeholder {
+    color: var(--text-faint);
+}
+
+.hist-filter-input:focus {
+    outline: 0;
+    background: var(--surface-1);
+    box-shadow: var(--elev-2);
+}
+
+.hist-filter-input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* The browser's own clear cross is suppressed: the field is 12rem wide and a
+   second affordance in it reads as a bug. */
+.hist-filter-input::-webkit-search-cancel-button {
+    display: none;
+}
+
+/* --- Clear all ----------------------------------------------------------- */
+
+/* Quiet until wanted. Deleting a history is not a thing to invite, so it is a
+   text button that only takes the danger colour on hover — where the reader is
+   already committed to reading it. */
+.hist-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    flex-shrink: 0;
+    padding: var(--sp-2);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: var(--fs-xs);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.hist-clear:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.hist-clear:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.hist-clear .icon-inline {
+    font-size: 18px;
+}
+
+/* --- The list ------------------------------------------------------------ */
+
+.hist-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    list-style: none;
+    /* Negative margin against equal padding: the rows still sit flush with the
+       rail's inner edge, but the focus ring on the first and last of them has
+       room inside the scroller rather than being clipped by it. */
+    margin: -2px;
+    padding: 2px;
+}
+
+.hist-item {
+    margin-bottom: 2px;
+}
+
+.hist-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    width: 100%;
+    padding: var(--sp-3);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-standard);
+}
+
+.hist-row:hover {
+    background: var(--surface-2);
+}
+
+.hist-row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+/* The selected row takes the active-nav treatment — the same soft accent fill
+   the rail's current page uses, so "where I am" means one thing app-wide. */
+.hist-row[aria-pressed="true"] {
+    background: var(--accent-soft);
+}
+
+.hist-row[aria-pressed="true"] .hist-row-title {
+    color: var(--accent-on-soft);
+    font-weight: var(--fw-medium);
+}
+
+.hist-row[aria-pressed="true"] .hist-row-meta {
+    color: var(--accent-on-soft);
+    opacity: 0.75;
+}
+
+.hist-row[hidden] {
+    display: none;
+}
+
+.hist-row-mark {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--accent-tint);
+    color: var(--accent);
+}
+
+.hist-row-mark .icon-inline {
+    font-size: 16px;
+}
+
+/* A run that stopped is marked at the row, not only inside it: the reader
+   scanning the list should not have to open one to find out. */
+.hist-row-mark.is-failed {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.hist-row-body {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Two lines, then an ellipsis. A prompt can be two thousand characters and a
+   row that grows to fit one turns the index into the thing it indexes. */
+.hist-row-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-tight);
+    color: var(--text-1);
+    overflow-wrap: anywhere;
+}
+
+.hist-row-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: 3px;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.hist-row-cat,
+.hist-row-flag {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Separated by a middot rather than by a border, which at this size would read
+   as a table rule. */
+.hist-row-cat::before,
+.hist-row-flag::before {
+    content: '·';
+    margin-right: var(--sp-2);
+}
+
+.hist-row-flag {
+    color: var(--danger);
+}
+
+.hist-row[aria-pressed="true"] .hist-row-flag {
+    color: inherit;
+}
+
+.hist-noresults {
+    margin: var(--sp-4) 0;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.hist-noresults[hidden] {
+    display: none;
+}
+
+.hist-more {
+    padding-top: var(--sp-3);
+}
+
+.hist-more .app-btn {
+    width: 100%;
+    justify-content: center;
+}
+
+.hist-more .app-btn[hidden] {
+    display: none;
+}
+
+/* ==========================================================================
+   PANE — the four states
+
+   Which child exists is decided here, by one attribute, rather than by the
+   script toggling `hidden` on four elements and getting one of them wrong.
+   ========================================================================== */
+
+.hist-pane {
+    min-height: 24rem;
+    padding: var(--sp-6) var(--sp-4) var(--sp-16);
+}
+
+.hist-resting,
+.hist-loading,
+.hist-error,
+.hist-pane .thread {
+    display: none;
+}
+
+.hist-pane[data-pane-state="resting"] .hist-resting,
+.hist-pane[data-pane-state="loading"] .hist-loading,
+.hist-pane[data-pane-state="error"] .hist-error,
+.hist-pane[data-pane-state="ready"] .thread {
+    display: flex;
+}
+
+/* --- Resting ------------------------------------------------------------- */
+
+.hist-resting {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-3);
+    min-height: 18rem;
+    text-align: center;
+}
+
+.hist-resting-mark {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--text-faint);
+}
+
+.hist-resting-mark .icon-inline {
+    font-size: 24px;
+}
+
+.hist-resting-text {
+    max-width: 26rem;
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+}
+
+/* --- Loading ------------------------------------------------------------- */
+
+.hist-loading {
+    flex-direction: column;
+    gap: var(--sp-3);
+    max-width: 44rem;
+    margin: 0 auto;
+}
+
+/* --- Error --------------------------------------------------------------- */
+
+.hist-error {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-3);
+    min-height: 18rem;
+    text-align: center;
+}
+
+.hist-error-icon {
+    color: var(--danger);
+    font-size: 24px;
+    line-height: 1;
+}
+
+.hist-error-text {
+    max-width: 26rem;
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-2);
+}
+
+/* ==========================================================================
+   THREAD ADDITIONS — what a finished run has that a running one does not
+   ========================================================================== */
+
+/* The title the agent chose. On the create screen there is nothing to put here
+   — the title does not exist until the run ends — so this belongs to History
+   rather than to the shared component. */
+.hist-title {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.hist-title[hidden] {
+    display: none;
+}
+
+.hist-pane .draft[hidden] {
+    display: none;
+}
+
+/* Says plainly that this is the opening and not the post, immediately under
+   the text it qualifies — a reader who scrolls to the end of an excerpt and
+   finds no ending needs the explanation there, not in a button row below. */
+.hist-excerpt-note {
+    margin: var(--sp-3) 0 0;
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+.hist-excerpt-note[hidden] {
+    display: none;
+}
+
+.hist-excerpt-note a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.hist-excerpt-note a:hover {
+    text-decoration: underline;
+}
+
+/* --- Actions -------------------------------------------------------------- */
+
+.hist-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-top: var(--sp-5);
+}
+
+.hist-actions:empty {
+    display: none;
+}
+
+/* The delete sits away from the rest: it is the one action in the row that
+   cannot be undone, and a flush row of five buttons invites a mis-click. */
+.hist-actions .hist-delete {
+    margin-left: auto;
+}
+
+.hist-actions .hist-delete:hover:not(:disabled) {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+/* ==========================================================================
+   RESPONSIVE
+
+   Below 1100px there is not room for a 20rem index beside a 44rem measure, so
+   the two panes stack: the rail becomes a short, self-scrolling list at the top
+   and the conversation reads beneath it. Deliberately not a master/detail
+   swap — a list that replaces itself with a reader needs a back button, and at
+   this width the page can simply show both.
+   ========================================================================== */
+
+@media (max-width: 1100px) {
+    .hist-shell[data-state="ready"] {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hist-rail {
+        position: static;
+        max-height: 22rem;
+    }
+
+    .hist-pane {
+        padding-left: 0;
+        padding-right: 0;
+    }
+}
+
+@media (max-width: 700px) {
+    .hist-rail {
+        max-height: 18rem;
+        padding: var(--sp-3);
+    }
+
+    /* Full-width and stacked: four actions cannot share a 375px line without
+       one of them wrapping to a second row on its own, which reads as an
+       accident. */
+    .hist-actions .app-btn {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+
+    .hist-actions .hist-delete {
+        margin-left: 0;
+    }
+}

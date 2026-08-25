@@ -1,0 +1,575 @@
+/* ==========================================================================
+   Thread — an exchange with the agent, live or remembered
+
+   Shared component. Two screens render the same conversation:
+
+     • Create (`create_blog.html`) shows a run *as it happens* — the reasoning
+       arriving line by line, the draft streaming into the message body, a
+       status line and a bar at the foot of the turn.
+     • History (`history.html`) shows a run *afterwards* — the same exchange,
+       read back from Firestore, with every live cue already settled.
+
+   They are one component on purpose. A finished generation and a running one
+   are the same conversation at two moments, and a reader who watched a draft
+   being written should recognise it when they come back to it a week later.
+   This file is everything that does not depend on which of the two it is; the
+   page stylesheets own the rest (the composer, the rail, the working-state
+   animation on the mark).
+
+   The layout rule that holds it together: the reader's message is a bubble,
+   the agent's is not. An answer that runs to a thousand words has no business
+   inside a bubble, and prose reads better on the canvas than in a container
+   that has to grow to fit it.
+
+   Every colour is a token from dashboard.css.
+   ========================================================================== */
+
+.thread {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-6);
+    width: 100%;
+    /* Measure, not layout: ~70 characters at --fs-body. The turn below it is a
+       thousand words of prose and this is the only thing keeping it readable. */
+    max-width: 44rem;
+    margin: 0 auto;
+    animation: fadeInUp var(--dur-slow) var(--ease-standard) backwards;
+}
+
+/* --- Turns -------------------------------------------------------------- */
+
+.turn {
+    display: flex;
+    gap: var(--sp-3);
+    min-width: 0;
+}
+
+.turn-who {
+    margin: 0 0 var(--sp-2);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+/* The ask. Right-aligned and bubbled — the asymmetry is what makes a column of
+   text read as a conversation without any avatar on this side. */
+.turn.is-you {
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.turn.is-you .turn-who {
+    margin-right: var(--sp-1);
+}
+
+.turn-bubble {
+    max-width: min(100%, 34rem);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg);
+    background: var(--accent-soft);
+    color: var(--accent-on-soft);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    /* A pasted prompt can carry hard breaks; keep them rather than collapsing
+       the whole thing into one paragraph. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* The answer. */
+.turn.is-agent {
+    align-items: flex-start;
+}
+
+.turn-mark {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    margin-top: 18px;
+    border-radius: 50%;
+    background: var(--accent-tint);
+    color: var(--accent);
+}
+
+.turn-mark .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.turn-main {
+    flex: 1;
+    min-width: 0;
+}
+
+/* --- Reasoning ---------------------------------------------------------- */
+
+/* A disclosure, not a panel: bordered on one side only, so it reads as an
+   aside inside the message rather than a second card stacked on the first. */
+.reason {
+    margin-bottom: var(--sp-4);
+}
+
+.reason-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--text-2);
+    cursor: pointer;
+}
+
+.reason-head:hover .reason-title {
+    color: var(--accent);
+}
+
+.reason-head:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-xs);
+}
+
+.reason-title {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+}
+
+/* Sized in em, like every other Material caret in the app (see
+   .filter-pill-caret): the glyph tracks the label it belongs to instead of
+   being pinned to a pixel size that only suited a Bootstrap Icons build. */
+.reason-caret {
+    font-size: 0.85em;
+    color: var(--text-faint);
+    transition: transform var(--dur-base) var(--ease-standard);
+}
+
+.reason-head[aria-expanded="false"] .reason-caret {
+    transform: rotate(-90deg);
+}
+
+/* The thinking indicator: three dots that travel while the model is composing
+   and nothing has arrived yet. That is a different state from "working", and it
+   used to look identical to it. [data-thinking] on the wrapper is the switch —
+   the dots go still the moment the draft starts, so a finished plan does not
+   keep pulsing. */
+.reason-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.reason-dots i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--border-strong);
+}
+
+.reason[data-thinking="true"] .reason-dots i {
+    background: var(--accent);
+    animation: reasonThink 1.4s var(--ease-standard) infinite;
+}
+
+.reason[data-thinking="true"] .reason-dots i:nth-child(2) {
+    animation-delay: 0.18s;
+}
+
+.reason[data-thinking="true"] .reason-dots i:nth-child(3) {
+    animation-delay: 0.36s;
+}
+
+.reason[data-thinking="true"] .reason-title {
+    color: var(--text-2);
+}
+
+@keyframes reasonThink {
+
+    0%,
+    60%,
+    100% {
+        opacity: 0.25;
+        transform: translateY(0);
+    }
+
+    30% {
+        opacity: 1;
+        transform: translateY(-3px);
+    }
+}
+
+/* Collapsed by the button rather than by `hidden`: the rule below can be
+   animated later if it ever needs to be, and `hidden` cannot. */
+.reason-head[aria-expanded="false"]+.reason-body {
+    display: none;
+}
+
+.reason-body {
+    padding: var(--sp-2) 0 0 var(--sp-2);
+    /* The rail ties the lines to the disclosure that owns them. */
+    border-left: 2px solid var(--border-subtle);
+    margin-left: 3px;
+    padding-left: var(--sp-4);
+}
+
+.reason-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Quieter than the draft on purpose. This is the agent talking about the piece;
+   the piece itself is the thing being made, and it sits directly below. */
+.reason-item {
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+    animation: reasonIn var(--dur-base) var(--ease-standard);
+}
+
+.reason-item.is-pending {
+    font-style: italic;
+    color: var(--text-faint);
+}
+
+@keyframes reasonIn {
+    from {
+        opacity: 0;
+        transform: translateY(-3px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* --- The draft ---------------------------------------------------------- */
+
+/* No inner scroll box: a message does not scroll independently of the
+   conversation it is in. The page follows the text instead, and stops
+   following the moment the reader scrolls up to read something. */
+.draft {
+    margin-bottom: var(--sp-4);
+}
+
+.draft-body {
+    font-size: var(--fs-body);
+    line-height: var(--lh-relaxed);
+    color: var(--text-1);
+    overflow-wrap: anywhere;
+}
+
+.draft-body> :first-child {
+    margin-top: 0;
+}
+
+.draft-body p {
+    margin: 0 0 var(--sp-4);
+}
+
+.draft-body h3,
+.draft-body h4 {
+    margin: var(--sp-6) 0 var(--sp-2);
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-strong);
+    line-height: var(--lh-tight);
+    color: var(--text-strong);
+}
+
+.draft-body h4 {
+    font-size: var(--fs-body);
+}
+
+.draft-body ul,
+.draft-body ol {
+    margin: 0 0 var(--sp-4);
+    padding-left: var(--sp-6);
+}
+
+.draft-body li {
+    margin-bottom: var(--sp-2);
+}
+
+.draft-body strong {
+    font-weight: var(--fw-strong);
+    color: var(--text-strong);
+}
+
+.draft-body code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--surface-3);
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+}
+
+/* The caret sits at the end of the sentence being written, and is removed the
+   moment the run stops — a stalled run must never be left blinking as though
+   more were coming. */
+.stream-caret {
+    display: inline-block;
+    width: 2px;
+    height: 1.05em;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    background: var(--accent);
+    animation: streamCaret 1s steps(2, start) infinite;
+}
+
+@keyframes streamCaret {
+    50% {
+        opacity: 0;
+    }
+}
+
+/* --- Trail -------------------------------------------------------------- */
+
+/* What the pipeline observed, ticked in as it becomes true. The five-step
+   checklist this replaces listed work still to come, which is a progress
+   dialog's job; a conversation reports what happened. */
+.trail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-4);
+    padding: 0;
+    list-style: none;
+}
+
+.trail:empty {
+    display: none;
+}
+
+.trail-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+    animation: reasonIn var(--dur-base) var(--ease-standard);
+}
+
+/* The tick is built by the script, so it carries the same classes the
+   templates use — .material-symbols-outlined.icon-inline — and only its colour
+   and alignment are set here. `check` is already in the subset font (the
+   destination menu uses it), so no font regeneration is needed for this. */
+.trail-tick {
+    flex-shrink: 0;
+    font-size: 1.05em;
+    color: var(--success);
+}
+
+/* --- Foot: live status, bar, note --------------------------------------- */
+
+.turn-foot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-4);
+}
+
+.turn-status {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0;
+    min-width: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-2);
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    align-self: center;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: statusPulse 1.6s var(--ease-standard) infinite;
+}
+
+@keyframes statusPulse {
+
+    0%,
+    100% {
+        opacity: 0.35;
+        transform: scale(0.85);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.status-stage {
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.status-meta {
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
+.status-meta:not(:empty)::before {
+    content: "·";
+    margin-right: var(--sp-2);
+}
+
+.turn-metrics {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0;
+    flex-shrink: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+}
+
+.turn-elapsed {
+    font-variant-numeric: tabular-nums;
+}
+
+/* The agent-working signature: the brand gradient under brandShimmer, the same
+   animation #nav-progress uses, so "the system is thinking" looks the same
+   wherever it happens. The width is the server's real percentage — the shimmer
+   supplies the liveness, so the bar never has to invent progress. */
+.turn-bar {
+    height: 3px;
+    margin: var(--sp-2) 0 var(--sp-3);
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    overflow: hidden;
+}
+
+.turn-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--brand-gradient);
+    background-size: 200% 100%;
+    transition: width var(--dur-slow) var(--ease-emphasized);
+    animation: brandShimmer 2.4s linear infinite;
+}
+
+.turn-note {
+    margin: 0;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-faint);
+}
+
+/* --- Settled and failed ------------------------------------------------- */
+
+/* Every "still working" cue stops at once. A run that has stopped with a
+   spinning mark, a pulsing dot and a shimmering bar is the single worst thing
+   this screen could show. */
+.turn.is-settled .status-dot {
+    animation: none;
+    background: var(--success);
+}
+
+.turn.is-settled .turn-bar-fill {
+    animation: none;
+}
+
+.turn.is-failed .status-dot {
+    background: var(--danger);
+}
+
+.turn.is-failed .turn-bar-fill {
+    background: var(--danger);
+}
+
+/* The bar stays: at 100% it is the clearest statement that the run finished,
+   and where it stopped is the most useful thing left after a failure.
+
+   The note stays too, and is not hidden here, because the script rewrites it on
+   the way out -- "Taking you there now." on success, "Nothing was saved." on a
+   failure. A rule hiding it on settle would have silently swallowed both. */
+
+.turn-fail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    margin-top: var(--sp-4);
+    padding: var(--sp-4);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius-sm);
+    background: var(--danger-soft);
+}
+
+.turn-fail-icon {
+    color: var(--danger);
+    font-size: var(--fs-body);
+    line-height: 1.4;
+}
+
+.turn-fail-body {
+    flex: 1;
+    min-width: 12rem;
+}
+
+.turn-fail-title {
+    margin: 0 0 2px;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+}
+
+.turn-fail-text {
+    margin: 0;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.turn-fail-actions {
+    display: flex;
+    gap: var(--sp-2);
+    margin-left: auto;
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 700px) {
+    /* The mark costs 44px of a 375px column and says nothing the "Scriptly"
+       label above the turn does not. */
+    .turn-mark {
+        display: none;
+    }
+
+    /* Stage and metrics stack rather than squeeze: "Formatting and styling"
+       and "54% · 0:32" cannot share a narrow line without one of them
+       truncating. */
+    .turn-foot {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--sp-1);
+    }
+
+    .turn-fail-actions {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .turn-fail-actions .app-btn {
+        flex: 1;
+    }
+}

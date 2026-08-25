@@ -39,6 +39,7 @@ content_copy
 dark_mode
 dashboard
 delete
+delete_sweep
 description
 desktop_windows
 done_all
@@ -119,6 +120,7 @@ south_east
 speed
 star
 start
+step
 subject
 support
 table

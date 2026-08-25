@@ -277,89 +277,12 @@
     // Live output: the reasoning panel and the streamed draft
     // ------------------------------------------------------------------
 
-    const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
-
-    // Everything below renders model output, so it is escaped before a single
-    // formatting rule touches it. The markdown-ish tags are added afterwards,
-    // to text that can no longer contain markup.
-    function escapeHtml(text) {
-        return String(text).replace(/[&<>]/g, (c) => ESC[c]);
-    }
-
-    function inlineMd(text) {
-        return text
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-            .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-    }
-
-    // A deliberately small markdown subset: headings, both kinds of list, bold,
-    // italic, inline code. Not a markdown library — this is a preview of text
-    // that is about to be rendered properly by the server, and the point is to
-    // make the shape of the piece legible as it appears. A half-written `**bo`
-    // showing its asterisks for one frame is the correct trade for that.
-    function renderMd(src) {
-        const out = [];
-        let para = [];
-        let list = null;
-
-        const flushPara = () => {
-            if (!para.length) return;
-            out.push('<p>' + inlineMd(para.join(' ')) + '</p>');
-            para = [];
-        };
-        const flushList = () => {
-            if (!list) return;
-            out.push('<' + list.tag + '>' + list.items.join('') + '</' + list.tag + '>');
-            list = null;
-        };
-        const pushItem = (tag, html) => {
-            if (!list || list.tag !== tag) {
-                flushList();
-                list = { tag: tag, items: [] };
-            }
-            list.items.push('<li>' + inlineMd(html) + '</li>');
-        };
-
-        escapeHtml(src).split('\n').forEach((raw) => {
-            const line = raw.trim();
-            if (!line) {
-                flushPara();
-                flushList();
-                return;
-            }
-
-            const heading = /^(#{1,6})\s+(.*)$/.exec(line);
-            if (heading) {
-                flushPara();
-                flushList();
-                const tag = heading[1].length <= 2 ? 'h3' : 'h4';
-                out.push('<' + tag + '>' + inlineMd(heading[2]) + '</' + tag + '>');
-                return;
-            }
-
-            const bullet = /^[-*]\s+(.*)$/.exec(line);
-            if (bullet) {
-                flushPara();
-                pushItem('ul', bullet[1]);
-                return;
-            }
-
-            const numbered = /^\d+[.)]\s+(.*)$/.exec(line);
-            if (numbered) {
-                flushPara();
-                pushItem('ol', numbered[1]);
-                return;
-            }
-
-            flushList();
-            para.push(line);
-        });
-
-        flushPara();
-        flushList();
-        return out.join('');
-    }
+    // The markdown preview renderer is shared with History, which paints the
+    // opening of a finished draft with exactly these rules — see
+    // js/components/draft-markdown.js. Read once into a local so a missing
+    // component fails here, loudly and at boot, rather than on the first chunk
+    // of text a reader is watching arrive.
+    const renderMd = window.DraftMarkdown.render;
 
     const CARET = '<span class="stream-caret" aria-hidden="true"></span>';
 

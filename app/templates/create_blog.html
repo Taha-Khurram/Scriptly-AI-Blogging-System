@@ -4,7 +4,10 @@
 {% block title %}Create | {{ app_config.app_name if app_config else 'ScriptlyAI' }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/create-blog.css') }}?v=5">
+{# The thread — the exchange itself — is a shared component: History renders
+   the same turns for a run that has already finished. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/thread.css') }}?v=1">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/create-blog.css') }}?v=6">
 {% endblock %}
 
 {#
@@ -323,5 +326,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/pages/create-blog.js') }}?v=5"></script>
+{# The markdown preview renderer is shared with History; it has to be in place
+   before the page script reads it. PJAX loads these in order. #}
+<script src="{{ url_for('static', filename='js/components/draft-markdown.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pages/create-blog.js') }}?v=6"></script>
 {% endblock %}
