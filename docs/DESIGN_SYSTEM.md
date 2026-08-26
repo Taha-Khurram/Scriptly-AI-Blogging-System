@@ -296,8 +296,11 @@ collection rather than the five rows on screen.
 > `[data-state]` switch moved from `.create-stage` to `.chat-shell`
 > (`blank` | `open`). What went is the destination pill: an agent that asks
 > before it writes has no use for a control that names where an unwritten post
-> will land. What is new is the rail of past conversations beside it. The
-> reasoning below still applies; only the class names moved.
+> will land. Past conversations are a `.filter-pill` + `.menu` dropdown in the
+> page header — not a column beside the thread, which spent a fifth of the
+> screen restating what the app rail already does and rendered as an empty card
+> on a first visit. The reasoning below still applies; only the class names
+> moved.
 
 Two panels in one stage under the shared page header, switched by one attribute
 (`.create-stage[data-state]`) exactly as the optimization panels switch: the

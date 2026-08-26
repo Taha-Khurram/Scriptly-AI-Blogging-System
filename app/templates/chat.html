@@ -19,23 +19,33 @@
   live here is gone: describing a topic, revising a section and clearing out an
   old draft are the same activity now, so they happen in one place.
 
-  Three regions in one shell:
+  One centred column, in two states. Past conversations are a menu in the page
+  header, not a column beside the thread: a rail spent a fifth of the screen
+  restating what the app sidebar already does, and on a first visit it was an
+  empty card pointing at nothing.
 
-    ┌ .chat-shell ──────────────────────────────────────────────────┐
-    │ ╭ .chat-rail ─────╮ ╭ .chat-pane ─────────────────────────╮   │
-    │ │ ( New chat )    │ │                            YOU      │   │
-    │ │ ─────────────── │ │       ╭ message bubble ──────────╮  │   │
-    │ │ ▸ Pricing post  │ │       ╰──────────────────────────╯  │   │
-    │ │   2 posts · 2h  │ │ SCRIPTLY                            │   │
-    │ │ ▸ RAG explainer │ │ ✦ Searching the web…                │   │
-    │ │   yesterday     │ │   ╭ outline card ─────────────────╮ │   │
-    │ │                 │ │   │ 5 sections · 3 sources        │ │   │
-    │ │                 │ │   │ ( Approve ) ( Change it )     │ │   │
-    │ │                 │ │   ╰───────────────────────────────╯ │   │
-    │ ╰─────────────────╯ │ ╭ .chat-composer ─────────────────╮ │   │
-    │                     │ ╰─────────────────────────────────╯ │   │
-    │                     ╰─────────────────────────────────────╯   │
-    └───────────────────────────────────────────────────────────────┘
+  data-state="blank"                      data-state="open"
+  ┌──────────────────────────────┐        ┌──────────────────────────────┐
+  │        BLOG AGENT            │        │                    YOU       │
+  │   What are we writing, Ada?  │        │      ╭ message bubble ────╮  │
+  │   Describe a topic and I'll… │        │      ╰─────────────────────╯ │
+  │                              │        │ SCRIPTLY                     │
+  │ ╭ .chat-composer ──────────╮ │        │ ✦ Searching the web…         │
+  │ │ Describe a topic…     (↑)│ │        │  ╭ outline card ──────────╮  │
+  │ ╰──────────────────────────╯ │        │  │ 5 sections · 3 sources │  │
+  │                              │        │  │ ( Approve ) ( Change ) │  │
+  │ ( Research  ) ( Plan a how ) │        │  ╰────────────────────────╯  │
+  │ ( Review    ) ( Edit a post) │        │ ╭ .chat-composer (sticky) ─╮ │
+  │  ⓘ Web search isn't set up   │        │ ╰──────────────────────────╯ │
+  └──────────────────────────────┘        └──────────────────────────────┘
+        .chat-lead                              .chat-thread
+        .chat-composer  ← not sticky            .chat-composer ← sticky
+        .chat-extras                            (halves hidden)
+
+  The DOM order is lead → thread → composer → extras, which is exactly what
+  both states need without a single `order` declaration: blank hides the thread
+  and shows the halves around the composer; open hides the halves and the
+  composer falls to the foot of the thread.
 
   The conversation's text is server-rendered for first paint; its *cards* ride
   along as JSON and are hydrated by chat.js. One card renderer, not two — the
@@ -59,6 +69,60 @@
       aria-label="Switch to dark theme" title="Switch to dark theme">
       <span class="material-symbols-outlined">dark_mode</span>
     </button>
+
+    {#
+      Past conversations, as a header menu rather than a column beside the
+      thread. A rail spent a fifth of the screen restating what the app sidebar
+      already does — navigate — and on a first visit it was an empty card
+      pointing at nothing. The page is one conversation; switching between them
+      is navigation, and navigation belongs in the chrome.
+
+      Hidden entirely when there are none: a control that opens onto "no
+      conversations" is a promise the screen cannot keep.
+    #}
+    <div class="convo-menu" data-convo-menu {{ 'hidden' if not sessions }}>
+      <button type="button" class="filter-pill" data-convo-trigger aria-haspopup="menu"
+        aria-expanded="false" aria-controls="convoPanel">
+        <i class="material-symbols-outlined icon-inline" aria-hidden="true">forum</i>
+        <span class="filter-pill-value" data-convo-label>
+          {{ active_session.title|truncate(28, true) if active_session else 'Conversations' }}
+        </span>
+        <i class="material-symbols-outlined icon-inline filter-pill-caret" aria-hidden="true">expand_more</i>
+      </button>
+
+      {# .convo-list and .convo-row are load-bearing: chat.js appends rows in
+         exactly this shape when the menu is paged or a chat is started. #}
+      <div class="menu is-end convo-panel" id="convoPanel" data-convo-panel role="menu" hidden>
+        <div class="convo-list" data-list>
+          {% for s in sessions %}
+          <div class="convo-row {{ 'is-current' if active_session and s.id == active_session.id }}"
+            data-row data-id="{{ s.id }}">
+            <a class="menu-item convo-open" role="menuitem" href="{{ url_for('chat.studio_page', s=s.id) }}">
+              <i class="material-symbols-outlined icon-inline menu-check" aria-hidden="true">check</i>
+              <span class="convo-text">
+                <span class="menu-label convo-title">{{ s.title or 'New conversation' }}</span>
+                <span class="convo-meta">
+                  {% if s.blog_count %}{{ s.blog_count }} post{{ '' if s.blog_count == 1 else 's' }} &middot; {% endif %}
+                  {{ s.updated_at[:10] }}
+                </span>
+              </span>
+            </a>
+            <button type="button" class="convo-del" data-delete-session="{{ s.id }}"
+              title="Delete this conversation" aria-label="Delete conversation">
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i>
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% if sessions_has_more %}
+        <button type="button" class="convo-more" data-load-more data-cursor="{{ sessions_cursor }}">
+          Load older
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
     <a href="{{ url_for('blog.drafts_page') }}" class="page-header-action is-ghost">
       <i class="material-symbols-outlined icon-inline" aria-hidden="true">edit_square</i>
       <span class="page-header-label">Drafts</span>
@@ -73,58 +137,24 @@
       data-search="{{ 'on' if search_available else 'off' }}"
       data-state="{{ 'open' if active_session else 'blank' }}">
 
-      <!-- ===================== RAIL ===================== -->
-      <aside class="chat-rail" aria-label="Conversations">
-        <div class="chat-rail-head">
-          <p class="chat-rail-title">Conversations</p>
-          <button type="button" class="chat-rail-new" data-new-chat title="Start a new conversation">
-            <i class="material-symbols-outlined icon-inline" aria-hidden="true">add_comment</i>
-          </button>
-        </div>
-
-        {# .chat-list and .chat-row are load-bearing: chat.js appends more rows
-           in exactly this shape when the rail is paged. #}
-        <div class="chat-list" data-list role="list">
-          {% for s in sessions %}
-          <div class="chat-row {{ 'is-active' if active_session and s.id == active_session.id }}" role="listitem"
-            data-row data-id="{{ s.id }}" data-at="{{ s.updated_at }}">
-            <a class="chat-row-main" href="{{ url_for('chat.studio_page', s=s.id) }}">
-              <span class="chat-row-title">{{ s.title or 'New conversation' }}</span>
-              <span class="chat-row-meta">
-                {% if s.blog_count %}
-                <span class="chat-row-count">
-                  <i class="material-symbols-outlined icon-inline" aria-hidden="true">article</i>
-                  {{ s.blog_count }}
-                </span>
-                {% endif %}
-                <span class="chat-row-when" data-when="{{ s.updated_at }}">{{ s.updated_at[:10] }}</span>
-              </span>
-            </a>
-            <button type="button" class="chat-row-del" data-delete-session="{{ s.id }}"
-              title="Delete this conversation" aria-label="Delete conversation">
-              <i class="material-symbols-outlined icon-inline" aria-hidden="true">delete</i>
-            </button>
-          </div>
-          {% endfor %}
-        </div>
-
-        {% if sessions_has_more %}
-        <button type="button" class="chat-more" data-load-more data-cursor="{{ sessions_cursor }}">
-          Load older
-        </button>
-        {% endif %}
-      </aside>
-
       <!-- ===================== PANE ===================== -->
       <section class="chat-pane" aria-label="Conversation">
 
         {#
-          The empty state. Not a blank box: the agent's whole flow is unusual
-          enough (it will not write until you approve a plan) that the first
-          screen has to say so, or the first outline reads as the agent
-          refusing to do what was asked.
+          The empty state, in two halves either side of the composer.
+
+          That split is the layout. The composer is what you came here to type
+          in, so on a blank screen it belongs directly under the question being
+          asked — not pinned to the bottom of the viewport with a field of
+          nothing in between, which is where a sticky composer puts it when
+          there is no conversation to push it down. The starters and the search
+          note sit below it, as the answer to "and if I don't know what to say".
+
+          Once a conversation exists both halves are hidden, the thread appears,
+          and the composer becomes sticky: then the bottom of the viewport IS
+          where it belongs, because that is where the newest message is.
         #}
-        <div class="chat-blank" data-blank>
+        <div class="chat-lead" data-lead>
           <div class="chat-blank-aura" aria-hidden="true"></div>
           <div class="chat-blank-lead">
             <p class="chat-blank-eyebrow">
@@ -143,40 +173,6 @@
               talking: revise sections, change the tone, write another, tidy up old drafts.
             </p>
           </div>
-
-          <div class="chat-starters">
-            <button type="button" class="chat-starter" data-starter
-              data-text="Research the latest trends in [your topic] and outline a post about them.">
-              <i class="material-symbols-outlined icon-inline" aria-hidden="true">travel_explore</i>
-              <span><strong>Research and plan</strong> a post on a current topic</span>
-            </button>
-            <button type="button" class="chat-starter" data-starter
-              data-text="Outline a practical how-to guide on [your topic] for a beginner.">
-              <i class="material-symbols-outlined icon-inline" aria-hidden="true">signpost</i>
-              <span><strong>Plan a how-to</strong> from what you already know</span>
-            </button>
-            <button type="button" class="chat-starter" data-starter
-              data-text="What have I got sitting in drafts?">
-              <i class="material-symbols-outlined icon-inline" aria-hidden="true">inventory_2</i>
-              <span><strong>Review my drafts</strong> and suggest what to finish</span>
-            </button>
-            <button type="button" class="chat-starter" data-starter
-              data-text="Find my post about [topic] and make the introduction punchier.">
-              <i class="material-symbols-outlined icon-inline" aria-hidden="true">edit_note</i>
-              <span><strong>Edit an existing post</strong> by describing the change</span>
-            </button>
-          </div>
-
-          {% if not search_available %}
-          {# Said on screen, not only in the model's instructions. A user who
-             asked for research and got none deserves to know it is a
-             deployment setting and not the agent ignoring them. #}
-          <p class="chat-blank-note">
-            <i class="material-symbols-outlined icon-inline" aria-hidden="true">info</i>
-            Web search isn&rsquo;t configured, so posts are written from the model&rsquo;s own
-            knowledge without live sources.
-          </p>
-          {% endif %}
         </div>
 
         {# The conversation. Text server-rendered; cards hydrated from the
@@ -249,6 +245,44 @@
             </div>
           </div>
         </form>
+
+        {# Below the composer, and only while the screen is blank: what to say
+           if you do not know what to say. #}
+        <div class="chat-extras" data-extras>
+          <div class="chat-starters">
+            <button type="button" class="chat-starter" data-starter
+              data-text="Research the latest trends in [your topic] and outline a post about them.">
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">travel_explore</i>
+              <span><strong>Research and plan</strong> a post on a current topic</span>
+            </button>
+            <button type="button" class="chat-starter" data-starter
+              data-text="Outline a practical how-to guide on [your topic] for a beginner.">
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">signpost</i>
+              <span><strong>Plan a how-to</strong> from what you already know</span>
+            </button>
+            <button type="button" class="chat-starter" data-starter
+              data-text="What have I got sitting in drafts?">
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">inventory_2</i>
+              <span><strong>Review my drafts</strong> and suggest what to finish</span>
+            </button>
+            <button type="button" class="chat-starter" data-starter
+              data-text="Find my post about [topic] and make the introduction punchier.">
+              <i class="material-symbols-outlined icon-inline" aria-hidden="true">edit_note</i>
+              <span><strong>Edit an existing post</strong> by describing the change</span>
+            </button>
+          </div>
+
+          {% if not search_available %}
+          {# Said on screen, not only in the model's instructions. A user who
+             asked for research and got none deserves to know it is a
+             deployment setting and not the agent ignoring them. #}
+          <p class="chat-blank-note">
+            <i class="material-symbols-outlined icon-inline" aria-hidden="true">info</i>
+            Web search isn&rsquo;t configured, so posts are written from the model&rsquo;s own
+            knowledge without live sources.
+          </p>
+          {% endif %}
+        </div>
       </section>
 
     </div>

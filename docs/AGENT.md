@@ -505,8 +505,12 @@ Nothing was replaced. The order this was built in, and the order to review it:
    It took over `/create` from `blog_routes.create_page`, which was deleted; the
    seven templates that linked to `blog.create_page` now link to
    `chat.studio_page`, and `/chat` redirects for continuity.
-8. **UI** — a new page reusing `components/thread.css`, which Create and History
-   already share. A live turn, a finished run and a conversation from last week
+8. **UI** — a new page reusing `components/thread.css`, which History already
+   uses. One centred 44rem column: `.chat-lead` → `.chat-thread` →
+   `.chat-composer` → `.chat-extras`, with `[data-state]` on the shell choosing
+   which halves show. Past conversations are a header dropdown rather than a
+   rail, and the composer is sticky only once a conversation exists — on a blank
+   screen it belongs under the question, not at the foot of the viewport. A live turn, a finished run and a conversation from last week
    are the same exchange at different times, and they look it.
 
 ### If you want to go further

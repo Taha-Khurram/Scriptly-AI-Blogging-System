@@ -1,6 +1,5 @@
 account_tree
 add
-add_comment
 admin_panel_settings
 ads_click
 alt_route

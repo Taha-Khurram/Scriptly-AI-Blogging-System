@@ -1,215 +1,202 @@
 /* ==========================================================================
    Studio — the conversational blog agent
 
-   Three regions under the shared page header: a rail of conversations, the
-   conversation itself, and a composer pinned to the bottom of the pane.
+   One centred column under the shared page header, in two states. Past
+   conversations are a menu in the header (§2), not a column beside the thread.
 
-     ┌ .chat-shell ──────────────────────────────────────────────────┐
-     │ ╭ .chat-rail ─────╮ ╭ .chat-pane ─────────────────────────╮   │
-     │ │ Conversations + │ │                            YOU      │   │
-     │ │ ─────────────── │ │       ╭ .turn-bubble ───────────╮   │   │
-     │ │ ▸ Pricing post  │ │       ╰─────────────────────────╯   │   │
-     │ │   2 posts · 2h  │ │ SCRIPTLY                            │   │
-     │ │ ▸ RAG explainer │ │ ✦ ⣿ Researching                  ▾  │   │
-     │ │   yesterday     │ │   ╭ .chat-card.is-outline ────────╮ │   │
-     │ │                 │ │   │ 5 sections · 3 sources       │ │   │
-     │ │ ( Load older )  │ │   │ ( Approve ) ( Change it )     │ │   │
-     │ ╰─────────────────╯ │   ╰──────────────────────────────╯  │   │
-     │                     │ ╭ .chat-composer (sticky) ────────╮ │   │
-     │                     │ ╰─────────────────────────────────╯ │   │
-     │                     ╰─────────────────────────────────────╯   │
-     └───────────────────────────────────────────────────────────────┘
+   data-state="blank"                    data-state="open"
+   ┌────────────────────────────┐        ┌────────────────────────────┐
+   │      BLOG AGENT            │        │                   YOU      │
+   │  What are we writing, Ada? │        │    ╭ .turn-bubble ──────╮  │
+   │  Describe a topic and I'll…│        │    ╰─────────────────────╯ │
+   │                            │        │ SCRIPTLY                   │
+   │ ╭ .chat-composer ────────╮ │        │ ✦ ⣿ Researching         ▾  │
+   │ │ Describe a topic…   (↑)│ │        │  ╭ .chat-card.is-outline ╮ │
+   │ ╰────────────────────────╯ │        │  │ ( Approve ) ( Change )│ │
+   │ ( Research ) ( Plan how-to)│        │  ╰───────────────────────╯ │
+   │ ( Review   ) ( Edit post  )│        │ ╭ .chat-composer sticky ─╮ │
+   │  ⓘ Web search isn't set up │        │ ╰────────────────────────╯ │
+   └────────────────────────────┘        └────────────────────────────┘
+     .chat-lead                            .chat-thread
+     .chat-composer  ← static              .chat-composer ← sticky
+     .chat-extras                          (both halves hidden)
+
+   Why the composer moves between the two
+   --------------------------------------
+
+   A composer that is always sticky sits at the bottom of the viewport. On a
+   blank screen there is nothing above it, so the field you came here to type in
+   ends up a screen-height below the question inviting you to type, with an
+   empty band between them. So it is sticky only once messages exist — then the
+   bottom of the viewport is exactly right, because that is where the newest one
+   is. The DOM order (lead → thread → composer → extras) gives both layouts with
+   no `order` declaration anywhere.
 
    What is NOT styled here
    -----------------------
 
    The thread — .turn, .turn-bubble, .reason, .draft, .trail — is
-   css/components/thread.css, the same component Create renders a live run in
-   and History renders a finished one. A live turn, a finished turn and a turn
-   from last week are the same exchange at different times and they look it.
-   This file is the furniture around it: the rail, the composer, the cards, and
-   the empty state.
+   css/components/thread.css, the same component History renders a finished run
+   in. A live turn, a settled turn and a turn from last week are the same
+   exchange at different times and they look it. This file is the furniture
+   around it: the header menu, the composer, the cards, and the empty state.
 
    Gradients are rationed to branding and to whatever is currently working
    (DESIGN_SYSTEM §4). On this screen that is exactly two places: the aura
    behind the empty state and one clause of its headline. A card is never
    gradient-filled — a card is a result, and results are surfaces.
 
-   Note on the composer
-   --------------------
+   Note on the composer component
+   ------------------------------
 
    .prompt-box / .prompt-input / .prompt-submit are the documented composer
-   component (DESIGN_SYSTEM §3), and their rules here are scoped under
-   .chat-composer rather than shared with create-blog.css. Two pages now build
-   the same control, so the honest consolidation is a components/composer.css —
-   deferred deliberately rather than forgotten, because extracting it means
-   editing the Create screen's stylesheet and that is a change with its own
-   regression surface, not a free tidy-up.
+   component (DESIGN_SYSTEM §3). Their rules here are scoped under
+   .chat-composer; this is now the only page that builds one, since the Studio
+   replaced the create screen that used to have the other copy.
    ========================================================================== */
 
 /* ==========================================================================
-   1. SHELL
+   1. SHELL — one centred column
+
+   The rail this replaced was a 19rem column of past conversations. It spent a
+   fifth of the screen restating what the app sidebar already does — navigate —
+   and on a first visit it rendered as an empty card pointing at nothing.
+   Conversations are a header menu now (§2), and the page is what it actually
+   is: one conversation.
+
+   The measure is capped and centred rather than filling the canvas. A line of
+   prose past roughly 70 characters is measurably harder to read, and a chat is
+   prose.
    ========================================================================== */
 
 .chat-shell {
-    display: grid;
-    grid-template-columns: 19rem minmax(0, 1fr);
-    gap: var(--sp-6);
-    align-items: start;
+    display: block;
 }
 
-/* ==========================================================================
-   2. RAIL — the conversation index
-   ========================================================================== */
-
-.chat-rail {
-    position: sticky;
-    top: calc(var(--sp-16) + var(--sp-2));
+/* 44rem, which is `.thread`'s own measure in components/thread.css.
+   Deliberately the same number: the thread centres itself inside whatever it is
+   given, so a wider pane left the composer spanning further left and further
+   right than the messages above it — two edges where there should be one. Every
+   child here now shares the column. */
+.chat-pane {
     display: flex;
     flex-direction: column;
-    max-height: calc(100vh - var(--sp-16) - var(--sp-8));
-    /* dvh where it exists: on mobile Safari and Chrome, 100vh is the height
-       with the address bar HIDDEN, so a vh-sized rail overflows the visible
-       area by the toolbar's height until the user scrolls. The vh line above
-       stays as the fallback. */
-    max-height: calc(100dvh - var(--sp-16) - var(--sp-8));
-    padding: var(--sp-4);
-    border-radius: var(--radius-md);
-    background: var(--surface-1);
-    box-shadow: var(--elev-1);
+    width: 100%;
+    max-width: 44rem;
+    margin: 0 auto;
 }
 
-.chat-rail-head {
+/* No forced height, in either state. The pane is as tall as what is in it.
+
+   Reserving a viewport was tried both ways and both were wrong. Top-anchored,
+   a one-turn conversation put the message at the top and the composer a
+   screen-height below it, detached from the exchange it belongs to.
+   Bottom-anchored, the same void simply moved above the message. Letting the
+   pane be content-height removes it entirely: a short conversation is a short
+   page with the composer directly under the last message, and once the
+   conversation outgrows the viewport the composer's `position: sticky` takes
+   over and pins it — which is the only situation that ever needed pinning. */
+
+/* ==========================================================================
+   2. CONVERSATIONS — a header menu, not a column
+
+   Built on the app's existing .filter-pill + .menu pair so the trigger and the
+   panel match every other dropdown in the dashboard. What is added here is only
+   what a conversation row needs and a filter option does not: two lines of
+   text, a title that truncates, and a delete affordance.
+   ========================================================================== */
+
+.convo-menu {
+    position: relative;
+}
+
+.convo-menu[hidden] {
+    display: none;
+}
+
+/* The trigger sits among 44px header actions; .filter-pill is 38px, so it is
+   nudged to share their centre line rather than sitting a few pixels low. */
+.convo-menu .filter-pill {
+    height: 40px;
+}
+
+.convo-panel {
+    /* Wider than the 220px default: these rows carry a sentence-long title and
+       a line of metadata, and a menu that truncates every title to eight words
+       is a menu you cannot choose from. */
+    min-width: 20rem;
+    max-width: min(24rem, calc(100vw - var(--sp-8)));
+    max-height: min(26rem, 60vh);
+}
+
+.convo-list {
     display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-bottom: var(--sp-3);
+    flex-direction: column;
 }
 
-.chat-rail-title {
-    flex: 1;
-    margin: 0;
-    font-size: var(--fs-2xs);
-    font-weight: var(--fw-strong);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-}
-
-.chat-rail-new {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    background: var(--surface-1);
-    color: var(--text-2);
-    cursor: pointer;
-    transition: background var(--dur-fast) var(--ease-standard);
-}
-
-.chat-rail-new:hover {
-    background: var(--surface-2);
-    color: var(--accent);
-}
-
-.chat-rail-new:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
-/* The list is the only thing that scrolls in the rail; the head and the "load
-   older" button stay put, so the control that adds rows never scrolls away
-   from the rows it adds. */
-.chat-list {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    margin: 0 calc(var(--sp-2) * -1);
-    padding: 0 var(--sp-2);
-}
-
-.chat-row {
+/* The row is the flex container; the link takes the space and the delete button
+   sits at its end. .menu-item is width:100% by design, so the link needs
+   min-width:0 before it is allowed to shrink and truncate. */
+.convo-row {
     display: flex;
     align-items: stretch;
     gap: var(--sp-1);
-    border-radius: var(--radius-sm);
-    transition: background var(--dur-fast) var(--ease-standard);
+    border-radius: var(--radius-xs);
 }
 
-.chat-row:hover {
+.convo-row:hover {
     background: var(--surface-2);
 }
 
-/* The active row takes the active-nav treatment — the same soft accent fill the
-   app sidebar's current page uses, so "where I am" means one thing app-wide. */
-.chat-row.is-active {
-    background: var(--accent-soft);
+/* The open conversation takes the tick and the accent, the same way a chosen
+   filter option does — so "where I am" reads identically across the app. */
+.convo-row.is-current .menu-check {
+    visibility: visible;
 }
 
-.chat-row.is-active .chat-row-title {
-    color: var(--accent-on-soft);
+.convo-row.is-current .convo-title {
+    color: var(--accent);
     font-weight: var(--fw-medium);
 }
 
-.chat-row-main {
+.convo-open {
     flex: 1;
     min-width: 0;
-    display: block;
-    padding: var(--sp-3);
-    border-radius: var(--radius-sm);
+    align-items: flex-start;
     text-decoration: none;
 }
 
-.chat-row-main:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
+/* .menu-item sets nowrap for single-line options. A conversation title is a
+   sentence, so this row opts out and clamps instead. */
+.convo-text {
+    min-width: 0;
+    white-space: normal;
 }
 
-.chat-row-title {
-    display: block;
-    font-size: var(--fs-sm);
-    line-height: var(--lh-tight);
-    color: var(--text-1);
-    /* Two lines, then clamp. A conversation is titled from its first message,
-       which is a sentence — one line truncates most of them into
-       indistinguishable stubs, and three make the rail a wall of prose. */
+.convo-title {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    line-height: var(--lh-tight);
 }
 
-.chat-row-meta {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-top: var(--sp-1);
+.convo-meta {
+    display: block;
+    margin-top: 2px;
     font-size: var(--fs-2xs);
     color: var(--text-faint);
 }
 
-.chat-row-count {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    color: var(--accent);
-}
-
-.chat-row-count .icon-inline {
-    font-size: 13px;
-}
-
 /* Revealed on hover or focus. A delete button on every row at rest turns the
-   rail into a list of ways to lose work. */
-.chat-row-del {
+   menu into a list of ways to lose work. */
+.convo-del {
     display: grid;
     place-items: center;
     width: 30px;
     flex-shrink: 0;
     border: 0;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-xs);
     background: none;
     color: var(--text-faint);
     cursor: pointer;
@@ -218,25 +205,26 @@
         color var(--dur-fast) var(--ease-standard);
 }
 
-.chat-row:hover .chat-row-del,
-.chat-row-del:focus-visible {
+.convo-row:hover .convo-del,
+.convo-del:focus-visible {
     opacity: 1;
 }
 
-.chat-row-del:hover {
+.convo-del:hover {
     color: var(--danger);
 }
 
-.chat-row-del:focus-visible {
+.convo-del:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
 }
 
-.chat-more {
-    margin-top: var(--sp-3);
+.convo-more {
+    width: 100%;
+    margin-top: var(--sp-1);
     padding: var(--sp-2);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
     background: none;
     font-family: inherit;
     font-size: var(--fs-xs);
@@ -244,49 +232,54 @@
     cursor: pointer;
 }
 
-.chat-more:hover:not(:disabled) {
-    background: var(--surface-2);
+.convo-more:hover:not(:disabled) {
+    color: var(--accent);
 }
 
-.chat-more:disabled {
+.convo-more:disabled {
     color: var(--text-faint);
     cursor: progress;
 }
+
 
 /* ==========================================================================
    3. PANE
    ========================================================================== */
 
-/* A viewport tall at minimum, so the composer sits at the bottom of the screen
-   on a short conversation instead of floating under two messages. dvh for the
-   mobile-toolbar reason above; the vh line is the fallback. */
-.chat-pane {
-    display: flex;
-    flex-direction: column;
-    min-height: calc(100vh - var(--sp-16) - var(--sp-8));
-    min-height: calc(100dvh - var(--sp-16) - var(--sp-8));
-}
-
 /* One attribute switches the pane between "nothing here yet" and "a
-   conversation" — the same [data-state] idiom .create-stage and .hist-shell
-   use. */
+   conversation" — the same [data-state] idiom .hist-shell uses.
+
+   The DOM order is lead → thread → composer → extras, which is what both
+   states need with no `order` declaration anywhere: blank hides the thread so
+   the two halves land either side of the composer, and open hides the halves
+   so the composer falls to the foot of the thread. */
 .chat-shell[data-state="blank"] .chat-thread {
     display: none;
 }
 
-.chat-shell[data-state="open"] .chat-blank {
+.chat-shell[data-state="open"] .chat-lead,
+.chat-shell[data-state="open"] .chat-extras {
     display: none;
 }
 
 /* --- Empty state --------------------------------------------------------- */
 
-.chat-blank {
+/* The hero is pushed off the top of the pane rather than centred in it. Dead
+   centre of a tall viewport puts the headline halfway down the screen and the
+   composer below the fold on a laptop; a generous top margin puts both in the
+   first screenful and still reads as deliberate. */
+.chat-lead {
     position: relative;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: var(--sp-8) 0 var(--sp-6);
+    padding: clamp(var(--sp-6), 6vh, var(--sp-16)) 0 var(--sp-6);
+    text-align: center;
+}
+
+/* Below the composer: the starters and the search note. `margin-top: auto` is
+   deliberately absent — these belong *with* the composer, and pushing them to
+   the foot of the viewport would strand them from the thing they are examples
+   for. */
+.chat-extras {
+    padding-bottom: var(--sp-8);
     text-align: center;
 }
 
@@ -294,7 +287,7 @@
    a pointer-events-free layer cannot swallow a click on the composer. */
 .chat-blank-aura {
     position: absolute;
-    top: 42%;
+    top: 60%;
     left: 50%;
     z-index: 0;
     width: min(680px, 115%);
@@ -358,7 +351,7 @@
 }
 
 .chat-blank-lede {
-    max-width: 38rem;
+    max-width: 34rem;
     margin: 0 auto;
     font-size: var(--fs-body);
     line-height: var(--lh-relaxed);
@@ -372,24 +365,29 @@
     align-items: center;
     gap: var(--sp-2);
     max-width: 34rem;
-    margin: var(--sp-6) auto 0;
+    margin: var(--sp-5) auto 0;
     padding: var(--sp-2) var(--sp-4);
     border-radius: var(--radius-pill);
-    background: var(--surface-2);
+    /* --surface-1, not --surface-2: the canvas *is* --surface-2, so the chip
+       was an invisible rectangle around the text. */
+    background: var(--surface-1);
     font-size: var(--fs-xs);
     color: var(--text-muted);
 }
 
 /* --- Starters ------------------------------------------------------------ */
 
+/* Two up, always, filling the column the composer and the thread share. The
+   media query at the foot of the file stacks them where the canvas genuinely
+   cannot hold two. */
 .chat-starters {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--sp-3);
-    max-width: 44rem;
-    margin: var(--sp-8) auto 0;
+    margin: var(--sp-5) 0 0;
+    text-align: left;
 }
 
 .chat-starter {
@@ -437,6 +435,49 @@
 .chat-thread {
     flex: 1;
     padding-bottom: var(--sp-6);
+}
+
+/* A turn that has produced nothing yet.
+
+   The status line at the foot of the turn says which stage the agent is on, but
+   the body — where the answer will appear — was simply empty, so the first
+   several seconds of every turn looked like a message that had failed to load.
+   These three dots occupy that space until the first token, draft chunk or card
+   arrives, and are removed the moment one does. Purely presentational: the
+   status line is what a screen reader is given. */
+.chat-typing {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0;
+    padding: var(--sp-2) 0;
+}
+
+.chat-typing i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    /* reasonThink is defined in components/thread.css, where the reasoning
+       disclosure uses it for exactly this meaning. */
+    animation: reasonThink 1.4s var(--ease-standard) infinite;
+}
+
+.chat-typing i:nth-child(2) {
+    animation-delay: 0.18s;
+}
+
+.chat-typing i:nth-child(3) {
+    animation-delay: 0.36s;
+}
+
+/* thread.css gives the status line its own pulsing dot. While the typing dots
+   are up that is a second animated cluster saying the same thing two lines
+   apart, so the foot's dot stands down until the body has content. The sibling
+   selector works because .chat-typing precedes .turn-foot and is removed the
+   moment anything arrives. */
+.chat-typing~.turn-foot .status-dot {
+    display: none;
 }
 
 /* The agent's prose. thread.css styles the *bubble* on the user's side; the
@@ -781,15 +822,27 @@
    5. COMPOSER
    ========================================================================== */
 
-/* Sticky to the bottom of the viewport rather than the end of the thread: the
-   place you type stays where you left it however long the conversation gets. */
+/* Sticky only once there is a conversation.
+
+   That condition is the fix for the layout this replaced. A composer that is
+   always sticky sits at the bottom of the viewport, and on a blank screen there
+   is nothing above it — so the field you came here to type in ended up a
+   screen-height below the question inviting you to type, with an empty band
+   between them. On a blank screen it is an ordinary block, directly under the
+   lede; once messages exist the bottom of the viewport is exactly where it
+   belongs, because that is where the newest one is. */
 .chat-composer {
+    z-index: 2;
+    padding: var(--sp-4) 0 var(--sp-3);
+}
+
+.chat-shell[data-state="open"] .chat-composer {
     position: sticky;
     bottom: 0;
-    z-index: 2;
-    padding: var(--sp-4) 0 var(--sp-5);
-    /* A fade so text scrolling under the composer does not appear to be cut
-       off by a hard edge. */
+    padding-bottom: var(--sp-5);
+    /* A fade, so text scrolling under the composer does not appear to be cut
+       off by a hard edge. Only when sticky: on a blank screen there is nothing
+       to scroll under it, and the gradient would read as a seam. */
     background: linear-gradient(to bottom,
             transparent, var(--surface-2) var(--sp-4));
 }
@@ -847,6 +900,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
 }
 
 /* --font-sans, matching .prompt-hint kbd on the create screen. Not
@@ -1030,35 +1084,12 @@
    7. RESPONSIVE
    ========================================================================== */
 
-@media (max-width: 1000px) {
-
-    /* The rail stops being a column and becomes a strip above the pane. A
-       19rem sidebar plus a readable measure does not fit, and the pane is the
-       screen — a conversation you cannot read is worse than an index you have
-       to scroll. */
-    .chat-shell {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .chat-rail {
-        position: static;
-        max-height: 16rem;
-    }
-
-    .chat-pane {
-        min-height: 0;
-    }
-}
-
 @media (max-width: 700px) {
-    .chat-rail {
-        max-height: 13rem;
-        padding: var(--sp-3);
-    }
 
+    /* One column of starters: two 15rem cards cannot share a 375px line, and a
+       grid that wraps them unevenly reads as an accident rather than a layout. */
     .chat-starters {
         grid-template-columns: minmax(0, 1fr);
-        margin-top: var(--sp-6);
     }
 
     /* Two actions cannot share a 375px line without one wrapping on its own,
@@ -1071,16 +1102,35 @@
     .chat-hint {
         display: none;
     }
+
+    /* The header has a theme toggle, a conversations pill, Drafts and New chat.
+       At this width the pill's label is the first thing that can go without
+       losing a control — the icon still says what it opens. */
+    .convo-menu .filter-pill-value {
+        display: none;
+    }
+
+    .convo-menu .filter-pill {
+        padding: 0 var(--sp-3);
+    }
 }
 
 /* Someone who asked for less motion gets the layout without the breathing
    aura; nothing here depends on the animation to be legible. */
 @media (prefers-reduced-motion: reduce) {
 
-    .chat-row,
+    .convo-row,
+    .convo-del,
     .chat-starter,
     .chat-composer .prompt-box,
     .chat-composer .prompt-submit {
         transition: none;
+    }
+
+    /* The dots stop moving but stay visible: they are the only thing saying
+       "an answer is coming", so they must not vanish along with the motion. */
+    .chat-typing i {
+        animation: none;
+        opacity: 0.55;
     }
 }

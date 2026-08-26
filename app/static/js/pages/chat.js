@@ -62,10 +62,16 @@
     const $$ = (sel) => Array.from(shell.querySelectorAll(sel));
 
     const el = {
-        rail: $('[data-list]'),
-        more: $('[data-load-more]'),
+        // The conversations menu lives in the page header, which is a sibling
+        // of [data-chat] rather than a descendant — so these are rooted at
+        // .dashboard-main and not at the shell.
+        convoMenu: root.querySelector('[data-convo-menu]'),
+        convoTrigger: root.querySelector('[data-convo-trigger]'),
+        convoPanel: root.querySelector('[data-convo-panel]'),
+        convoLabel: root.querySelector('[data-convo-label]'),
+        list: root.querySelector('[data-list]'),
+        more: root.querySelector('[data-load-more]'),
         pane: $('.chat-pane'),
-        blank: $('[data-blank]'),
         thread: $('[data-thread]'),
         form: $('[data-composer]'),
         input: $('[data-input]'),
@@ -330,6 +336,13 @@
             head.setAttribute('aria-expanded', String(!open));
         }, { signal: signal });
 
+        // Until something real arrives, the body says "an answer is coming"
+        // rather than being empty — see .chat-typing in chat.css.
+        const typing = node('p', 'chat-typing');
+        typing.setAttribute('aria-hidden', 'true');
+        for (let i = 0; i < 3; i += 1) typing.appendChild(node('i'));
+        main.appendChild(typing);
+
         const text = node('div', 'turn-text');
         main.appendChild(text);
 
@@ -351,8 +364,8 @@
 
         state.turn = {
             root: turn, main: main, reason: reason, title: title, list: list,
-            text: text, cards: cards, foot: foot, stage: stage, live: live,
-            draft: null, draftBody: null, steps: 0
+            typing: typing, text: text, cards: cards, foot: foot, stage: stage,
+            live: live, draft: null, draftBody: null, steps: 0
         };
         state.buffer.text = '';
         state.buffer.draft = '';
@@ -360,8 +373,16 @@
         return state.turn;
     }
 
+    /** Drop the pending dots. Called by whatever arrives first. */
+    function clearTyping() {
+        if (!state.turn || !state.turn.typing) return;
+        state.turn.typing.remove();
+        state.turn.typing = null;
+    }
+
     function closeAgentTurn(failed) {
         if (!state.turn) return;
+        clearTyping();
         flushBuffers();
         state.turn.root.classList.remove('is-live');
         state.turn.root.classList.add(failed ? 'is-failed' : 'is-settled');
@@ -785,7 +806,7 @@
         const data = await api('/api/chat/sessions', json({}));
         state.sessionId = data.session.id;
         shell.dataset.session = state.sessionId;
-        prependRailRow(data.session);
+        addConversation(data.session);
         // The URL carries the conversation so a reload stays in it, without a
         // navigation that would tear down this script mid-turn.
         window.history.replaceState({}, '',
@@ -805,6 +826,7 @@
 
         try {
             const sessionId = await ensureSession();
+            claimTitle(text);
             const data = await api(
                 `/api/chat/sessions/${encodeURIComponent(sessionId)}/messages`,
                 json({ message: text })
@@ -1031,15 +1053,18 @@
                 break;
             }
             case 'token':
+                clearTyping();
                 state.buffer.text += (data.text || '');
                 scheduleFlush();
                 break;
             case 'draft':
+                clearTyping();
                 ensureDraftCard();
                 state.buffer.draft += (data.text || '');
                 scheduleFlush();
                 break;
             case 'card': {
+                clearTyping();
                 const rendered = renderCard(data.kind, data.data);
                 if (rendered) {
                     state.turn.cards.appendChild(rendered);
@@ -1074,7 +1099,7 @@
         state.turnId = null;
         detach();
         follow();
-        refreshRailRow();
+        refreshConversation();
     }
 
     function failTurn(message) {
@@ -1171,55 +1196,176 @@
     }, { signal: signal });
 
     // ------------------------------------------------------------------
-    // The rail
+    // The conversations menu
+    //
+    // Replaces the in-page rail. The same rows in a smaller, navigational
+    // place: a dropdown in the page header rather than a column spending a
+    // fifth of the screen restating what the app sidebar already does.
     // ------------------------------------------------------------------
 
-    function prependRailRow(session) {
-        if (!el.rail) return;
-        const row = node('div', 'chat-row is-active');
+    function menuOpen() {
+        return el.convoTrigger
+            && el.convoTrigger.getAttribute('aria-expanded') === 'true';
+    }
+
+    function setMenu(open) {
+        if (!el.convoTrigger || !el.convoPanel) return;
+        el.convoTrigger.setAttribute('aria-expanded', String(open));
+        el.convoPanel.hidden = !open;
+    }
+
+    if (el.convoTrigger) {
+        el.convoTrigger.addEventListener('click', (event) => {
+            event.stopPropagation();
+            setMenu(!menuOpen());
+        }, { signal: signal });
+
+        // Outside click and Escape both close it, which is what every other
+        // menu in the app does — a dropdown that only closes by re-clicking its
+        // own trigger is the one people leave open by accident.
+        document.addEventListener('click', (event) => {
+            if (!menuOpen()) return;
+            if (el.convoMenu && el.convoMenu.contains(event.target)) return;
+            setMenu(false);
+        }, { signal: signal });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && menuOpen()) {
+                setMenu(false);
+                el.convoTrigger.focus();
+            }
+        }, { signal: signal });
+    }
+
+    /**
+     * Build one menu row. The single place that knows a row's shape.
+     *
+     * Used by both paths that add rows the server did not render — a
+     * conversation started mid-session, and the "Load older" page — so a row
+     * added by either is the row the template would have produced.
+     */
+    function convoRow(session, current) {
+        const row = node('div', 'convo-row' + (current ? ' is-current' : ''));
         row.dataset.id = session.id;
-        row.setAttribute('role', 'listitem');
 
-        const main = node('a', 'chat-row-main');
-        main.href = '/create?s=' + encodeURIComponent(session.id);
-        main.appendChild(node('span', 'chat-row-title',
+        const link = node('a', 'menu-item convo-open');
+        link.setAttribute('role', 'menuitem');
+        link.href = '/create?s=' + encodeURIComponent(session.id);
+
+        const check = icon('check');
+        check.classList.add('menu-check');
+        link.appendChild(check);
+
+        const text = node('span', 'convo-text');
+        text.appendChild(node('span', 'menu-label convo-title',
             session.title || 'New conversation'));
-        const meta = node('span', 'chat-row-meta');
-        meta.appendChild(node('span', 'chat-row-when', 'now'));
-        main.appendChild(meta);
-        row.appendChild(main);
+        const meta = [];
+        if (session.blog_count) {
+            meta.push(session.blog_count
+                + ' post' + (session.blog_count === 1 ? '' : 's'));
+        }
+        meta.push((session.updated_at || '').slice(0, 10) || 'now');
+        text.appendChild(node('span', 'convo-meta', meta.join(' · ')));
+        link.appendChild(text);
+        row.appendChild(link);
 
-        $$('.chat-row').forEach((n) => n.classList.remove('is-active'));
-        el.rail.prepend(row);
+        const del = node('button', 'convo-del');
+        del.type = 'button';
+        del.dataset.deleteSession = session.id;
+        del.title = 'Delete this conversation';
+        del.setAttribute('aria-label', 'Delete conversation');
+        del.appendChild(icon('delete'));
+        bindDeleteSession(del);
+        row.appendChild(del);
+
+        return row;
     }
 
-    function refreshRailRow() {
-        // The title is derived server-side from the first message, so after the
-        // first turn the rail row still says "New conversation". Rather than
-        // refetch the list, take the title from the first user message on
-        // screen — the same string the server derived it from.
-        if (!state.sessionId || !el.rail) return;
-        const row = el.rail.querySelector(`[data-id="${state.sessionId}"]`);
+    function addConversation(session) {
+        if (!el.list) return;
+        el.list.querySelectorAll('.convo-row').forEach((n) => {
+            n.classList.remove('is-current');
+        });
+        el.list.prepend(convoRow(session, true));
+        // The menu is hidden while there is nothing in it, so the first
+        // conversation is what reveals the control.
+        if (el.convoMenu) el.convoMenu.hidden = false;
+        setConvoLabel(session.title || 'New conversation');
+    }
+
+    /**
+     * Name a brand-new conversation from its first message, at once.
+     *
+     * The server derives the title from that same message, but not until the
+     * turn is persisted — so without this the header pill and the menu row read
+     * "New conversation" for the whole first turn, which is the one time the
+     * user is most likely to look at them.
+     *
+     * Guarded on the placeholder text: a conversation the user renamed, or one
+     * the server has already titled, is left alone.
+     */
+    function claimTitle(text) {
+        const title = (text || '').trim().slice(0, 80);
+        if (!title) return;
+
+        if (el.convoLabel
+                && el.convoLabel.textContent.trim() === 'New conversation') {
+            setConvoLabel(title);
+        }
+        if (!state.sessionId || !el.list) return;
+        const row = el.list.querySelector('[data-id="' + state.sessionId + '"]');
+        const rowTitle = row && row.querySelector('.convo-title');
+        if (rowTitle && rowTitle.textContent.trim() === 'New conversation') {
+            rowTitle.textContent = title;
+        }
+    }
+
+    function setConvoLabel(title) {
+        if (!el.convoLabel || !title) return;
+        el.convoLabel.textContent = title.length > 28
+            ? title.slice(0, 28).trimEnd() + '…'
+            : title;
+    }
+
+    function refreshConversation() {
+        // The title is derived server-side from the first message, so until the
+        // page is reloaded a conversation started in this session still reads
+        // "New conversation". Rather than refetch the list, take the title from
+        // the first user message on screen — the same string the server derived
+        // it from.
+        if (!state.sessionId || !el.list) return;
+        const row = el.list.querySelector('[data-id="' + state.sessionId + '"]');
         if (!row) return;
-        const title = row.querySelector('.chat-row-title');
-        if (!title || title.textContent !== 'New conversation') return;
+        const title = row.querySelector('.convo-title');
+        if (!title || title.textContent.trim() !== 'New conversation') return;
         const first = el.thread.querySelector('.turn.is-you .turn-bubble');
-        if (first) title.textContent = first.textContent.slice(0, 80);
+        if (!first) return;
+        const text = first.textContent.slice(0, 80);
+        title.textContent = text;
+        setConvoLabel(text);
     }
 
-    $$('[data-new-chat]').forEach((button) => {
+    $$('[data-new-chat]').forEach(bindNewChat);
+    root.querySelectorAll('[data-new-chat]').forEach(bindNewChat);
+
+    function bindNewChat(button) {
+        if (button.dataset.boundNew) return;
+        button.dataset.boundNew = '1';
         button.addEventListener('click', () => {
             // A navigation, not an in-place reset: a fresh page is the simplest
             // way to be certain no state from the previous conversation — a
             // focus pointer, a half-watched turn — survives into the new one.
             window.location.href = '/create';
         }, { signal: signal });
-    });
+    }
 
-    $$('[data-delete-session]').forEach(bindDeleteSession);
+    root.querySelectorAll('[data-delete-session]').forEach(bindDeleteSession);
 
     function bindDeleteSession(button) {
         button.addEventListener('click', async (event) => {
+            // The button sits beside the row's link inside the same row, so the
+            // event is stopped both ways: without it a delete also navigates to
+            // the conversation being deleted.
             event.preventDefault();
             event.stopPropagation();
             const id = button.dataset.deleteSession;
@@ -1233,8 +1379,14 @@
                     '/api/chat/sessions/' + encodeURIComponent(id),
                     { method: 'DELETE' }
                 );
-                const row = button.closest('.chat-row');
+                const row = button.closest('.convo-row');
                 if (row) row.remove();
+                // An empty menu is a control that opens onto nothing.
+                if (el.list && !el.list.querySelector('.convo-row')
+                        && el.convoMenu) {
+                    el.convoMenu.hidden = true;
+                    setMenu(false);
+                }
                 toast('Conversation deleted', data.message || '', 'success');
                 if (id === state.sessionId) window.location.href = '/create';
             } catch (error) {
@@ -1252,19 +1404,8 @@
                 const data = await api('/api/chat/sessions?before='
                     + encodeURIComponent(el.more.dataset.cursor || ''));
                 (data.items || []).forEach((session) => {
-                    const row = node('div', 'chat-row');
-                    row.dataset.id = session.id;
-                    row.setAttribute('role', 'listitem');
-                    const main = node('a', 'chat-row-main');
-                    main.href = '/create?s=' + encodeURIComponent(session.id);
-                    main.appendChild(node('span', 'chat-row-title',
-                        session.title || 'New conversation'));
-                    const meta = node('span', 'chat-row-meta');
-                    meta.appendChild(node('span', 'chat-row-when',
-                        (session.updated_at || '').slice(0, 10)));
-                    main.appendChild(meta);
-                    row.appendChild(main);
-                    el.rail.appendChild(row);
+                    el.list.appendChild(
+                        convoRow(session, session.id === state.sessionId));
                 });
                 if (data.has_more) {
                     el.more.dataset.cursor = data.next_cursor;
