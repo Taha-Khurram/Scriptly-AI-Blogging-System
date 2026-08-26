@@ -4,10 +4,10 @@
 {% block title %}Studio | {{ app_config.app_name if app_config else 'Scriptly' }}{% endblock %}
 
 {% block extra_css %}
-{# The thread is the same component Create and History render. A live turn, a
-   finished run and a conversation from last week are the same exchange at
-   different times, and they should look it. chat.css adds the rail, the
-   composer and the cards. #}
+{# The thread is the same component History renders a finished run in. A live
+   turn, a settled turn and a conversation from last week are the same exchange
+   at different times, and they should look it. chat.css adds the furniture
+   around it: the header menu, the composer, the cards and the empty state. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/thread.css') }}?v=1">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/chat.css') }}?v=1">
 {% endblock %}
@@ -35,11 +35,11 @@
   │ ╰──────────────────────────╯ │        │  │ 5 sections · 3 sources │  │
   │                              │        │  │ ( Approve ) ( Change ) │  │
   │ ( Research  ) ( Plan a how ) │        │  ╰────────────────────────╯  │
-  │ ( Review    ) ( Edit a post) │        │ ╭ .chat-composer (sticky) ─╮ │
+  │ ( Review    ) ( Edit a post) │        │ ╭ .chat-composer ─────────╮  │
   │  ⓘ Web search isn't set up   │        │ ╰──────────────────────────╯ │
   └──────────────────────────────┘        └──────────────────────────────┘
         .chat-lead                              .chat-thread
-        .chat-composer  ← not sticky            .chat-composer ← sticky
+        .chat-composer                          .chat-composer
         .chat-extras                            (halves hidden)
 
   The DOM order is lead → thread → composer → extras, which is exactly what
@@ -145,14 +145,13 @@
 
           That split is the layout. The composer is what you came here to type
           in, so on a blank screen it belongs directly under the question being
-          asked — not pinned to the bottom of the viewport with a field of
-          nothing in between, which is where a sticky composer puts it when
-          there is no conversation to push it down. The starters and the search
-          note sit below it, as the answer to "and if I don't know what to say".
+          asked — not a screen-height below it, which is where a pane forced to
+          a viewport tall used to put it. The starters and the search note sit
+          below it, as the answer to "and if I don't know what to say".
 
-          Once a conversation exists both halves are hidden, the thread appears,
-          and the composer becomes sticky: then the bottom of the viewport IS
-          where it belongs, because that is where the newest message is.
+          Once a conversation exists both halves are hidden and the thread
+          appears, so the composer falls to the foot of the exchange — still
+          directly under the last thing said.
         #}
         <div class="chat-lead" data-lead>
           <div class="chat-blank-aura" aria-hidden="true"></div>

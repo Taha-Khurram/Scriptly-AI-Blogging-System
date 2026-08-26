@@ -509,8 +509,12 @@ Nothing was replaced. The order this was built in, and the order to review it:
    uses. One centred 44rem column: `.chat-lead` → `.chat-thread` →
    `.chat-composer` → `.chat-extras`, with `[data-state]` on the shell choosing
    which halves show. Past conversations are a header dropdown rather than a
-   rail, and the composer is sticky only once a conversation exists — on a blank
-   screen it belongs under the question, not at the foot of the viewport. A live turn, a finished run and a conversation from last week
+   rail. Neither state forces a height: the composer follows the conversation
+   rather than being pinned to the viewport, because pinning it was what put a
+   screenful of empty canvas between a one-turn conversation and its own input.
+   (`position: sticky` cannot pin it — it is the last in-flow child of the pane,
+   so it has no travel within its containing block. That is written up in
+   `chat.css` §5 along with what a real pin would cost.) A live turn, a finished run and a conversation from last week
    are the same exchange at different times, and they look it.
 
 ### If you want to go further

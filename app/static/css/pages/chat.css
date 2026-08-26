@@ -14,23 +14,22 @@
    │ │ Describe a topic…   (↑)│ │        │  ╭ .chat-card.is-outline ╮ │
    │ ╰────────────────────────╯ │        │  │ ( Approve ) ( Change )│ │
    │ ( Research ) ( Plan how-to)│        │  ╰───────────────────────╯ │
-   │ ( Review   ) ( Edit post  )│        │ ╭ .chat-composer sticky ─╮ │
+   │ ( Review   ) ( Edit post  )│        │ ╭ .chat-composer ────────╮ │
    │  ⓘ Web search isn't set up │        │ ╰────────────────────────╯ │
    └────────────────────────────┘        └────────────────────────────┘
      .chat-lead                            .chat-thread
-     .chat-composer  ← static              .chat-composer ← sticky
+     .chat-composer                        .chat-composer
      .chat-extras                          (both halves hidden)
 
-   Why the composer moves between the two
-   --------------------------------------
+   Why one DOM order covers both
+   -----------------------------
 
-   A composer that is always sticky sits at the bottom of the viewport. On a
-   blank screen there is nothing above it, so the field you came here to type in
-   ends up a screen-height below the question inviting you to type, with an
-   empty band between them. So it is sticky only once messages exist — then the
-   bottom of the viewport is exactly right, because that is where the newest one
-   is. The DOM order (lead → thread → composer → extras) gives both layouts with
-   no `order` declaration anywhere.
+   lead → thread → composer → extras. Blank hides the thread, so the two halves
+   land either side of the composer and the field sits directly under the
+   question inviting you to type. Open hides the halves, so the composer falls
+   to the foot of the conversation. No `order` declaration anywhere, and no
+   height is forced in either state — see §5 for why the composer is not sticky
+   and what that costs.
 
    What is NOT styled here
    -----------------------
@@ -92,10 +91,8 @@
    a one-turn conversation put the message at the top and the composer a
    screen-height below it, detached from the exchange it belongs to.
    Bottom-anchored, the same void simply moved above the message. Letting the
-   pane be content-height removes it entirely: a short conversation is a short
-   page with the composer directly under the last message, and once the
-   conversation outgrows the viewport the composer's `position: sticky` takes
-   over and pins it — which is the only situation that ever needed pinning. */
+   pane be content-height removes it entirely: a conversation is as tall as it
+   is, with the composer directly under the last message either way. */
 
 /* ==========================================================================
    2. CONVERSATIONS — a header menu, not a column
@@ -822,29 +819,27 @@
    5. COMPOSER
    ========================================================================== */
 
-/* Sticky only once there is a conversation.
+/* In normal flow, directly under the last thing said.
 
-   That condition is the fix for the layout this replaced. A composer that is
-   always sticky sits at the bottom of the viewport, and on a blank screen there
-   is nothing above it — so the field you came here to type in ended up a
-   screen-height below the question inviting you to type, with an empty band
-   between them. On a blank screen it is an ordinary block, directly under the
-   lede; once messages exist the bottom of the viewport is exactly where it
-   belongs, because that is where the newest one is. */
+   NOT sticky, and the earlier attempt at that is worth recording because it
+   looked like it worked. `position: sticky; bottom: 0` can only move a box
+   within its containing block, and the composer is the last in-flow child of
+   .chat-pane — its static bottom edge already coincides with the pane's, so
+   there is no travel and the declaration did nothing. What actually held it at
+   the foot of the screen was `min-height: 100dvh` on the pane, which is also
+   what produced the screenful of empty canvas between a one-turn conversation
+   and its own input.
+
+   So the composer follows the conversation instead. On a long conversation it
+   scrolls with the page — and in practice it is on screen whenever it is
+   needed, because chat.js follows the document to the bottom while a turn
+   streams. Pinning it for real would mean `position: fixed` with the column's
+   geometry hard-coded, or a fixed-height shell with the thread scrolling in its
+   own box — and that second one is the convention this app deliberately does
+   not use (see components/thread.css: the page scrolls, not an inner box). */
 .chat-composer {
     z-index: 2;
-    padding: var(--sp-4) 0 var(--sp-3);
-}
-
-.chat-shell[data-state="open"] .chat-composer {
-    position: sticky;
-    bottom: 0;
-    padding-bottom: var(--sp-5);
-    /* A fade, so text scrolling under the composer does not appear to be cut
-       off by a hard edge. Only when sticky: on a blank screen there is nothing
-       to scroll under it, and the gradient would read as a seam. */
-    background: linear-gradient(to bottom,
-            transparent, var(--surface-2) var(--sp-4));
+    padding: var(--sp-4) 0 var(--sp-5);
 }
 
 .chat-composer .prompt-box {
